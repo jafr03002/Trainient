@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown, Minus, MessageSquare } from "lucide-react";
 import { useListWorkouts, useGetCalendarColors } from "@workspace/api-client-react";
 
 const DEFAULT_COLORS = [
@@ -75,7 +75,7 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
           </div>
 
           {/* Exercise list */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
             {exercises.map((ex: any, i: number) => {
               const topSet = getTopSet(ex.sets);
               const prevEx = prevExercises.find((pe: any) => pe.name === ex.name);
@@ -99,6 +99,7 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
 
               return (
                 <div key={i} className="space-y-2">
+                  {/* Exercise header */}
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
                       {ex.muscle}
@@ -108,18 +109,23 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
 
                   {/* Sets */}
                   <div className="space-y-1">
-                    {(ex.sets as any[]).filter((s: any) => s.completed || s.weight > 0).map((s: any, si: number) => (
-                      <div key={si} className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="w-10 text-xs">Set {s.setNumber}</span>
-                        <span className="font-medium text-foreground">{s.weight}kg × {s.reps}</span>
-                        {s.rpe && <span className="text-xs">@ RPE {s.rpe}</span>}
-                      </div>
-                    ))}
+                    {(ex.sets as any[])
+                      .filter((s: any) => s.completed || s.weight > 0)
+                      .map((s: any, si: number) => (
+                        <div key={si} className={`flex items-center gap-3 text-sm py-0.5 ${s.isNewPr ? "text-amber-400" : "text-muted-foreground"}`}>
+                          <span className="w-12 text-xs shrink-0">Set {s.setNumber}</span>
+                          <span className={`font-medium ${s.isNewPr ? "text-amber-300" : "text-foreground"}`}>
+                            {s.weight}kg × {s.reps}
+                          </span>
+                          {s.rpe && <span className="text-xs">@ RPE {s.rpe}</span>}
+                          {s.isNewPr && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/20 uppercase tracking-wider">PR</span>}
+                        </div>
+                      ))}
                   </div>
 
-                  {/* Comparison */}
+                  {/* Comparison vs previous */}
                   {comparison.text && (
-                    <div className={`flex items-center gap-1.5 text-xs mt-2 p-2 rounded-lg ${
+                    <div className={`flex items-center gap-1.5 text-xs mt-1 p-2 rounded-lg ${
                       comparison.icon === "up" ? "bg-green-500/10 text-green-400" :
                       comparison.icon === "down" ? "bg-red-500/10 text-red-400" :
                       "bg-secondary/30 text-muted-foreground"
@@ -128,6 +134,14 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
                       {comparison.icon === "down" && <TrendingDown className="w-3.5 h-3.5 shrink-0" />}
                       {comparison.icon === "same" && <Minus className="w-3.5 h-3.5 shrink-0" />}
                       {comparison.text}
+                    </div>
+                  )}
+
+                  {/* Per-exercise notes */}
+                  {ex.notes && (
+                    <div className="flex items-start gap-2 mt-2 p-3 rounded-xl bg-secondary/30 border border-border/50">
+                      <MessageSquare className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground leading-relaxed italic">{ex.notes}</p>
                     </div>
                   )}
                 </div>
@@ -157,9 +171,7 @@ export default function Calendar() {
   const workouts = (workoutsQuery.data ?? []) as WorkoutLog[];
 
   const colorMap: Record<string, string> = {};
-  (colorsQuery.data ?? []).forEach((c) => {
-    colorMap[c.dayLabel] = c.hexColor;
-  });
+  (colorsQuery.data ?? []).forEach((c) => { colorMap[c.dayLabel] = c.hexColor; });
 
   const allLabels = [...new Set(workouts.map((w) => w.dayLabel).filter(Boolean))] as string[];
 
@@ -169,13 +181,8 @@ export default function Calendar() {
     workoutsByDate[w.date].push(w);
   });
 
-  function prevMonth() {
-    setCurrentDate(new Date(year, month - 1, 1));
-  }
-
-  function nextMonth() {
-    setCurrentDate(new Date(year, month + 1, 1));
-  }
+  function prevMonth() { setCurrentDate(new Date(year, month - 1, 1)); }
+  function nextMonth() { setCurrentDate(new Date(year, month + 1, 1)); }
 
   const monthName = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
@@ -231,6 +238,9 @@ export default function Calendar() {
             : "";
           const sessions = dateStr ? (workoutsByDate[dateStr] ?? []) : [];
           const isToday = dateStr === today;
+          const hasNotes = sessions.some((s) =>
+            (s.exercisesLogged as any[]).some((ex: any) => ex.notes)
+          );
 
           return (
             <div
@@ -245,10 +255,11 @@ export default function Calendar() {
             >
               {isCurrentMonth && (
                 <>
-                  <div className={`text-xs font-medium mb-1 ${
-                    isToday ? "text-primary" : "text-muted-foreground"
-                  }`}>
+                  <div className={`text-xs font-medium mb-1 flex items-center gap-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                     {dayNum}
+                    {hasNotes && (
+                      <MessageSquare className="w-2.5 h-2.5 text-muted-foreground/60" />
+                    )}
                   </div>
                   <div className="space-y-0.5">
                     {sessions.map((session) => {
@@ -282,10 +293,7 @@ export default function Calendar() {
         <div className="flex flex-wrap gap-3 pt-2">
           {allLabels.map((label) => (
             <div key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div
-                className="w-3 h-3 rounded-sm"
-                style={{ background: getColor(label, colorMap, allLabels) }}
-              />
+              <div className="w-3 h-3 rounded-sm" style={{ background: getColor(label, colorMap, allLabels) }} />
               {label}
             </div>
           ))}

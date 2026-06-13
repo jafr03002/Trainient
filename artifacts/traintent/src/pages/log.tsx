@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Loader2, Trophy, X } from "lucide-react";
+import { Plus, Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords } from "@workspace/api-client-react";
 
 type LoggedSet = {
@@ -20,6 +20,8 @@ type LoggedExercise = {
   targetSets: number;
   targetReps: string;
   targetRpe: number;
+  notes: string;
+  showNotes: boolean;
 };
 
 type PrFlash = { id: number; exercise: string; weight: number };
@@ -33,7 +35,6 @@ export default function Log() {
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
   const flashIdRef = useRef(0);
 
-  // Build a snapshot of PRs at load time — this is the baseline to beat
   const prBaselineRef = useRef<Record<string, number>>({});
   useEffect(() => {
     if (personalRecords) {
@@ -45,7 +46,6 @@ export default function Log() {
     }
   }, [personalRecords]);
 
-  // Highest weight seen THIS session per exercise — so subsequent sets can still be flagged
   const sessionBestRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -59,6 +59,8 @@ export default function Log() {
           targetSets: ex.sets,
           targetReps: ex.reps,
           targetRpe: ex.rpe,
+          notes: "",
+          showNotes: false,
           sets: Array.from({ length: ex.sets }, (_, i) => ({
             setNumber: i + 1,
             weight: 0,
@@ -83,6 +85,22 @@ export default function Log() {
     });
   }
 
+  function updateNotes(exIdx: number, notes: string) {
+    setLogs((prev) => {
+      const next = [...prev];
+      next[exIdx] = { ...next[exIdx], notes };
+      return next;
+    });
+  }
+
+  function toggleNotes(exIdx: number) {
+    setLogs((prev) => {
+      const next = [...prev];
+      next[exIdx] = { ...next[exIdx], showNotes: !next[exIdx].showNotes };
+      return next;
+    });
+  }
+
   function completeSet(exIdx: number, setIdx: number) {
     const ex = logs[exIdx];
     const set = ex.sets[setIdx];
@@ -92,16 +110,13 @@ export default function Log() {
     const baseline = prBaselineRef.current[nameKey] ?? 0;
     const sessionBest = sessionBestRef.current[nameKey] ?? 0;
     const currentBest = Math.max(baseline, sessionBest);
-
     const isNewPr = weight > 0 && weight > currentBest;
 
     if (isNewPr) {
       sessionBestRef.current[nameKey] = weight;
       const id = ++flashIdRef.current;
       setPrFlashes((f) => [...f, { id, exercise: ex.name, weight }]);
-      setTimeout(() => {
-        setPrFlashes((f) => f.filter((x) => x.id !== id));
-      }, 4000);
+      setTimeout(() => setPrFlashes((f) => f.filter((x) => x.id !== id)), 4000);
     }
 
     setLogs((prev) => {
@@ -140,6 +155,7 @@ export default function Log() {
           name: ex.name,
           muscle: ex.muscle,
           sets: ex.sets,
+          notes: ex.notes || undefined,
         })),
         notes: null,
       },
@@ -156,10 +172,7 @@ export default function Log() {
   }
 
   const day = (program.days as any[])[0];
-  const sessionPrCount = logs.reduce(
-    (acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length,
-    0
-  );
+  const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
 
   return (
     <div className="p-6 max-w-3xl mx-auto pb-32">
@@ -220,12 +233,9 @@ export default function Log() {
                   {ex.muscle}
                 </span>
                 {(() => {
-                  const nameKey = ex.name.toLowerCase();
-                  const baseline = prBaselineRef.current[nameKey];
+                  const baseline = prBaselineRef.current[ex.name.toLowerCase()];
                   return baseline ? (
-                    <span className="text-xs text-muted-foreground">
-                      PR: {baseline} kg
-                    </span>
+                    <span className="text-xs text-muted-foreground">PR: {baseline} kg</span>
                   ) : null;
                 })()}
               </div>
@@ -250,22 +260,14 @@ export default function Log() {
                     key={set.setNumber}
                     layout
                     className={`grid grid-cols-5 gap-2 items-center py-1 rounded-lg transition-all ${
-                      set.isNewPr
-                        ? "bg-amber-500/8 -mx-1 px-1"
-                        : set.completed
-                        ? "opacity-55"
-                        : ""
+                      set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
                     }`}
                     data-testid={`set-row-${exIdx}-${setIdx}`}
                   >
                     <div className="flex items-center gap-1">
                       <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
                       {set.isNewPr && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                        >
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
                           <Trophy className="w-3 h-3 text-amber-400" />
                         </motion.div>
                       )}
@@ -278,9 +280,7 @@ export default function Log() {
                       placeholder="0"
                       disabled={set.completed}
                       className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none disabled:opacity-50 transition-colors ${
-                        set.isNewPr
-                          ? "border-amber-500/40 focus:border-amber-400"
-                          : "border-border focus:border-primary"
+                        set.isNewPr ? "border-amber-500/40 focus:border-amber-400" : "border-border focus:border-primary"
                       }`}
                       data-testid={`input-weight-${exIdx}-${setIdx}`}
                     />
@@ -315,25 +315,62 @@ export default function Log() {
                         }`}
                         data-testid={`button-complete-set-${exIdx}-${setIdx}`}
                       >
-                        {set.isNewPr ? (
-                          <Trophy className="w-3.5 h-3.5" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
+                        {set.isNewPr ? <Trophy className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </motion.div>
                 ))}
               </div>
 
-              <button
-                onClick={() => addSet(exIdx)}
-                className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                data-testid={`button-add-set-${exIdx}`}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add set
-              </button>
+              {/* Actions row */}
+              <div className="flex items-center justify-between mt-3">
+                <button
+                  onClick={() => addSet(exIdx)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid={`button-add-set-${exIdx}`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add set
+                </button>
+                <button
+                  onClick={() => toggleNotes(exIdx)}
+                  className={`flex items-center gap-1.5 text-xs transition-colors ${
+                    ex.notes
+                      ? "text-primary"
+                      : ex.showNotes
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid={`button-toggle-notes-${exIdx}`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  {ex.notes ? "Note saved" : "Add note"}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${ex.showNotes ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+
+              {/* Notes textarea */}
+              <AnimatePresence>
+                {ex.showNotes && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden"
+                  >
+                    <textarea
+                      value={ex.notes}
+                      onChange={(e) => updateNotes(exIdx, e.target.value)}
+                      placeholder="How did this feel? e.g. felt strong, elbow pain, grip gave out..."
+                      rows={2}
+                      autoFocus
+                      className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+                      data-testid={`textarea-notes-${exIdx}`}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         ))}
