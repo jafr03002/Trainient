@@ -12,6 +12,7 @@ import {
   useListTrackedExercises,
   getGetStrengthProgressQueryKey,
 } from "@workspace/api-client-react";
+import { Trophy } from "lucide-react";
 
 const MUSCLE_COLORS: Record<string, string> = {
   chest: "hsl(217, 91%, 60%)",
@@ -32,6 +33,12 @@ const tooltipStyle = {
   },
 };
 
+function isRecent(dateStr: string, days = 7): boolean {
+  const then = new Date(dateStr);
+  const now = new Date();
+  return (now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24) <= days;
+}
+
 export default function Progress() {
   const [selectedExercise, setSelectedExercise] = useState("");
 
@@ -44,11 +51,23 @@ export default function Progress() {
   const personalRecords = useGetPersonalRecords();
   const muscleVolume = useGetMuscleVolumeBreakdown();
 
+  const recentPrCount = (personalRecords.data ?? []).filter((pr) => isRecent(pr.date, 7)).length;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">Progress</h1>
-        <p className="text-muted-foreground mt-1">Track your strength, volume, and personal records.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Progress</h1>
+            <p className="text-muted-foreground mt-1">Track your strength, volume, and personal records.</p>
+          </div>
+          {recentPrCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold">
+              <Trophy className="w-4 h-4" />
+              {recentPrCount} new PR{recentPrCount > 1 ? "s" : ""} this week
+            </div>
+          )}
+        </div>
       </motion.div>
 
       {/* Strength chart */}
@@ -146,15 +165,42 @@ export default function Progress() {
                 </tr>
               </thead>
               <tbody>
-                {personalRecords.data.map((pr) => (
-                  <tr key={pr.exercise} className="border-b border-border/40 last:border-0" data-testid={`pr-${pr.exercise.toLowerCase().replace(/\s+/g, "-")}`}>
-                    <td className="py-3 text-sm font-medium text-foreground">{pr.exercise}</td>
-                    <td className="py-3 text-sm text-right font-bold text-primary">{pr.maxWeight} kg</td>
-                    <td className="py-3 text-sm text-right text-muted-foreground">
-                      {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                  </tr>
-                ))}
+                {[...(personalRecords.data ?? [])]
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map((pr) => {
+                    const recent = isRecent(pr.date, 7);
+                    return (
+                      <tr
+                        key={pr.exercise}
+                        className={`border-b border-border/40 last:border-0 transition-colors ${recent ? "bg-amber-500/5" : ""}`}
+                        data-testid={`pr-${pr.exercise.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        <td className="py-3 text-sm font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            {recent && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                              >
+                                <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              </motion.div>
+                            )}
+                            {pr.exercise}
+                            {recent && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                                New
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 text-sm text-right font-bold text-primary">{pr.maxWeight} kg</td>
+                        <td className="py-3 text-sm text-right text-muted-foreground">
+                          {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

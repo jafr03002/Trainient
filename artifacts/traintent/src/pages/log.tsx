@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
-import { Plus, Check, Loader2 } from "lucide-react";
-import { useGetCurrentProgram, useCreateWorkout } from "@workspace/api-client-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Check, Loader2, Trophy, X } from "lucide-react";
+import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords } from "@workspace/api-client-react";
 
 type LoggedSet = {
   setNumber: number;
@@ -10,6 +10,7 @@ type LoggedSet = {
   reps: number;
   rpe: number | null;
   completed: boolean;
+  isNewPr: boolean;
 };
 
 type LoggedExercise = {
@@ -21,11 +22,31 @@ type LoggedExercise = {
   targetRpe: number;
 };
 
+type PrFlash = { id: number; exercise: string; weight: number };
+
 export default function Log() {
   const [, setLocation] = useLocation();
   const { data: program } = useGetCurrentProgram();
+  const { data: personalRecords } = useGetPersonalRecords();
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
+  const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
+  const flashIdRef = useRef(0);
+
+  // Build a snapshot of PRs at load time — this is the baseline to beat
+  const prBaselineRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (personalRecords) {
+      const map: Record<string, number> = {};
+      for (const pr of personalRecords) {
+        map[pr.exercise.toLowerCase()] = pr.maxWeight;
+      }
+      prBaselineRef.current = map;
+    }
+  }, [personalRecords]);
+
+  // Highest weight seen THIS session per exercise — so subsequent sets can still be flagged
+  const sessionBestRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (program?.days) {
@@ -44,6 +65,7 @@ export default function Log() {
             reps: 0,
             rpe: null,
             completed: false,
+            isNewPr: false,
           })),
         }))
       );
@@ -62,7 +84,36 @@ export default function Log() {
   }
 
   function completeSet(exIdx: number, setIdx: number) {
-    updateSet(exIdx, setIdx, "completed", true);
+    const ex = logs[exIdx];
+    const set = ex.sets[setIdx];
+    const weight = set.weight ?? 0;
+    const nameKey = ex.name.toLowerCase();
+
+    const baseline = prBaselineRef.current[nameKey] ?? 0;
+    const sessionBest = sessionBestRef.current[nameKey] ?? 0;
+    const currentBest = Math.max(baseline, sessionBest);
+
+    const isNewPr = weight > 0 && weight > currentBest;
+
+    if (isNewPr) {
+      sessionBestRef.current[nameKey] = weight;
+      const id = ++flashIdRef.current;
+      setPrFlashes((f) => [...f, { id, exercise: ex.name, weight }]);
+      setTimeout(() => {
+        setPrFlashes((f) => f.filter((x) => x.id !== id));
+      }, 4000);
+    }
+
+    setLogs((prev) => {
+      const next = [...prev];
+      next[exIdx] = {
+        ...next[exIdx],
+        sets: next[exIdx].sets.map((s, si) =>
+          si === setIdx ? { ...s, completed: true, isNewPr } : s
+        ),
+      };
+      return next;
+    });
   }
 
   function addSet(exIdx: number) {
@@ -71,7 +122,7 @@ export default function Log() {
       const ex = next[exIdx];
       next[exIdx] = {
         ...ex,
-        sets: [...ex.sets, { setNumber: ex.sets.length + 1, weight: 0, reps: 0, rpe: null, completed: false }],
+        sets: [...ex.sets, { setNumber: ex.sets.length + 1, weight: 0, reps: 0, rpe: null, completed: false, isNewPr: false }],
       };
       return next;
     });
@@ -105,12 +156,52 @@ export default function Log() {
   }
 
   const day = (program.days as any[])[0];
+  const sessionPrCount = logs.reduce(
+    (acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length,
+    0
+  );
 
   return (
     <div className="p-6 max-w-3xl mx-auto pb-32">
+      {/* PR Toast Stack */}
+      <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+        <AnimatePresence>
+          {prFlashes.map((flash) => (
+            <motion.div
+              key={flash.id}
+              initial={{ opacity: 0, x: 60, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 60, scale: 0.9 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-3 bg-amber-500/90 backdrop-blur-sm text-black font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
+            >
+              <Trophy className="w-4 h-4 shrink-0" />
+              <div>
+                <div className="text-xs font-medium opacity-80">New personal record!</div>
+                <div>{flash.exercise} — {flash.weight} kg</div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
-        <p className="text-muted-foreground mt-1">{day?.focus}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
+            <p className="text-muted-foreground mt-1">{day?.focus}</p>
+          </div>
+          {sessionPrCount > 0 && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold"
+            >
+              <Trophy className="w-4 h-4" />
+              {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
+            </motion.div>
+          )}
+        </div>
       </motion.div>
 
       <div className="mt-6 space-y-6">
@@ -128,6 +219,15 @@ export default function Log() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
                   {ex.muscle}
                 </span>
+                {(() => {
+                  const nameKey = ex.name.toLowerCase();
+                  const baseline = prBaselineRef.current[nameKey];
+                  return baseline ? (
+                    <span className="text-xs text-muted-foreground">
+                      PR: {baseline} kg
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -146,12 +246,30 @@ export default function Log() {
 
               <div className="space-y-2">
                 {ex.sets.map((set, setIdx) => (
-                  <div
+                  <motion.div
                     key={set.setNumber}
-                    className={`grid grid-cols-5 gap-2 items-center py-1 ${set.completed ? "opacity-60" : ""}`}
+                    layout
+                    className={`grid grid-cols-5 gap-2 items-center py-1 rounded-lg transition-all ${
+                      set.isNewPr
+                        ? "bg-amber-500/8 -mx-1 px-1"
+                        : set.completed
+                        ? "opacity-55"
+                        : ""
+                    }`}
                     data-testid={`set-row-${exIdx}-${setIdx}`}
                   >
-                    <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
+                      {set.isNewPr && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                        >
+                          <Trophy className="w-3 h-3 text-amber-400" />
+                        </motion.div>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">{ex.targetReps}</span>
                     <input
                       type="number"
@@ -159,7 +277,11 @@ export default function Log() {
                       onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
                       placeholder="0"
                       disabled={set.completed}
-                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none disabled:opacity-50 transition-colors ${
+                        set.isNewPr
+                          ? "border-amber-500/40 focus:border-amber-400"
+                          : "border-border focus:border-primary"
+                      }`}
                       data-testid={`input-weight-${exIdx}-${setIdx}`}
                     />
                     <input
@@ -185,16 +307,22 @@ export default function Log() {
                         onClick={() => !set.completed && completeSet(exIdx, setIdx)}
                         disabled={set.completed}
                         className={`p-1.5 rounded-lg transition-colors ${
-                          set.completed
+                          set.isNewPr
+                            ? "bg-amber-500/20 text-amber-400"
+                            : set.completed
                             ? "bg-chart-2/20 text-chart-2"
                             : "bg-secondary/30 text-muted-foreground hover:bg-primary/20 hover:text-primary"
                         }`}
                         data-testid={`button-complete-set-${exIdx}-${setIdx}`}
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        {set.isNewPr ? (
+                          <Trophy className="w-3.5 h-3.5" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
 
@@ -221,6 +349,8 @@ export default function Log() {
           >
             {createWorkout.isPending ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+            ) : sessionPrCount > 0 ? (
+              <><Trophy className="w-5 h-5 text-amber-300" /> Finish — {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
             ) : (
               "Finish workout"
             )}
