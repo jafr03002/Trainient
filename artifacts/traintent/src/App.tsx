@@ -1,41 +1,231 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Layout } from "@/components/layout";
+
+import Landing from "@/pages/landing";
+import Onboarding from "@/pages/onboarding";
+import Dashboard from "@/pages/dashboard";
+import Program from "@/pages/program";
+import Log from "@/pages/log";
+import Checkin from "@/pages/checkin";
+import Progress from "@/pages/progress";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
-const queryClient = new QueryClient();
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
 
-function Home() {
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || "/"
+    : path;
+}
+
+if (!clerkPubKey) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
+}
+
+const clerkAppearance = {
+  cssLayerName: "clerk",
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl: basePath || "/",
+    logoImageUrl: `${window.location.origin}${basePath}/favicon.svg`,
+  },
+  variables: {
+    colorPrimary: "hsl(217, 91%, 60%)",
+    colorForeground: "hsl(0, 0%, 98%)",
+    colorMutedForeground: "hsl(240, 5%, 65%)",
+    colorDanger: "hsl(0, 62.8%, 30.6%)",
+    colorBackground: "hsl(240, 10%, 6%)",
+    colorInput: "hsl(240, 10%, 16%)",
+    colorInputForeground: "hsl(0, 0%, 98%)",
+    colorNeutral: "hsl(240, 10%, 12%)",
+    fontFamily: "'Inter', sans-serif",
+    borderRadius: "0.5rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-[#0f0f12] rounded-2xl w-[440px] max-w-full overflow-hidden border border-[#1a1a1f]",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-foreground",
+    headerSubtitle: "text-muted-foreground",
+    socialButtonsBlockButtonText: "text-foreground",
+    formFieldLabel: "text-foreground",
+    footerActionLink: "text-primary hover:text-primary/90",
+    footerActionText: "text-muted-foreground",
+    dividerText: "text-muted-foreground",
+    identityPreviewEditButton: "text-primary hover:text-primary/90",
+    formFieldSuccessText: "text-chart-2",
+    alertText: "text-destructive-foreground",
+    logoBox: "h-8 mb-6",
+    logoImage: "h-8 w-auto",
+    socialButtonsBlockButton: "border-border hover:bg-secondary",
+    formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90",
+    formFieldInput: "bg-input border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary",
+    footerAction: "border-t border-border pt-4 mt-4",
+    dividerLine: "bg-border",
+    alert: "bg-destructive/20 border-destructive",
+    otpCodeFieldInput: "bg-input border-border text-foreground",
+    formFieldRow: "mb-4",
+    main: "p-6",
+  },
+};
+
+function SignInPage() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Replit Agent is building...</h1>
-        <p className="mt-2 text-sm text-gray-600">Your app will appear here once it's ready.</p>
-      </div>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
     </div>
   );
 }
 
-function Router() {
+function SignUpPage() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route component={NotFound} />
-    </Switch>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+      <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
+    </div>
   );
 }
 
-function App() {
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const queryClient = useQueryClient();
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (
+        prevUserIdRef.current !== undefined &&
+        prevUserIdRef.current !== userId
+      ) {
+        queryClient.clear();
+      }
+      prevUserIdRef.current = userId;
+    });
+    return unsubscribe;
+  }, [addListener, queryClient]);
+
+  return null;
+}
+
+function ApiAuthWirer() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
+  return null;
+}
+
+function ProtectedRoute({ component: Component, ...rest }: any) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <Route {...rest}>
+      {() => (
+        <>
+          <Show when="signed-in">
+            <Component />
+          </Show>
+          <Show when="signed-out">
+            <Redirect to="/sign-in" />
+          </Show>
+        </>
+      )}
+    </Route>
+  );
+}
+
+function HomeRedirect() {
+  return (
+    <>
+      <Show when="signed-in">
+        <Redirect to="/dashboard" />
+      </Show>
+      <Show when="signed-out">
+        <Landing />
+      </Show>
+    </>
+  );
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function App() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      appearance={clerkAppearance}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      signInFallbackRedirectUrl={`${basePath}/dashboard`}
+      signUpFallbackRedirectUrl={`${basePath}/onboarding`}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkQueryClientCacheInvalidator />
+        <ApiAuthWirer />
+        <TooltipProvider>
+          <WouterRouter base={basePath}>
+            <Switch>
+              <Route path="/" component={HomeRedirect} />
+              <Route path="/sign-in/*?" component={SignInPage} />
+              <Route path="/sign-up/*?" component={SignUpPage} />
+              
+              {/* Authenticated Routes wrapped in Layout */}
+              <Route path="/:rest*">
+                {() => (
+                  <>
+                    <Show when="signed-in">
+                      <Layout>
+                        <Switch>
+                          <Route path="/onboarding" component={Onboarding} />
+                          <Route path="/dashboard" component={Dashboard} />
+                          <Route path="/program" component={Program} />
+                          <Route path="/log" component={Log} />
+                          <Route path="/checkin" component={Checkin} />
+                          <Route path="/progress" component={Progress} />
+                          <Route path="/settings" component={Settings} />
+                          <Route component={NotFound} />
+                        </Switch>
+                      </Layout>
+                    </Show>
+                    <Show when="signed-out">
+                      <Redirect to="/sign-in" />
+                    </Show>
+                  </>
+                )}
+              </Route>
+            </Switch>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
 

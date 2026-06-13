@@ -1,36 +1,60 @@
-# [Project name]
+# Traintent
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+AI-powered gym coaching SaaS that generates personalised training programs and adjusts them weekly based on check-in data.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
+- `pnpm --filter @workspace/traintent run dev` — run the frontend (port 24301)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `SESSION_SECRET`
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite, Wouter (routing), TanStack Query, Framer Motion, Recharts, Tailwind + shadcn
+- API: Express 5 + Clerk Express middleware
 - DB: PostgreSQL + Drizzle ORM
+- Auth: Clerk (managed Replit tenant)
+- AI: OpenAI GPT-4o (direct, OPENAI_API_KEY)
+- Payments: Stripe (£9.99/month Pro plan)
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/db/src/schema/` — DB schema tables (userProfiles, programs, workoutLogs, checkins, subscriptions)
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for API contract)
+- `lib/api-client-react/src/generated/` — generated React Query hooks
+- `lib/api-zod/src/generated/` — generated Zod schemas
+- `artifacts/api-server/src/routes/` — Express route handlers
+- `artifacts/traintent/src/pages/` — 9 frontend pages
+- `artifacts/traintent/src/index.css` — dark-mode theme (HSL CSS variables)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Contract-first: OpenAPI spec → Orval codegen → typed hooks + Zod validation used end-to-end
+- Clerk auth: JWT bearer token wired in `App.tsx` via `setAuthTokenGetter` + `useAuth().getToken()`; backend uses `@clerk/express` middleware
+- AI programs: GPT-4o with `response_format: json_object`, structured prompt enforcing RPE/sets/reps schema
+- Stripe API version: `2026-05-27.dahlia` (Stripe v22.x)
+- Clerk ClerkProvider redirect props: `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` (not `afterSignInUrl`)
+- Raw body middleware for Stripe webhook must be registered before `express.json()` for the `/api/subscriptions/webhook` path
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Landing** — marketing page with feature highlights
+- **Auth** — Clerk-hosted sign-in/sign-up with dark theme
+- **Onboarding (7 steps)** — goal, experience, training days, equipment, body stats, priority muscles, review + generate
+- **Dashboard** — stats (streak, week, sessions), next workout card, recent sessions, volume chart
+- **My Program** — tabbed view per training day, exercise cards with RPE/sets/cue/coaching tip
+- **Workout Logger** — live set tracking with weight/reps/RPE inputs, rest timer, finish + save
+- **Weekly Check-in** — 5 questions (energy, sleep, soreness, completion, notes) → GPT-4o adjusts next week's program
+- **Progress** — strength chart, muscle volume breakdown bar chart, personal records table
+- **Settings** — profile edit, subscription status, Stripe checkout/portal, sign out
 
 ## User preferences
 
@@ -38,7 +62,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After adding new schema tables, run `pnpm run typecheck:libs` before leaf package typechecks (stale lib declarations)
+- Stripe v22.x uses API version `2026-05-27.dahlia`, not older `basil` string
+- Clerk ClerkProvider no longer has `afterSignInUrl` — use `signInFallbackRedirectUrl`
+- `useCreatePortalSession` mutation takes `void` (no body), call with `mutateAsync()` not `mutateAsync({})`
+- DB push (`pnpm --filter @workspace/db run push`) must be run after schema changes
 
 ## Pointers
 

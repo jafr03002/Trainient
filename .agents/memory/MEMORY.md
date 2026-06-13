@@ -1,0 +1,3 @@
+- [Stripe v22 API version](stripe-clerk-quirks.md) — Stripe v22.x requires `2026-05-27.dahlia` not older `basil` string
+- [Clerk ClerkProvider props](stripe-clerk-quirks.md) — `afterSignInUrl` removed; use `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl`
+- [DB lib rebuild required](db-lib-rebuild.md) — after adding schema tables, run `pnpm run typecheck:libs` before leaf typechecks

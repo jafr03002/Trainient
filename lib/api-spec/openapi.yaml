@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Traintent AI Gym Coaching API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile and onboarding
+  - name: programs
+    description: AI-generated training programs
+  - name: workouts
+    description: Workout logging
+  - name: checkins
+    description: Weekly check-ins
+  - name: progress
+    description: Progress analytics
+  - name: subscriptions
+    description: Stripe subscription management
+  - name: ai
+    description: AI generation endpoints
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,362 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Profile ──────────────────────────────────────────────────────────────────
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get the current user's profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+    post:
+      operationId: createProfile
+      tags: [profile]
+      summary: Create or upsert user profile (called at end of onboarding)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  # ── Programs ─────────────────────────────────────────────────────────────────
+  /programs/current:
+    get:
+      operationId: getCurrentProgram
+      tags: [programs]
+      summary: Get the user's current active program
+      responses:
+        "200":
+          description: Current program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Program"
+        "404":
+          description: No active program
+
+  /programs:
+    get:
+      operationId: listPrograms
+      tags: [programs]
+      summary: List all programs for the user
+      responses:
+        "200":
+          description: List of programs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Program"
+
+  /programs/generate:
+    post:
+      operationId: generateProgram
+      tags: [programs, ai]
+      summary: Trigger AI generation of a new program based on user profile
+      responses:
+        "201":
+          description: Program generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Program"
+
+  # ── Workouts ─────────────────────────────────────────────────────────────────
+  /workouts:
+    get:
+      operationId: listWorkouts
+      tags: [workouts]
+      summary: List workout logs for the user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of workout logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutLog"
+    post:
+      operationId: createWorkout
+      tags: [workouts]
+      summary: Save a completed workout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkoutLogInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutLog"
+
+  /workouts/recent:
+    get:
+      operationId: getRecentWorkouts
+      tags: [workouts]
+      summary: Get the 3 most recent workout logs (dashboard use)
+      responses:
+        "200":
+          description: Recent workouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutLog"
+
+  /workouts/stats:
+    get:
+      operationId: getWorkoutStats
+      tags: [workouts]
+      summary: Quick stats for the dashboard (current week, total logged, streak)
+      responses:
+        "200":
+          description: Workout stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutStats"
+
+  # ── Check-ins ─────────────────────────────────────────────────────────────────
+  /checkins:
+    get:
+      operationId: listCheckins
+      tags: [checkins]
+      summary: List all check-ins for the user
+      responses:
+        "200":
+          description: Check-ins list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Checkin"
+    post:
+      operationId: submitCheckin
+      tags: [checkins, ai]
+      summary: Submit weekly check-in and trigger AI program adjustment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckinInput"
+      responses:
+        "201":
+          description: Check-in submitted and AI adjustment generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinResult"
+
+  /checkins/latest:
+    get:
+      operationId: getLatestCheckin
+      tags: [checkins]
+      summary: Get the most recent check-in (to decide if banner should show)
+      responses:
+        "200":
+          description: Latest check-in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkin"
+        "404":
+          description: No check-ins yet
+
+  # ── Progress ──────────────────────────────────────────────────────────────────
+  /progress/volume:
+    get:
+      operationId: getVolumeProgress
+      tags: [progress]
+      summary: Weekly total volume over time (for line chart)
+      responses:
+        "200":
+          description: Volume data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VolumePoint"
+
+  /progress/strength:
+    get:
+      operationId: getStrengthProgress
+      tags: [progress]
+      summary: Max weight per exercise over time
+      parameters:
+        - name: exercise
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Strength data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrengthPoint"
+
+  /progress/prs:
+    get:
+      operationId: getPersonalRecords
+      tags: [progress]
+      summary: All-time personal records per exercise
+      responses:
+        "200":
+          description: Personal records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PersonalRecord"
+
+  /progress/muscle-volume:
+    get:
+      operationId: getMuscleVolumeBreakdown
+      tags: [progress]
+      summary: Weekly sets per muscle group (stacked bar chart data)
+      responses:
+        "200":
+          description: Muscle volume breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MuscleVolumeWeek"
+
+  /progress/exercises:
+    get:
+      operationId: listTrackedExercises
+      tags: [progress]
+      summary: List all exercises the user has logged (for the strength chart dropdown)
+      responses:
+        "200":
+          description: Exercise names
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  # ── Subscriptions ─────────────────────────────────────────────────────────────
+  /subscriptions/current:
+    get:
+      operationId: getSubscription
+      tags: [subscriptions]
+      summary: Get current subscription status
+      responses:
+        "200":
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+  /subscriptions/checkout:
+    post:
+      operationId: createCheckoutSession
+      tags: [subscriptions]
+      summary: Create a Stripe checkout session for Pro plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+
+  /subscriptions/portal:
+    post:
+      operationId: createPortalSession
+      tags: [subscriptions]
+      summary: Create a Stripe customer portal session
+      responses:
+        "200":
+          description: Portal URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalSession"
+
+  /subscriptions/webhook:
+    post:
+      operationId: stripeWebhook
+      tags: [subscriptions]
+      summary: Stripe webhook endpoint
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +401,258 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── Profile ────────────────────────────────────────────────────────────────
+    UserProfile:
+      type: object
+      required: [userId, goal, experience, trainingDays, equipment, priorityMuscles, onboardingComplete, createdAt]
+      properties:
+        userId:         { type: string }
+        name:           { type: ["string", "null"] }
+        goal:           { type: string }
+        experience:     { type: string }
+        trainingDays:   { type: integer }
+        equipment:      { type: array, items: { type: string } }
+        age:            { type: ["integer", "null"] }
+        sex:            { type: ["string", "null"] }
+        weight:         { type: ["number", "null"] }
+        weightUnit:     { type: ["string", "null"] }
+        injuries:       { type: ["string", "null"] }
+        priorityMuscles: { type: array, items: { type: string } }
+        onboardingComplete: { type: boolean }
+        createdAt:      { type: string }
+
+    UserProfileInput:
+      type: object
+      required: [goal, experience, trainingDays, equipment, priorityMuscles]
+      properties:
+        name:           { type: string }
+        goal:           { type: string }
+        experience:     { type: string }
+        trainingDays:   { type: integer }
+        equipment:      { type: array, items: { type: string } }
+        age:            { type: ["integer", "null"] }
+        sex:            { type: ["string", "null"] }
+        weight:         { type: ["number", "null"] }
+        weightUnit:     { type: ["string", "null"] }
+        injuries:       { type: ["string", "null"] }
+        priorityMuscles: { type: array, items: { type: string } }
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        name:           { type: string }
+        age:            { type: ["integer", "null"] }
+        weight:         { type: ["number", "null"] }
+        weightUnit:     { type: ["string", "null"] }
+        injuries:       { type: ["string", "null"] }
+
+    # ── Programs ──────────────────────────────────────────────────────────────
+    Exercise:
+      type: object
+      required: [name, sets, reps, rpe, restSeconds, cue, muscle]
+      properties:
+        name:        { type: string }
+        sets:        { type: integer }
+        reps:        { type: string }
+        rpe:         { type: integer }
+        restSeconds: { type: integer }
+        cue:         { type: string }
+        muscle:      { type: string }
+
+    ProgramDay:
+      type: object
+      required: [dayNumber, label, focus, exercises]
+      properties:
+        dayNumber:  { type: integer }
+        label:      { type: string }
+        focus:      { type: string }
+        exercises:
+          type: array
+          items:
+            $ref: "#/components/schemas/Exercise"
+
+    Program:
+      type: object
+      required: [id, userId, weekNumber, programName, splitType, aiNotes, days, generatedAt]
+      properties:
+        id:          { type: integer }
+        userId:      { type: string }
+        weekNumber:  { type: integer }
+        programName: { type: string }
+        splitType:   { type: string }
+        aiNotes:     { type: string }
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgramDay"
+        generatedAt: { type: string }
+
+    # ── Workouts ──────────────────────────────────────────────────────────────
+    LoggedSet:
+      type: object
+      required: [setNumber, weight, reps, rpe, completed]
+      properties:
+        setNumber: { type: integer }
+        weight:    { type: number }
+        reps:      { type: integer }
+        rpe:       { type: ["integer", "null"] }
+        completed: { type: boolean }
+
+    LoggedExercise:
+      type: object
+      required: [name, muscle, sets]
+      properties:
+        name:   { type: string }
+        muscle: { type: string }
+        sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoggedSet"
+
+    WorkoutLog:
+      type: object
+      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, durationMinutes, createdAt]
+      properties:
+        id:               { type: integer }
+        userId:           { type: string }
+        date:             { type: string }
+        dayNumber:        { type: integer }
+        weekNumber:       { type: integer }
+        exercisesLogged:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoggedExercise"
+        durationMinutes:  { type: ["integer", "null"] }
+        notes:            { type: ["string", "null"] }
+        createdAt:        { type: string }
+
+    WorkoutLogInput:
+      type: object
+      required: [date, dayNumber, weekNumber, exercisesLogged]
+      properties:
+        date:             { type: string }
+        dayNumber:        { type: integer }
+        weekNumber:       { type: integer }
+        exercisesLogged:
+          type: array
+          items:
+            $ref: "#/components/schemas/LoggedExercise"
+        durationMinutes:  { type: ["integer", "null"] }
+        notes:            { type: ["string", "null"] }
+
+    WorkoutStats:
+      type: object
+      required: [currentWeek, totalLogged, lastSessionDate, streakDays]
+      properties:
+        currentWeek:     { type: integer }
+        totalLogged:     { type: integer }
+        lastSessionDate: { type: ["string", "null"] }
+        streakDays:      { type: integer }
+
+    # ── Check-ins ─────────────────────────────────────────────────────────────
+    Checkin:
+      type: object
+      required: [id, userId, weekNumber, energy, sleep, soreness, completion, submittedAt]
+      properties:
+        id:          { type: integer }
+        userId:      { type: string }
+        weekNumber:  { type: integer }
+        energy:      { type: integer }
+        sleep:       { type: integer }
+        soreness:    { type: string }
+        completion:  { type: string }
+        notes:       { type: ["string", "null"] }
+        submittedAt: { type: string }
+
+    CheckinInput:
+      type: object
+      required: [weekNumber, energy, sleep, soreness, completion]
+      properties:
+        weekNumber:  { type: integer }
+        energy:      { type: integer }
+        sleep:       { type: integer }
+        soreness:    { type: string }
+        completion:  { type: string }
+        notes:       { type: ["string", "null"] }
+
+    CheckinResult:
+      type: object
+      required: [checkin, aiMessage, updatedProgram]
+      properties:
+        checkin:
+          $ref: "#/components/schemas/Checkin"
+        aiMessage:      { type: string }
+        updatedProgram:
+          $ref: "#/components/schemas/Program"
+
+    # ── Progress ──────────────────────────────────────────────────────────────
+    VolumePoint:
+      type: object
+      required: [week, totalSets]
+      properties:
+        week:       { type: integer }
+        totalSets:  { type: integer }
+        totalReps:  { type: integer }
+
+    StrengthPoint:
+      type: object
+      required: [date, maxWeight]
+      properties:
+        date:       { type: string }
+        maxWeight:  { type: number }
+        exercise:   { type: string }
+
+    PersonalRecord:
+      type: object
+      required: [exercise, maxWeight, date]
+      properties:
+        exercise:   { type: string }
+        maxWeight:  { type: number }
+        date:       { type: string }
+
+    MuscleVolumeWeek:
+      type: object
+      required: [week]
+      properties:
+        week:       { type: integer }
+        chest:      { type: integer }
+        back:       { type: integer }
+        shoulders:  { type: integer }
+        arms:       { type: integer }
+        legs:       { type: integer }
+        glutes:     { type: integer }
+        core:       { type: integer }
+
+    # ── Subscriptions ─────────────────────────────────────────────────────────
+    Subscription:
+      type: object
+      required: [plan, status]
+      properties:
+        userId:                 { type: string }
+        plan:                   { type: string }
+        status:                 { type: string }
+        stripeCustomerId:       { type: ["string", "null"] }
+        stripeSubscriptionId:   { type: ["string", "null"] }
+        currentPeriodEnd:       { type: ["string", "null"] }
+
+    CheckoutInput:
+      type: object
+      required: [plan, successUrl, cancelUrl]
+      properties:
+        plan:       { type: string }
+        successUrl: { type: string }
+        cancelUrl:  { type: string }
+
+    CheckoutSession:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+
+    PortalSession:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
