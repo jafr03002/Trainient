@@ -1,0 +1,200 @@
+Apply the following changes and fixes to the existing app:
+
+---
+
+## 1. LANDING PAGE — Branding & Slogan
+
+- The app name is "Trainient" (stylised exactly like this)
+- Main headline slogan: "Train With Intent"
+- Do not add any subheadline
+- Update all instances of the app name across the entire codebase to "Trainient"
+- Update the browser tab title, logo text, and any meta tags to "Trainient"
+- The landing page should feel premium and minimal — hero section with the slogan
+  large and bold, CTA button "Start training" below it
+
+---
+
+## 2. INDEPENDENT MODE (no AI)
+
+Add a second mode to the app alongside the existing AI Coach mode.
+Users choose their mode during onboarding (insert as Step 1, push existing steps
+to Step 2 onward):
+
+New Step 1 — Choose your mode (single select cards):
+
+Card 1: "AI Coach"
+  - Icon: robot / brain
+  - Description: "AI builds your program, monitors progress,
+    and adjusts weekly based on your check-ins"
+
+Card 2: "Independent"
+  - Icon: person / dumbbell
+  - Description: "You're in control. Build your own program,
+    log your sessions, and track progression yourself — no AI involved"
+
+Save selected mode as user_profiles.mode (values: "ai" or "independent")
+
+Independent mode behaviour:
+- Skip onboarding steps that are AI-specific (goal, experience, equipment, priority
+  muscles can still be collected for stats but no AI call is made)
+- No program generation, no weekly check-in, no AI adjustments
+- User manually creates their own program:
+  - /program page shows an empty state with "Create your program" button
+  - User can add training days, name each day (e.g. "Push", "Pull", "Upper A")
+  - Within each day, user adds exercises manually:
+    exercise name (text input or search from exercise library),
+    sets, reps — all editable
+  - Program is saved to the same programs table with ai_generated: false
+- Workout logger works exactly the same as AI mode
+- Progress tracking works exactly the same (charts, PRs, volume, strength trends)
+- No weekly check-in banner ever appears in independent mode
+- No AI messaging anywhere in the UI when in independent mode
+- Settings page allows switching mode (with a confirmation modal warning
+  that switching to AI mode will trigger program regeneration)
+
+---
+
+## 3. DYNAMIC TRAINING CALENDAR
+
+Add a full calendar view accessible from the dashboard and as its own page /calendar.
+
+Calendar behaviour:
+- Blank / empty on days with no logged session
+- On days where a session was logged, show a colour-coded pill/badge on that date
+  with the session label (e.g. "Upper A", "Push", "Legs")
+- Each training day type has its own colour (see colour customisation below)
+- Tapping / clicking a day with a logged session opens a Session Review modal
+  or drawer (see section 4 below)
+- The calendar shows the current month by default with prev/next month navigation
+- On mobile, the calendar should be a full-width swipeable month view
+- On desktop, show a standard grid month calendar
+
+Colour logic:
+- Each unique training day label gets assigned a colour from a preset palette
+- The colour assignment is saved per user so it persists
+- Users can customise these colours (see section 5)
+
+---
+
+## 4. SESSION REVIEW (view past sessions by tapping calendar days)
+
+When a user taps a completed session day on the calendar, open a modal or
+bottom drawer showing:
+
+Header:
+- Session label (e.g. "Upper A — Push")
+- Date of the session
+- No duration shown
+
+Exercise list:
+- Each exercise logged in that session
+- For each exercise, show every set logged: weight × reps @ RPE
+- No rest time shown anywhere in this view
+
+Weight comparison (ONLY shown in this review view, NOT during live logging):
+- Below each exercise, show a comparison vs the same exercise in the previous
+  session of the same day type
+- Format:
+  "Last time: 80kg × 8 — Today: 85kg × 8 ↑ +5kg" (green arrow up)
+  "Last time: 100kg × 5 — Today: 95kg × 4 ↓ -5kg" (red arrow down)
+  "First time logging this exercise" (if no previous session exists)
+- Compare using the top set (heaviest set) of each exercise
+- Only show this comparison in the review modal — never during active logging
+
+---
+
+## 5. COLOUR CUSTOMISATION FOR CALENDAR
+
+Add a section in /settings under a new heading "Calendar colours":
+
+- List each unique training day label the user has (e.g. Upper A, Push, Legs)
+- Next to each label, show a colour swatch button
+- Clicking the swatch opens a simple colour picker (use a native
+  <input type="color"> element styled to match the app)
+- Saving updates the colour in Supabase in a table called calendar_colors:
+  user_id, day_label, hex_color
+- These colours apply everywhere the label appears (calendar, dashboard, program)
+
+---
+
+## 6. GENDER / WEIGHT FIELD FIX
+
+In onboarding Step 6 (body stats), update the Sex field:
+- Remove the "Prefer not to say" option entirely
+- Only show two chips: "Male" and "Female"
+- This field remains optional — user can skip without selecting either
+
+---
+
+## 7. PRIORITY MUSCLE GROUP SELECTION FIX
+
+In onboarding Step 7 (priority muscle groups):
+- Fix the bug where selected chips cannot be deselected after being chosen
+- Clicking a selected chip must deselect it (toggle behaviour)
+- The max 3 selection limit still applies — if 3 are already selected,
+  clicking an unselected chip should do nothing (no error, just no action)
+- Add a subtle counter below the chips: "2 / 3 selected"
+- Chips must be fully re-selectable and de-selectable at any point before
+  the user taps Continue
+
+---
+
+## 8. WEEKLY CHECK-IN TIMING LOGIC
+
+Fix the weekly check-in banner/prompt timing:
+
+Rules:
+- Never show the weekly check-in prompt during Week 1 (the first 6 days
+  after account creation)
+- Starting from Day 7 (exactly 6 days after onboarding completion),
+  the check-in banner becomes visible on the dashboard
+- Once visible, the banner persists every day until the user completes
+  the check-in for that week
+- After the user submits the check-in, hide the banner until the next
+  week's check-in window opens (7 days after the last submission)
+- Store onboarding_completed_at timestamp in user_profiles
+- Check-in eligibility logic:
+  const daysSinceOnboarding = daysSince(user.onboarding_completed_at)
+  const weeksSinceLastCheckin = daysSince(lastCheckin.submitted_at)
+  show banner if: daysSinceOnboarding >= 6 AND weeksSinceLastCheckin >= 7
+  (or no checkin exists yet and daysSinceOnboarding >= 6)
+- In independent mode: never show this banner at all (as per section 2)
+
+---
+
+## WORKOUT LOGGER RULES
+
+- Do NOT track or display rest times anywhere in the logger
+- Do NOT log or display workout duration anywhere in the app
+- The logger only captures: exercise name, set number, weight, reps, RPE
+- Remove any rest timer, duration timer, or elapsed time UI from the logger
+
+---
+
+## DATABASE ADDITIONS
+
+Add these columns / tables if not already present:
+
+user_profiles table — add columns:
+- mode VARCHAR (values: 'ai', 'independent'), default 'ai'
+- onboarding_completed_at TIMESTAMP
+
+calendar_colors table (new):
+- id, user_id, day_label VARCHAR, hex_color VARCHAR, updated_at
+- RLS: users can only read/write their own rows
+
+programs table — add column:
+- ai_generated BOOLEAN default true
+
+No other schema changes needed.
+
+---
+
+## GENERAL NOTES
+- All fixes must be backwards compatible — existing AI mode users are unaffected
+- Independent mode users should never see any AI-related UI elements or copy
+- All new UI components must match the existing Tailwind design system and
+  dark-mode styling already in place
+- Test the calendar colour customisation saves and loads correctly on page refresh
+- The session review weight comparison must pull from workout_logs and correctly
+  match exercises by name across sessions of the same day type

@@ -9,6 +9,7 @@ import {
   useGetLatestCheckin,
   useGetRecentWorkouts,
   useGetVolumeProgress,
+  useGetProfile,
 } from "@workspace/api-client-react";
 
 function greet() {
@@ -18,6 +19,13 @@ function greet() {
   return "Good evening";
 }
 
+function daysSince(dateStr: string | null | undefined): number {
+  if (!dateStr) return Infinity;
+  const then = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 export default function Dashboard() {
   const { user } = useUser();
   const stats = useGetWorkoutStats();
@@ -25,15 +33,23 @@ export default function Dashboard() {
   const latestCheckin = useGetLatestCheckin();
   const recentWorkouts = useGetRecentWorkouts();
   const volumeProgress = useGetVolumeProgress();
+  const profileQuery = useGetProfile();
 
-  const thisWeekChecked = (() => {
-    if (!latestCheckin.data) return false;
-    const submittedAt = new Date(latestCheckin.data.submittedAt);
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    return submittedAt >= startOfWeek;
+  const profile = profileQuery.data;
+  const isIndependent = profile?.mode === "independent";
+
+  const showCheckinBanner = (() => {
+    if (isIndependent) return false;
+    if (profileQuery.isLoading || latestCheckin.isLoading) return false;
+    if (!profile?.onboardingCompletedAt) return false;
+
+    const daysSinceOnboarding = daysSince(profile.onboardingCompletedAt);
+    if (daysSinceOnboarding < 6) return false;
+
+    if (!latestCheckin.data) return true;
+
+    const daysSinceCheckin = daysSince(latestCheckin.data.submittedAt);
+    return daysSinceCheckin >= 7;
   })();
 
   const statCards = [
@@ -65,11 +81,10 @@ export default function Dashboard() {
     },
   ];
 
-  const nextDay = program.data?.days?.[0];
+  const nextDay = program.data?.days?.[0] as any;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <h1 className="text-2xl font-bold text-foreground">
           {greet()}, {user?.firstName ?? "Coach"}.
@@ -81,8 +96,8 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* Check-in banner */}
-      {!thisWeekChecked && !latestCheckin.isLoading && (
+      {/* Check-in banner — AI mode only, after day 6 */}
+      {showCheckinBanner && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -125,7 +140,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today's session */}
+        {/* This week's session */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -138,8 +153,12 @@ export default function Dashboard() {
             <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
           ) : !program.data ? (
             <div className="text-center py-6">
-              <p className="text-muted-foreground text-sm mb-3">No program yet</p>
-              <Link href="/program" className="text-primary text-sm font-semibold hover:underline">Generate one</Link>
+              <p className="text-muted-foreground text-sm mb-3">
+                {isIndependent ? "No program built yet" : "No program yet"}
+              </p>
+              <Link href="/program" className="text-primary text-sm font-semibold hover:underline">
+                {isIndependent ? "Build your program" : "Generate one"}
+              </Link>
             </div>
           ) : nextDay ? (
             <div>
@@ -148,7 +167,7 @@ export default function Dashboard() {
                 <span className="text-sm text-muted-foreground">{nextDay.focus}</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                {nextDay.exercises.length} exercises
+                {nextDay.exercises?.length ?? 0} exercises
               </p>
               <Link href="/log">
                 <button
@@ -179,19 +198,16 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-3">
               {recentWorkouts.data.map((w) => {
-                const muscles = [...new Set((w.exercisesLogged as any[]).map((e) => e.muscle))].slice(0, 3).join(", ");
-                const totalSets = (w.exercisesLogged as any[]).reduce((acc: number, e: any) => acc + e.sets.length, 0);
+                const label = (w as any).dayLabel ?? "Workout";
+                const totalSets = (w.exercisesLogged as any[]).reduce((acc: number, e: any) => acc + (e.sets?.length ?? 0), 0);
                 return (
                   <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0" data-testid={`session-${w.id}`}>
                     <div>
-                      <div className="text-sm font-medium text-foreground">{muscles || "Workout"}</div>
+                      <div className="text-sm font-medium text-foreground">{label}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {new Date(w.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · {totalSets} sets
                       </div>
                     </div>
-                    {w.durationMinutes && (
-                      <span className="text-xs text-muted-foreground">{w.durationMinutes}min</span>
-                    )}
                   </div>
                 );
               })}

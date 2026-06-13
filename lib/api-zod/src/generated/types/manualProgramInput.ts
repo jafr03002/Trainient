@@ -7,14 +7,8 @@
  */
 import type { ProgramDay } from './programDay';
 
-export interface Program {
-  id: number;
-  userId: string;
-  weekNumber: number;
+export interface ManualProgramInput {
   programName: string;
   splitType: string;
-  aiNotes: string;
-  aiGenerated: boolean;
   days: ProgramDay[];
-  generatedAt: string;
 }

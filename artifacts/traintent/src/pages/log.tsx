@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, X, Loader2, Timer } from "lucide-react";
+import { motion } from "framer-motion";
+import { Plus, Check, Loader2 } from "lucide-react";
 import { useGetCurrentProgram, useCreateWorkout } from "@workspace/api-client-react";
 
 type LoggedSet = {
@@ -19,56 +19,13 @@ type LoggedExercise = {
   targetSets: number;
   targetReps: string;
   targetRpe: number;
-  restSeconds: number;
 };
-
-function RestTimer({ seconds, onDismiss }: { seconds: number; onDismiss: () => void }) {
-  const [remaining, setRemaining] = useState(seconds);
-  useEffect(() => {
-    const iv = setInterval(() => setRemaining((r) => {
-      if (r <= 1) { clearInterval(iv); onDismiss(); return 0; }
-      return r - 1;
-    }), 1000);
-    return () => clearInterval(iv);
-  }, [onDismiss]);
-
-  const pct = (remaining / seconds) * 100;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="fixed bottom-6 right-6 z-50 bg-card border border-border rounded-2xl p-5 shadow-xl w-52"
-      data-testid="rest-timer"
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Timer className="w-4 h-4 text-primary" />
-          Rest timer
-        </div>
-        <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="text-3xl font-bold text-primary text-center mb-3">
-        {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
-      </div>
-      <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
-        <motion.div className="h-full bg-primary" animate={{ width: `${pct}%` }} />
-      </div>
-    </motion.div>
-  );
-}
 
 export default function Log() {
   const [, setLocation] = useLocation();
   const { data: program } = useGetCurrentProgram();
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
-  const [showTimer, setShowTimer] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(90);
-  const startTime = useRef(Date.now());
 
   useEffect(() => {
     if (program?.days) {
@@ -81,7 +38,6 @@ export default function Log() {
           targetSets: ex.sets,
           targetReps: ex.reps,
           targetRpe: ex.rpe,
-          restSeconds: ex.restSeconds,
           sets: Array.from({ length: ex.sets }, (_, i) => ({
             setNumber: i + 1,
             weight: 0,
@@ -107,9 +63,6 @@ export default function Log() {
 
   function completeSet(exIdx: number, setIdx: number) {
     updateSet(exIdx, setIdx, "completed", true);
-    const ex = logs[exIdx];
-    setTimerSeconds(ex.restSeconds);
-    setShowTimer(true);
   }
 
   function addSet(exIdx: number) {
@@ -125,18 +78,18 @@ export default function Log() {
   }
 
   async function finishWorkout() {
-    const duration = Math.round((Date.now() - startTime.current) / 60000);
+    const day = (program?.days as any[])?.[0];
     await createWorkout.mutateAsync({
       data: {
         date: new Date().toISOString().split("T")[0],
-        dayNumber: (program?.days as any[])?.[0]?.dayNumber ?? 1,
+        dayNumber: day?.dayNumber ?? 1,
         weekNumber: program?.weekNumber ?? 1,
+        dayLabel: day?.label ?? null,
         exercisesLogged: logs.map((ex) => ({
           name: ex.name,
           muscle: ex.muscle,
           sets: ex.sets,
         })),
-        durationMinutes: duration,
         notes: null,
       },
     });
@@ -178,12 +131,11 @@ export default function Log() {
               </div>
               <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Target: {ex.targetSets} × {ex.targetReps} @ RPE {ex.targetRpe} · {ex.restSeconds}s rest
+                Target: {ex.targetSets} × {ex.targetReps} @ RPE {ex.targetRpe}
               </p>
             </div>
 
             <div className="p-4">
-              {/* Table header */}
               <div className="grid grid-cols-5 gap-2 mb-2 text-xs text-muted-foreground font-medium">
                 <span>Set</span>
                 <span>Target</span>
@@ -196,9 +148,7 @@ export default function Log() {
                 {ex.sets.map((set, setIdx) => (
                   <div
                     key={set.setNumber}
-                    className={`grid grid-cols-5 gap-2 items-center py-1 transition-colors ${
-                      set.completed ? "opacity-60" : ""
-                    }`}
+                    className={`grid grid-cols-5 gap-2 items-center py-1 ${set.completed ? "opacity-60" : ""}`}
                     data-testid={`set-row-${exIdx}-${setIdx}`}
                   >
                     <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
@@ -232,7 +182,7 @@ export default function Log() {
                         data-testid={`input-rpe-${exIdx}-${setIdx}`}
                       />
                       <button
-                        onClick={() => set.completed ? undefined : completeSet(exIdx, setIdx)}
+                        onClick={() => !set.completed && completeSet(exIdx, setIdx)}
                         disabled={set.completed}
                         className={`p-1.5 rounded-lg transition-colors ${
                           set.completed
@@ -277,12 +227,6 @@ export default function Log() {
           </button>
         </div>
       </div>
-
-      <AnimatePresence>
-        {showTimer && (
-          <RestTimer seconds={timerSeconds} onDismiss={() => setShowTimer(false)} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

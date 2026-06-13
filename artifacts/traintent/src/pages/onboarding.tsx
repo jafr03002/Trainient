@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile } from "@workspace/api-client-react";
-import { useGenerateProgram } from "@workspace/api-client-react";
+import { useCreateProfile, useGenerateProgram } from "@workspace/api-client-react";
 
 const GOALS = [
   { value: "hypertrophy", label: "Build muscle", sub: "Hypertrophy" },
@@ -35,6 +34,7 @@ const SPLIT_HINTS: Record<number, string> = {
 };
 
 type FormState = {
+  mode: string;
   goal: string;
   experience: string;
   trainingDays: number;
@@ -48,6 +48,7 @@ type FormState = {
 };
 
 const INITIAL: FormState = {
+  mode: "",
   goal: "",
   experience: "",
   trainingDays: 4,
@@ -67,20 +68,23 @@ export default function Onboarding() {
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
 
-  const totalSteps = 7;
+  const totalSteps = 8;
   const progress = ((step + 1) / totalSteps) * 100;
 
   function canAdvance() {
-    if (step === 0) return !!form.goal;
-    if (step === 1) return !!form.experience;
-    if (step === 3) return form.equipment.length > 0;
+    if (step === 0) return !!form.mode;
+    if (step === 1) return !!form.goal;
+    if (step === 2) return !!form.experience;
+    if (step === 4) return form.mode === "independent" || form.equipment.length > 0;
     return true;
   }
 
   function toggleEquipment(item: string) {
     setForm((f) => ({
       ...f,
-      equipment: f.equipment.includes(item) ? f.equipment.filter((e) => e !== item) : [...f.equipment, item],
+      equipment: f.equipment.includes(item)
+        ? f.equipment.filter((e) => e !== item)
+        : [...f.equipment, item],
     }));
   }
 
@@ -88,15 +92,18 @@ export default function Onboarding() {
     setForm((f) => {
       if (item === "No preference") return { ...f, priorityMuscles: ["No preference"] };
       const filtered = f.priorityMuscles.filter((m) => m !== "No preference");
-      if (filtered.includes(item)) return { ...f, priorityMuscles: filtered.filter((m) => m !== item) };
+      if (filtered.includes(item)) {
+        return { ...f, priorityMuscles: filtered.filter((m) => m !== item) };
+      }
       if (filtered.length >= 3) return f;
       return { ...f, priorityMuscles: [...filtered, item] };
     });
   }
 
-  async function handleGenerate() {
+  async function handleFinish() {
     await createProfile.mutateAsync({
       data: {
+        mode: form.mode,
         goal: form.goal,
         experience: form.experience,
         trainingDays: form.trainingDays,
@@ -109,11 +116,16 @@ export default function Onboarding() {
         priorityMuscles: form.priorityMuscles,
       },
     });
-    await generateProgram.mutateAsync();
+
+    if (form.mode === "ai") {
+      await generateProgram.mutateAsync();
+    }
+
     setLocation("/dashboard");
   }
 
   const isPending = createProfile.isPending || generateProgram.isPending;
+  const isLastStep = step === totalSteps - 1;
 
   const variants = {
     enter: { opacity: 0, x: 40 },
@@ -121,9 +133,10 @@ export default function Onboarding() {
     exit: { opacity: 0, x: -40 },
   };
 
+  const selectedMuscleCount = form.priorityMuscles.filter((m) => m !== "No preference").length;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Progress bar */}
       <div className="w-full h-1 bg-secondary/40">
         <motion.div
           className="h-full bg-primary"
@@ -147,10 +160,60 @@ export default function Onboarding() {
               exit="exit"
               transition={{ duration: 0.22 }}
             >
+              {/* Step 0 — Mode selection */}
               {step === 0 && (
                 <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">How do you want to train?</h2>
+                  <p className="text-muted-foreground mb-8">Choose your mode — you can switch later in Settings.</p>
+                  <div className="grid grid-cols-1 gap-4">
+                    <button
+                      data-testid="mode-ai"
+                      onClick={() => setForm((f) => ({ ...f, mode: "ai" }))}
+                      className={`p-5 rounded-xl border text-left transition-all ${
+                        form.mode === "ai"
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+                          <Brain className="w-5 h-5" />
+                        </div>
+                        <span className="font-semibold text-foreground text-lg">AI Coach</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        AI builds your program, monitors progress, and adjusts weekly based on your check-ins
+                      </p>
+                    </button>
+
+                    <button
+                      data-testid="mode-independent"
+                      onClick={() => setForm((f) => ({ ...f, mode: "independent" }))}
+                      className={`p-5 rounded-xl border text-left transition-all ${
+                        form.mode === "independent"
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <span className="font-semibold text-foreground text-lg">Independent</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        You're in control. Build your own program, log your sessions, and track progression yourself — no AI involved
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 1 — Goal */}
+              {step === 1 && (
+                <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
-                  <p className="text-muted-foreground mb-8">This shapes every aspect of your program.</p>
+                  <p className="text-muted-foreground mb-8">This shapes your program and tracking.</p>
                   <div className="grid grid-cols-1 gap-3">
                     {GOALS.map((g) => (
                       <button
@@ -171,7 +234,8 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 1 && (
+              {/* Step 2 — Experience */}
+              {step === 2 && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Your experience level</h2>
                   <p className="text-muted-foreground mb-8">Honest answers lead to better programs.</p>
@@ -195,7 +259,8 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 2 && (
+              {/* Step 3 — Training days */}
+              {step === 3 && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Training days per week</h2>
                   <p className="text-muted-foreground mb-8">How many days can you commit to?</p>
@@ -215,16 +280,23 @@ export default function Onboarding() {
                   <div className="flex justify-between text-xs text-muted-foreground mb-6">
                     {[2, 3, 4, 5, 6].map((n) => <span key={n}>{n}</span>)}
                   </div>
-                  <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
-                    {SPLIT_HINTS[form.trainingDays]}
-                  </div>
+                  {form.mode === "ai" && (
+                    <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
+                      {SPLIT_HINTS[form.trainingDays]}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {step === 3 && (
+              {/* Step 4 — Equipment (skip for independent) */}
+              {step === 4 && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
-                  <p className="text-muted-foreground mb-8">Select everything you have access to.</p>
+                  <p className="text-muted-foreground mb-8">
+                    {form.mode === "ai"
+                      ? "Select everything you have access to."
+                      : "Optional — helps with progress tracking."}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {EQUIPMENT.map((item) => (
                       <button
@@ -244,10 +316,11 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 4 && (
+              {/* Step 5 — Body stats */}
+              {step === 5 && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Body stats</h2>
-                  <p className="text-muted-foreground mb-8">Optional — helps the AI calibrate intensity.</p>
+                  <p className="text-muted-foreground mb-8">Optional — helps calibrate your program.</p>
                   <div className="space-y-5">
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Age</label>
@@ -261,14 +334,17 @@ export default function Onboarding() {
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Sex</label>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Sex <span className="text-muted-foreground font-normal">(optional)</span></label>
                       <div className="flex gap-2">
-                        {["Male", "Female", "Prefer not to say"].map((s) => (
+                        {["Male", "Female"].map((s) => (
                           <button
                             key={s}
-                            data-testid={`sex-${s.toLowerCase().replace(/\s+/g, "-")}`}
-                            onClick={() => setForm((f) => ({ ...f, sex: s.toLowerCase() }))}
-                            className={`flex-1 py-2 rounded-xl border text-sm font-medium transition-all ${
+                            data-testid={`sex-${s.toLowerCase()}`}
+                            onClick={() => setForm((f) => ({
+                              ...f,
+                              sex: f.sex === s.toLowerCase() ? "" : s.toLowerCase(),
+                            }))}
+                            className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                               form.sex === s.toLowerCase()
                                 ? "border-primary bg-primary/10 text-primary"
                                 : "border-border bg-card text-muted-foreground hover:text-foreground"
@@ -323,11 +399,12 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step === 5 && (
+              {/* Step 6 — Priority muscles */}
+              {step === 6 && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Priority muscle groups</h2>
-                  <p className="text-muted-foreground mb-8">Pick up to 3. The AI adds extra volume here.</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-muted-foreground mb-8">Pick up to 3. Extra volume goes here.</p>
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {MUSCLES.map((m) => (
                       <button
                         key={m}
@@ -343,27 +420,37 @@ export default function Onboarding() {
                       </button>
                     ))}
                   </div>
-                  {form.priorityMuscles.length === 3 && (
-                    <p className="text-xs text-muted-foreground mt-4">Maximum 3 selected</p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {form.priorityMuscles.includes("No preference")
+                      ? "No preference selected"
+                      : `${selectedMuscleCount} / 3 selected`}
+                  </p>
                 </div>
               )}
 
-              {step === 6 && (
+              {/* Step 7 — Review & finish */}
+              {step === 7 && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Ready to build your program</h2>
-                  <p className="text-muted-foreground mb-8">Here's what your AI coach will use.</p>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    {form.mode === "ai" ? "Ready to build your program" : "You're all set"}
+                  </h2>
+                  <p className="text-muted-foreground mb-8">
+                    {form.mode === "ai"
+                      ? "Here's what your AI coach will use."
+                      : "Your profile is ready. Head to My Program to build your first program."}
+                  </p>
                   <div className="space-y-3 mb-8">
                     {[
-                      { label: "Goal", value: GOALS.find((g) => g.value === form.goal)?.label },
-                      { label: "Experience", value: EXPERIENCE.find((e) => e.value === form.experience)?.label },
+                      { label: "Mode", value: form.mode === "ai" ? "AI Coach" : "Independent" },
+                      form.goal && { label: "Goal", value: GOALS.find((g) => g.value === form.goal)?.label },
+                      form.experience && { label: "Experience", value: EXPERIENCE.find((e) => e.value === form.experience)?.label },
                       { label: "Training days", value: `${form.trainingDays} days/week` },
-                      { label: "Equipment", value: form.equipment.join(", ") },
+                      form.equipment.length > 0 && { label: "Equipment", value: form.equipment.join(", ") },
                       form.age && { label: "Age", value: form.age },
                       form.sex && { label: "Sex", value: form.sex },
                       form.weight && { label: "Weight", value: `${form.weight} ${form.weightUnit}` },
                       form.injuries && { label: "Injuries", value: form.injuries },
-                      form.priorityMuscles.length && { label: "Priority muscles", value: form.priorityMuscles.join(", ") },
+                      form.priorityMuscles.length > 0 && { label: "Priority muscles", value: form.priorityMuscles.join(", ") },
                     ]
                       .filter(Boolean)
                       .map((item: any) => (
@@ -382,17 +469,21 @@ export default function Onboarding() {
 
                   <Button
                     className="w-full h-12 text-base font-semibold"
-                    onClick={handleGenerate}
+                    onClick={handleFinish}
                     disabled={isPending}
                     data-testid="button-generate-program"
                   >
                     {isPending ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        {createProfile.isPending ? "Saving profile..." : "Building your program..."}
+                        {createProfile.isPending
+                          ? "Saving profile..."
+                          : "Building your program..."}
                       </>
-                    ) : (
+                    ) : form.mode === "ai" ? (
                       "Generate my program"
+                    ) : (
+                      "Get started"
                     )}
                   </Button>
                 </div>
@@ -400,7 +491,7 @@ export default function Onboarding() {
             </motion.div>
           </AnimatePresence>
 
-          {step < 6 && (
+          {!isLastStep && (
             <div className="flex items-center gap-3 mt-10">
               {step > 0 && (
                 <Button
@@ -423,6 +514,18 @@ export default function Onboarding() {
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
+          )}
+
+          {isLastStep && step > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setStep((s) => s - 1)}
+              className="h-11 mt-4 w-full"
+              data-testid="button-back"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Back
+            </Button>
           )}
         </div>
       </div>

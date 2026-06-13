@@ -36,6 +36,61 @@ router.get("/programs", requireAuth, async (req, res) => {
   res.json(programs.map(serializeProgram));
 });
 
+// Manual program creation (independent mode)
+router.post("/programs", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const { programName, splitType, days } = req.body;
+  if (!programName || !splitType || !days) {
+    res.status(400).json({ error: "programName, splitType, and days are required" });
+    return;
+  }
+
+  const latestProgram = await db.query.programsTable.findFirst({
+    where: eq(programsTable.userId, userId),
+    orderBy: [desc(programsTable.weekNumber)],
+  });
+  const newWeekNumber = (latestProgram?.weekNumber ?? 0) + 1;
+
+  const [program] = await db
+    .insert(programsTable)
+    .values({
+      userId,
+      weekNumber: newWeekNumber,
+      programName,
+      splitType,
+      aiNotes: "",
+      days,
+      aiGenerated: false,
+    })
+    .returning();
+
+  res.status(201).json(serializeProgram(program));
+});
+
+// Update existing manual program
+router.put("/programs/:id", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const { programName, splitType, days } = req.body;
+  if (!programName || !splitType || !days) {
+    res.status(400).json({ error: "programName, splitType, and days are required" });
+    return;
+  }
+
+  const [program] = await db
+    .update(programsTable)
+    .set({ programName, splitType, days })
+    .where(eq(programsTable.id, id))
+    .returning();
+
+  if (!program || program.userId !== userId) {
+    res.status(404).json({ error: "Program not found" });
+    return;
+  }
+
+  res.json(serializeProgram(program));
+});
+
 router.post("/programs/generate", requireAuth, async (req, res) => {
   const userId = getUserId(req);
 
@@ -121,6 +176,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
       splitType: raw.split_type,
       aiNotes: raw.ai_notes,
       days,
+      aiGenerated: true,
     })
     .returning();
 

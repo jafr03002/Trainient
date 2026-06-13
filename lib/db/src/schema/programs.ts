@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,7 @@ export const programsTable = pgTable("programs", {
   splitType: text("split_type").notNull(),
   aiNotes: text("ai_notes").notNull().default(""),
   days: jsonb("days").notNull().default([]),
+  aiGenerated: boolean("ai_generated").notNull().default(true),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
 });
 

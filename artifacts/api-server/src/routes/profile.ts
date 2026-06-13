@@ -9,6 +9,14 @@ import {
 
 const router = Router();
 
+function serializeProfile(p: typeof userProfilesTable.$inferSelect) {
+  return {
+    ...p,
+    createdAt: p.createdAt.toISOString(),
+    onboardingCompletedAt: p.onboardingCompletedAt?.toISOString() ?? null,
+  };
+}
+
 router.get("/profile", requireAuth, async (req, res) => {
   const userId = getUserId(req);
   const profile = await db.query.userProfilesTable.findFirst({
@@ -18,10 +26,7 @@ router.get("/profile", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Profile not found" });
     return;
   }
-  res.json({
-    ...profile,
-    createdAt: profile.createdAt.toISOString(),
-  });
+  res.json(serializeProfile(profile));
 });
 
 router.post("/profile", requireAuth, async (req, res) => {
@@ -32,45 +37,47 @@ router.post("/profile", requireAuth, async (req, res) => {
     return;
   }
   const data = parsed.data;
+  const now = new Date();
   const [profile] = await db
     .insert(userProfilesTable)
     .values({
       userId,
       name: data.name ?? null,
-      goal: data.goal,
-      experience: data.experience,
+      mode: data.mode ?? "ai",
+      goal: data.goal ?? "",
+      experience: data.experience ?? "",
       trainingDays: data.trainingDays,
-      equipment: data.equipment,
+      equipment: data.equipment ?? [],
       age: data.age ?? null,
       sex: data.sex ?? null,
       weight: data.weight ?? null,
       weightUnit: data.weightUnit ?? "kg",
       injuries: data.injuries ?? null,
-      priorityMuscles: data.priorityMuscles,
+      priorityMuscles: data.priorityMuscles ?? [],
       onboardingComplete: true,
+      onboardingCompletedAt: now,
     })
     .onConflictDoUpdate({
       target: userProfilesTable.userId,
       set: {
         name: data.name ?? null,
-        goal: data.goal,
-        experience: data.experience,
+        mode: data.mode ?? "ai",
+        goal: data.goal ?? "",
+        experience: data.experience ?? "",
         trainingDays: data.trainingDays,
-        equipment: data.equipment,
+        equipment: data.equipment ?? [],
         age: data.age ?? null,
         sex: data.sex ?? null,
         weight: data.weight ?? null,
         weightUnit: data.weightUnit ?? "kg",
         injuries: data.injuries ?? null,
-        priorityMuscles: data.priorityMuscles,
+        priorityMuscles: data.priorityMuscles ?? [],
         onboardingComplete: true,
+        onboardingCompletedAt: now,
       },
     })
     .returning();
-  res.status(201).json({
-    ...profile,
-    createdAt: profile.createdAt.toISOString(),
-  });
+  res.status(201).json(serializeProfile(profile));
 });
 
 router.patch("/profile", requireAuth, async (req, res) => {
@@ -89,10 +96,7 @@ router.patch("/profile", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Profile not found" });
     return;
   }
-  res.json({
-    ...profile,
-    createdAt: profile.createdAt.toISOString(),
-  });
+  res.json(serializeProfile(profile));
 });
 
 export default router;

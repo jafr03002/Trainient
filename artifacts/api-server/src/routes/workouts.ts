@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, workoutLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateWorkoutBody, ListWorkoutsQueryParams } from "@workspace/api-zod";
@@ -62,11 +62,9 @@ router.get("/workouts/stats", requireAuth, async (req, res) => {
   const totalLogged = logs.length;
   const lastSessionDate = logs[0]?.date ?? null;
 
-  // Determine current week number from most recent program week
   const weekNumbers = [...new Set(logs.map((l) => l.weekNumber))].sort((a, b) => b - a);
   const currentWeek = weekNumbers[0] ?? 1;
 
-  // Simple streak: count consecutive days from today backwards
   let streakDays = 0;
   const today = new Date();
   for (let i = 0; i < 30; i++) {
@@ -81,6 +79,20 @@ router.get("/workouts/stats", requireAuth, async (req, res) => {
   }
 
   res.json({ currentWeek, totalLogged, lastSessionDate, streakDays });
+});
+
+router.get("/workouts/by-day-label", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const label = req.query["label"] as string;
+  if (!label) {
+    res.status(400).json({ error: "label query param required" });
+    return;
+  }
+  const logs = await db.query.workoutLogsTable.findMany({
+    where: and(eq(workoutLogsTable.userId, userId), eq(workoutLogsTable.dayLabel, label)),
+    orderBy: [desc(workoutLogsTable.createdAt)],
+  });
+  res.json(logs.map(serializeLog));
 });
 
 export default router;

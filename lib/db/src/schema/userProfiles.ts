@@ -5,9 +5,10 @@ import { z } from "zod/v4";
 export const userProfilesTable = pgTable("user_profiles", {
   userId: text("user_id").primaryKey(),
   name: text("name"),
-  goal: text("goal").notNull(),
-  experience: text("experience").notNull(),
-  trainingDays: integer("training_days").notNull(),
+  mode: text("mode").notNull().default("ai"),
+  goal: text("goal").notNull().default(""),
+  experience: text("experience").notNull().default(""),
+  trainingDays: integer("training_days").notNull().default(4),
   equipment: text("equipment").array().notNull().default([]),
   age: integer("age"),
   sex: text("sex"),
@@ -16,6 +17,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   injuries: text("injuries"),
   priorityMuscles: text("priority_muscles").array().notNull().default([]),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  onboardingCompletedAt: timestamp("onboarding_completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

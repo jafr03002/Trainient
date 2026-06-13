@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CheckoutSession {
-  url: string;
+export interface CalendarColorInput {
+  dayLabel: string;
+  hexColor: string;
 }

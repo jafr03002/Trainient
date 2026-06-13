@@ -8,6 +8,7 @@ export const workoutLogsTable = pgTable("workout_logs", {
   date: text("date").notNull(),
   dayNumber: integer("day_number").notNull(),
   weekNumber: integer("week_number").notNull(),
+  dayLabel: text("day_label"),
   exercisesLogged: jsonb("exercises_logged").notNull().default([]),
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),

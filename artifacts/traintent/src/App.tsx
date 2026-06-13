@@ -17,6 +17,7 @@ import Log from "@/pages/log";
 import Checkin from "@/pages/checkin";
 import Progress from "@/pages/progress";
 import Settings from "@/pages/settings";
+import Calendar from "@/pages/calendar";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -132,23 +133,6 @@ function ApiAuthWirer() {
   return null;
 }
 
-function ProtectedRoute({ component: Component, ...rest }: any) {
-  return (
-    <Route {...rest}>
-      {() => (
-        <>
-          <Show when="signed-in">
-            <Component />
-          </Show>
-          <Show when="signed-out">
-            <Redirect to="/sign-in" />
-          </Show>
-        </>
-      )}
-    </Route>
-  );
-}
-
 function HomeRedirect() {
   return (
     <>
@@ -208,6 +192,7 @@ function App() {
                           <Route path="/program" component={Program} />
                           <Route path="/log" component={Log} />
                           <Route path="/checkin" component={Checkin} />
+                          <Route path="/calendar" component={Calendar} />
                           <Route path="/progress" component={Progress} />
                           <Route path="/settings" component={Settings} />
                           <Route component={NotFound} />

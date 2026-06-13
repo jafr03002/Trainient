@@ -8,10 +8,18 @@ import {
   useGetSubscription,
   useCreateCheckoutSession,
   useCreatePortalSession,
+  useGetCalendarColors,
+  useUpsertCalendarColor,
   getGetProfileQueryKey,
   getGetSubscriptionQueryKey,
+  getGetCalendarColorsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+
+const DEFAULT_COLORS = [
+  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
+];
 
 export default function Settings() {
   const { user } = useUser();
@@ -22,6 +30,8 @@ export default function Settings() {
   const updateProfile = useUpdateProfile();
   const createCheckout = useCreateCheckoutSession();
   const createPortal = useCreatePortalSession();
+  const calendarColors = useGetCalendarColors();
+  const upsertColor = useUpsertCalendarColor();
 
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
@@ -29,6 +39,9 @@ export default function Settings() {
   const [age, setAge] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showModeConfirm, setShowModeConfirm] = useState(false);
+  const [pendingMode, setPendingMode] = useState<string | null>(null);
+  const [colorMap, setColorMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (profile.data) {
@@ -38,6 +51,14 @@ export default function Settings() {
       setAge(profile.data.age?.toString() ?? "");
     }
   }, [profile.data, user?.firstName]);
+
+  useEffect(() => {
+    if (calendarColors.data) {
+      const map: Record<string, string> = {};
+      calendarColors.data.forEach((c) => { map[c.dayLabel] = c.hexColor; });
+      setColorMap(map);
+    }
+  }, [calendarColors.data]);
 
   async function handleSave() {
     await updateProfile.mutateAsync({
@@ -51,6 +72,14 @@ export default function Settings() {
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleModeSwitch() {
+    if (!pendingMode) return;
+    await updateProfile.mutateAsync({ data: { mode: pendingMode } });
+    queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
+    setShowModeConfirm(false);
+    setPendingMode(null);
   }
 
   async function handleUpgrade() {
@@ -69,6 +98,17 @@ export default function Settings() {
     const result = await createPortal.mutateAsync();
     if (result.url) window.open(result.url, "_blank");
   }
+
+  async function handleColorChange(label: string, hex: string) {
+    setColorMap((m) => ({ ...m, [label]: hex }));
+    await upsertColor.mutateAsync({ data: { dayLabel: label, hexColor: hex } });
+    queryClient.invalidateQueries({ queryKey: getGetCalendarColorsQueryKey() });
+  }
+
+  const currentMode = profile.data?.mode ?? "ai";
+
+  // Unique day labels from calendar colors data
+  const knownLabels = calendarColors.data?.map((c) => c.dayLabel) ?? [];
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
@@ -152,11 +192,122 @@ export default function Settings() {
         </button>
       </motion.section>
 
+      {/* Training mode */}
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        className="p-5 rounded-xl bg-card border border-border space-y-4"
+      >
+        <h2 className="font-semibold text-foreground">Training mode</h2>
+        <div className="flex items-center gap-3">
+          <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${
+            currentMode === "ai"
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "bg-secondary/50 text-muted-foreground border-border"
+          }`}>
+            {currentMode === "ai" ? "AI Coach" : "Independent"}
+          </div>
+        </div>
+
+        {currentMode === "ai" ? (
+          <div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Switch to Independent mode to build and manage your own program without AI.
+            </p>
+            <button
+              onClick={() => { setPendingMode("independent"); setShowModeConfirm(true); }}
+              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+            >
+              Switch to Independent
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Switch to AI Coach mode to get AI-generated programs and weekly adjustments.
+            </p>
+            <button
+              onClick={() => { setPendingMode("ai"); setShowModeConfirm(true); }}
+              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+            >
+              Switch to AI Coach
+            </button>
+          </div>
+        )}
+
+        {showModeConfirm && (
+          <div className="p-4 rounded-xl bg-secondary/20 border border-border">
+            <p className="text-sm text-foreground font-medium mb-2">
+              Switch to {pendingMode === "ai" ? "AI Coach" : "Independent"} mode?
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+              {pendingMode === "ai"
+                ? "Switching to AI Coach will trigger program regeneration on your next visit to My Program."
+                : "Your existing program will remain, but AI check-ins and adjustments will be disabled."}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowModeConfirm(false); setPendingMode(null); }}
+                className="flex-1 h-9 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleModeSwitch}
+                disabled={updateProfile.isPending}
+                className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.section>
+
+      {/* Calendar colours */}
+      {knownLabels.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-5 rounded-xl bg-card border border-border space-y-4"
+        >
+          <div>
+            <h2 className="font-semibold text-foreground">Calendar colours</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Customise the colour for each training day label.</p>
+          </div>
+
+          <div className="space-y-3">
+            {knownLabels.map((label, i) => {
+              const currentColor = colorMap[label] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length] ?? "#3b82f6";
+              return (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">{label}</span>
+                  <label className="relative cursor-pointer">
+                    <div
+                      className="w-8 h-8 rounded-lg border-2 border-border overflow-hidden cursor-pointer hover:border-primary transition-colors"
+                      style={{ background: currentColor }}
+                    />
+                    <input
+                      type="color"
+                      value={currentColor}
+                      onChange={(e) => handleColorChange(label, e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
       {/* Subscription */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.12 }}
         className="p-5 rounded-xl bg-card border border-border space-y-4"
       >
         <h2 className="font-semibold text-foreground">Subscription</h2>
@@ -214,7 +365,7 @@ export default function Settings() {
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.14 }}
+        transition={{ delay: 0.16 }}
         className="p-5 rounded-xl bg-card border border-destructive/20 space-y-4"
         data-testid="danger-zone"
       >

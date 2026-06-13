@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: Traintent AI Gym Coaching API
+  description: Trainient AI Gym Coaching API
 servers:
   - url: /api
     description: Base API path
@@ -13,7 +13,7 @@ tags:
   - name: profile
     description: User profile and onboarding
   - name: programs
-    description: AI-generated training programs
+    description: Training programs
   - name: workouts
     description: Workout logging
   - name: checkins
@@ -22,8 +22,8 @@ tags:
     description: Progress analytics
   - name: subscriptions
     description: Stripe subscription management
-  - name: ai
-    description: AI generation endpoints
+  - name: calendar
+    description: Calendar colours
 
 paths:
   /healthz:
@@ -119,15 +119,51 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Program"
+    post:
+      operationId: createManualProgram
+      tags: [programs]
+      summary: Create a manual (non-AI) program
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualProgramInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Program"
 
   /programs/generate:
     post:
       operationId: generateProgram
-      tags: [programs, ai]
+      tags: [programs]
       summary: Trigger AI generation of a new program based on user profile
       responses:
         "201":
           description: Program generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Program"
+
+  /programs/:id:
+    put:
+      operationId: updateProgram
+      tags: [programs]
+      summary: Update a manual program (add/edit days and exercises)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualProgramInput"
+      responses:
+        "200":
+          description: Updated
           content:
             application/json:
               schema:
@@ -205,6 +241,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkoutStats"
 
+  /workouts/by-day-label:
+    get:
+      operationId: getWorkoutsByDayLabel
+      tags: [workouts]
+      summary: Get all workouts for a specific day label (for session review comparison)
+      parameters:
+        - name: label
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Workouts for this day label
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutLog"
+
   # ── Check-ins ─────────────────────────────────────────────────────────────────
   /checkins:
     get:
@@ -222,7 +279,7 @@ paths:
                   $ref: "#/components/schemas/Checkin"
     post:
       operationId: submitCheckin
-      tags: [checkins, ai]
+      tags: [checkins]
       summary: Submit weekly check-in and trigger AI program adjustment
       requestBody:
         required: true
@@ -335,6 +392,39 @@ paths:
                 items:
                   type: string
 
+  # ── Calendar colours ──────────────────────────────────────────────────────────
+  /calendar/colors:
+    get:
+      operationId: getCalendarColors
+      tags: [calendar]
+      summary: Get all calendar day-label colour mappings for the user
+      responses:
+        "200":
+          description: Colour mappings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarColor"
+    post:
+      operationId: upsertCalendarColor
+      tags: [calendar]
+      summary: Save or update a colour for a day label
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalendarColorInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarColor"
+
   # ── Subscriptions ─────────────────────────────────────────────────────────────
   /subscriptions/current:
     get:
@@ -406,59 +496,63 @@ components:
     # ── Profile ────────────────────────────────────────────────────────────────
     UserProfile:
       type: object
-      required: [userId, goal, experience, trainingDays, equipment, priorityMuscles, onboardingComplete, createdAt]
+      required: [userId, mode, goal, experience, trainingDays, equipment, priorityMuscles, onboardingComplete, createdAt]
       properties:
-        userId:         { type: string }
-        name:           { type: ["string", "null"] }
-        goal:           { type: string }
-        experience:     { type: string }
-        trainingDays:   { type: integer }
-        equipment:      { type: array, items: { type: string } }
-        age:            { type: ["integer", "null"] }
-        sex:            { type: ["string", "null"] }
-        weight:         { type: ["number", "null"] }
-        weightUnit:     { type: ["string", "null"] }
-        injuries:       { type: ["string", "null"] }
-        priorityMuscles: { type: array, items: { type: string } }
-        onboardingComplete: { type: boolean }
-        createdAt:      { type: string }
+        userId:                 { type: string }
+        name:                   { type: ["string", "null"] }
+        mode:                   { type: string }
+        goal:                   { type: string }
+        experience:             { type: string }
+        trainingDays:           { type: integer }
+        equipment:              { type: array, items: { type: string } }
+        age:                    { type: ["integer", "null"] }
+        sex:                    { type: ["string", "null"] }
+        weight:                 { type: ["number", "null"] }
+        weightUnit:             { type: ["string", "null"] }
+        injuries:               { type: ["string", "null"] }
+        priorityMuscles:        { type: array, items: { type: string } }
+        onboardingComplete:     { type: boolean }
+        onboardingCompletedAt:  { type: ["string", "null"] }
+        createdAt:              { type: string }
 
     UserProfileInput:
       type: object
-      required: [goal, experience, trainingDays, equipment, priorityMuscles]
+      required: [mode, trainingDays]
       properties:
-        name:           { type: string }
-        goal:           { type: string }
-        experience:     { type: string }
-        trainingDays:   { type: integer }
-        equipment:      { type: array, items: { type: string } }
-        age:            { type: ["integer", "null"] }
-        sex:            { type: ["string", "null"] }
-        weight:         { type: ["number", "null"] }
-        weightUnit:     { type: ["string", "null"] }
-        injuries:       { type: ["string", "null"] }
-        priorityMuscles: { type: array, items: { type: string } }
+        name:                   { type: string }
+        mode:                   { type: string }
+        goal:                   { type: string }
+        experience:             { type: string }
+        trainingDays:           { type: integer }
+        equipment:              { type: array, items: { type: string } }
+        age:                    { type: ["integer", "null"] }
+        sex:                    { type: ["string", "null"] }
+        weight:                 { type: ["number", "null"] }
+        weightUnit:             { type: ["string", "null"] }
+        injuries:               { type: ["string", "null"] }
+        priorityMuscles:        { type: array, items: { type: string } }
 
     UserProfileUpdate:
       type: object
       properties:
         name:           { type: string }
+        mode:           { type: string }
         age:            { type: ["integer", "null"] }
         weight:         { type: ["number", "null"] }
         weightUnit:     { type: ["string", "null"] }
         injuries:       { type: ["string", "null"] }
 
-    # ── Programs ──────────────────────────────────────────────────────────────
+    # ── Programs ───────────────────────────────────────────────────────────────
     Exercise:
       type: object
-      required: [name, sets, reps, rpe, restSeconds, cue, muscle]
+      required: [name, sets, reps, muscle]
       properties:
         name:        { type: string }
         sets:        { type: integer }
         reps:        { type: string }
-        rpe:         { type: integer }
-        restSeconds: { type: integer }
-        cue:         { type: string }
+        rpe:         { type: ["integer", "null"] }
+        restSeconds: { type: ["integer", "null"] }
+        cue:         { type: ["string", "null"] }
         muscle:      { type: string }
 
     ProgramDay:
@@ -475,19 +569,31 @@ components:
 
     Program:
       type: object
-      required: [id, userId, weekNumber, programName, splitType, aiNotes, days, generatedAt]
+      required: [id, userId, weekNumber, programName, splitType, aiNotes, days, aiGenerated, generatedAt]
       properties:
-        id:          { type: integer }
-        userId:      { type: string }
-        weekNumber:  { type: integer }
-        programName: { type: string }
-        splitType:   { type: string }
-        aiNotes:     { type: string }
+        id:           { type: integer }
+        userId:       { type: string }
+        weekNumber:   { type: integer }
+        programName:  { type: string }
+        splitType:    { type: string }
+        aiNotes:      { type: string }
+        aiGenerated:  { type: boolean }
         days:
           type: array
           items:
             $ref: "#/components/schemas/ProgramDay"
-        generatedAt: { type: string }
+        generatedAt:  { type: string }
+
+    ManualProgramInput:
+      type: object
+      required: [programName, splitType, days]
+      properties:
+        programName:  { type: string }
+        splitType:    { type: string }
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgramDay"
 
     # ── Workouts ──────────────────────────────────────────────────────────────
     LoggedSet:
@@ -513,18 +619,18 @@ components:
 
     WorkoutLog:
       type: object
-      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, durationMinutes, createdAt]
+      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, createdAt]
       properties:
         id:               { type: integer }
         userId:           { type: string }
         date:             { type: string }
         dayNumber:        { type: integer }
         weekNumber:       { type: integer }
+        dayLabel:         { type: ["string", "null"] }
         exercisesLogged:
           type: array
           items:
             $ref: "#/components/schemas/LoggedExercise"
-        durationMinutes:  { type: ["integer", "null"] }
         notes:            { type: ["string", "null"] }
         createdAt:        { type: string }
 
@@ -535,11 +641,11 @@ components:
         date:             { type: string }
         dayNumber:        { type: integer }
         weekNumber:       { type: integer }
+        dayLabel:         { type: ["string", "null"] }
         exercisesLogged:
           type: array
           items:
             $ref: "#/components/schemas/LoggedExercise"
-        durationMinutes:  { type: ["integer", "null"] }
         notes:            { type: ["string", "null"] }
 
     WorkoutStats:
@@ -624,6 +730,23 @@ components:
         legs:       { type: integer }
         glutes:     { type: integer }
         core:       { type: integer }
+
+    # ── Calendar colours ──────────────────────────────────────────────────────
+    CalendarColor:
+      type: object
+      required: [id, userId, dayLabel, hexColor]
+      properties:
+        id:         { type: integer }
+        userId:     { type: string }
+        dayLabel:   { type: string }
+        hexColor:   { type: string }
+
+    CalendarColorInput:
+      type: object
+      required: [dayLabel, hexColor]
+      properties:
+        dayLabel:   { type: string }
+        hexColor:   { type: string }
 
     # ── Subscriptions ─────────────────────────────────────────────────────────
     Subscription:

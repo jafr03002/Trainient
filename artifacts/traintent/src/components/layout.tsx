@@ -6,7 +6,8 @@ import {
   Activity, 
   ClipboardCheck, 
   LineChart, 
-  Settings, 
+  Settings,
+  Calendar,
   LogOut 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Program", href: "/program", icon: Dumbbell },
   { name: "Log Workout", href: "/log", icon: Activity },
-  { name: "Check-in", href: "/checkin", icon: ClipboardCheck },
+  { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Progress", href: "/progress", icon: LineChart },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -24,7 +25,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { signOut } = useClerk();
 
-  // Hide layout for onboarding
   if (location === "/onboarding") {
     return <main className="min-h-screen bg-background">{children}</main>;
   }
@@ -38,7 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground">
               T
             </div>
-            Traintent
+            Trainient
           </Link>
         </div>
         
@@ -77,14 +77,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 relative min-h-screen overflow-x-hidden">
+      <main className="flex-1 md:ml-64 relative min-h-screen overflow-x-hidden pb-20 md:pb-0">
         {children}
       </main>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-card/80 backdrop-blur-md z-50">
-        <nav className="flex items-center justify-around p-3">
-          {navItems.slice(0, 5).map((item) => {
+      <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-border bg-card/90 backdrop-blur-md z-50">
+        <nav className="flex items-center justify-around px-2 py-2">
+          {navItems.slice(0, 6).map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
             
@@ -92,12 +92,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-1 p-2 rounded-lg ${
+                className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.name}</span>
+                <span className="text-[9px] font-medium">{item.name.replace(" ", "\n")}</span>
               </Link>
             );
           })}

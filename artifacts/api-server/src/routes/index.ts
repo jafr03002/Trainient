@@ -6,6 +6,7 @@ import workoutsRouter from "./workouts";
 import checkinsRouter from "./checkins";
 import progressRouter from "./progress";
 import subscriptionsRouter from "./subscriptions";
+import calendarRouter from "./calendar";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(workoutsRouter);
 router.use(checkinsRouter);
 router.use(progressRouter);
 router.use(subscriptionsRouter);
+router.use(calendarRouter);
 
 export default router;

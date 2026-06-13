@@ -3,3 +3,4 @@ export * from "./programs";
 export * from "./workoutLogs";
 export * from "./checkins";
 export * from "./subscriptions";
+export * from "./calendarColors";
