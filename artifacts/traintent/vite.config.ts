@@ -66,6 +66,14 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Local dev: forward API + Clerk proxy calls to the Express server.
+    // On Replit this routing is handled by the platform proxy instead.
+    proxy: {
+      "/api": {
+        target: process.env.API_PROXY_TARGET ?? "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port,
