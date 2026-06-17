@@ -30,11 +30,27 @@ type SessionModalProps = {
   onClose: () => void;
 };
 
-function getTopSet(sets: any[]): { weight: number; reps: number } | null {
+function getTopSet(sets: any[]): any | null {
   if (!sets || sets.length === 0) return null;
   return sets.reduce((best: any, s: any) => {
     return !best || (s.weight ?? 0) > (best.weight ?? 0) ? s : best;
   }, null);
+}
+
+function isUnilateralSet(s: any): boolean {
+  return s && (s.repsLeft != null || s.repsRight != null);
+}
+
+// Comparable rep count: lower of the two sides for unilateral sets (section 7).
+function setReps(s: any): number {
+  if (isUnilateralSet(s)) return Math.min(s.repsLeft ?? 0, s.repsRight ?? 0);
+  return s.reps ?? 0;
+}
+
+// Display label, e.g. "8" or "8L / 7R".
+function setRepsLabel(s: any): string {
+  if (isUnilateralSet(s)) return `${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
+  return `${s.reps ?? 0}`;
 }
 
 function SessionModal({ session, previousSession, colorHex, onClose }: SessionModalProps) {
@@ -86,8 +102,8 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
                 comparison = { text: "First time logging this exercise", icon: "first" };
               } else if (topSet && prevTopSet) {
                 const weightDiff = (topSet.weight ?? 0) - (prevTopSet.weight ?? 0);
-                const prevStr = `${prevTopSet.weight}kg × ${prevTopSet.reps}`;
-                const curStr = `${topSet.weight}kg × ${topSet.reps}`;
+                const prevStr = `${prevTopSet.weight}kg × ${setRepsLabel(prevTopSet)}`;
+                const curStr = `${topSet.weight}kg × ${setRepsLabel(topSet)}`;
                 if (weightDiff > 0) {
                   comparison = { text: `Last time: ${prevStr} — Today: ${curStr} +${weightDiff}kg`, icon: "up" };
                 } else if (weightDiff < 0) {
@@ -115,9 +131,8 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
                         <div key={si} className={`flex items-center gap-3 text-sm py-0.5 ${s.isNewPr ? "text-amber-400" : "text-muted-foreground"}`}>
                           <span className="w-12 text-xs shrink-0">Set {s.setNumber}</span>
                           <span className={`font-medium ${s.isNewPr ? "text-amber-300" : "text-foreground"}`}>
-                            {s.weight}kg × {s.reps}
+                            {s.weight}kg × {setRepsLabel(s)}
                           </span>
-                          {s.rpe && <span className="text-xs">@ RPE {s.rpe}</span>}
                           {s.isNewPr && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/20 uppercase tracking-wider">PR</span>}
                         </div>
                       ))}

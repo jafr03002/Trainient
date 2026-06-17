@@ -9,8 +9,15 @@
 export interface LoggedSet {
   setNumber: number;
   weight: number;
-  reps: number;
   /** @nullable */
-  rpe: number | null;
+  reps?: number | null;
+  /** @nullable */
+  repsLeft?: number | null;
+  /** @nullable */
+  repsRight?: number | null;
+  /** @nullable */
+  rpe?: number | null;
   completed: boolean;
+  /** @nullable */
+  isNewPr?: boolean | null;
 }

@@ -112,7 +112,9 @@ export const GetCurrentProgramResponse = zod.object({
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
-  "muscle": zod.string()
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
 }))
 })),
   "generatedAt": zod.string()
@@ -141,7 +143,9 @@ export const ListProgramsResponseItem = zod.object({
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
-  "muscle": zod.string()
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
 }))
 })),
   "generatedAt": zod.string()
@@ -166,7 +170,9 @@ export const CreateManualProgramBody = zod.object({
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
-  "muscle": zod.string()
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
 }))
 }))
 })
@@ -189,7 +195,9 @@ export const UpdateProgramBody = zod.object({
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
-  "muscle": zod.string()
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
 }))
 }))
 })
@@ -213,7 +221,9 @@ export const UpdateProgramResponse = zod.object({
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
-  "muscle": zod.string()
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
 }))
 })),
   "generatedAt": zod.string()
@@ -244,9 +254,12 @@ export const ListWorkoutsResponseItem = zod.object({
   "sets": zod.array(zod.object({
   "setNumber": zod.number(),
   "weight": zod.number(),
-  "reps": zod.number(),
-  "rpe": zod.number().nullable(),
-  "completed": zod.boolean()
+  "reps": zod.number().nullish(),
+  "repsLeft": zod.number().nullish(),
+  "repsRight": zod.number().nullish(),
+  "rpe": zod.number().nullish(),
+  "completed": zod.boolean(),
+  "isNewPr": zod.boolean().nullish()
 }))
 })),
   "notes": zod.string().nullish(),
@@ -269,9 +282,12 @@ export const CreateWorkoutBody = zod.object({
   "sets": zod.array(zod.object({
   "setNumber": zod.number(),
   "weight": zod.number(),
-  "reps": zod.number(),
-  "rpe": zod.number().nullable(),
-  "completed": zod.boolean()
+  "reps": zod.number().nullish(),
+  "repsLeft": zod.number().nullish(),
+  "repsRight": zod.number().nullish(),
+  "rpe": zod.number().nullish(),
+  "completed": zod.boolean(),
+  "isNewPr": zod.boolean().nullish()
 }))
 })),
   "notes": zod.string().nullish()
@@ -294,9 +310,12 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "sets": zod.array(zod.object({
   "setNumber": zod.number(),
   "weight": zod.number(),
-  "reps": zod.number(),
-  "rpe": zod.number().nullable(),
-  "completed": zod.boolean()
+  "reps": zod.number().nullish(),
+  "repsLeft": zod.number().nullish(),
+  "repsRight": zod.number().nullish(),
+  "rpe": zod.number().nullish(),
+  "completed": zod.boolean(),
+  "isNewPr": zod.boolean().nullish()
 }))
 })),
   "notes": zod.string().nullish(),
@@ -336,9 +355,12 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "sets": zod.array(zod.object({
   "setNumber": zod.number(),
   "weight": zod.number(),
-  "reps": zod.number(),
-  "rpe": zod.number().nullable(),
-  "completed": zod.boolean()
+  "reps": zod.number().nullish(),
+  "repsLeft": zod.number().nullish(),
+  "repsRight": zod.number().nullish(),
+  "rpe": zod.number().nullish(),
+  "completed": zod.boolean(),
+  "isNewPr": zod.boolean().nullish()
 }))
 })),
   "notes": zod.string().nullish(),

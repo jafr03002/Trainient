@@ -17,4 +17,7 @@ export interface Exercise {
   /** @nullable */
   cue?: string | null;
   muscle: string;
+  /** @nullable */
+  secondaryMuscle?: string | null;
+  isUnilateral?: boolean;
 }

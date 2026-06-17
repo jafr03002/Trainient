@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
-import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords } from "@workspace/api-client-react";
+import { Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
+import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
 
 type LoggedSet = {
   setNumber: number;
   weight: number;
   reps: number;
-  rpe: number | null;
+  repsLeft: number;
+  repsRight: number;
   completed: boolean;
   isNewPr: boolean;
 };
@@ -16,20 +17,31 @@ type LoggedSet = {
 type LoggedExercise = {
   name: string;
   muscle: string;
+  isUnilateral: boolean;
   sets: LoggedSet[];
   targetSets: number;
   targetReps: string;
-  targetRpe: number;
   notes: string;
   showNotes: boolean;
 };
 
 type PrFlash = { id: number; exercise: string; weight: number };
 
+// Section 10: format a single previous set for the per-set "last time" hint.
+function formatPrevSet(s: any): string | null {
+  if (!s) return null;
+  if (s.repsLeft != null || s.repsRight != null) {
+    return `${s.weight ?? 0}kg × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
+  }
+  if (s.weight == null && s.reps == null) return null;
+  return `${s.weight ?? 0}kg × ${s.reps ?? 0}`;
+}
+
 export default function Log() {
   const [, setLocation] = useLocation();
   const { data: program } = useGetCurrentProgram();
   const { data: personalRecords } = useGetPersonalRecords();
+  const { data: history } = useListWorkouts({ limit: 200 });
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
@@ -46,26 +58,53 @@ export default function Log() {
     }
   }, [personalRecords]);
 
+  // Build "last time" lookup from workout history — keep the full set list of the
+  // most recent prior log per exercise, so each set row can show its own match.
+  const lastSetsByExercise: Record<string, any[]> = {};
+  for (const log of (history ?? []) as any[]) {
+    for (const ex of (log.exercisesLogged as any[]) ?? []) {
+      const key = ex.name?.toLowerCase();
+      if (!key || lastSetsByExercise[key]) continue; // history is newest-first; keep first seen
+      if (Array.isArray(ex.sets) && ex.sets.length > 0) lastSetsByExercise[key] = ex.sets;
+    }
+  }
+
   const sessionBestRef = useRef<Record<string, number>>({});
+
+  // Which program day to log — passed as ?day=<dayNumber> from the program page.
+  const targetDayNumber = (() => {
+    const raw = new URLSearchParams(window.location.search).get("day");
+    const n = raw ? parseInt(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  })();
+
+  function resolveDay(days: any[]): any {
+    if (targetDayNumber != null) {
+      const found = days.find((d) => d.dayNumber === targetDayNumber);
+      if (found) return found;
+    }
+    return days[0];
+  }
 
   useEffect(() => {
     if (program?.days) {
-      const day = (program.days as any[])[0];
+      const day = resolveDay(program.days as any[]);
       if (!day) return;
       setLogs(
         day.exercises.map((ex: any) => ({
           name: ex.name,
           muscle: ex.muscle,
+          isUnilateral: !!ex.isUnilateral,
           targetSets: ex.sets,
           targetReps: ex.reps,
-          targetRpe: ex.rpe,
           notes: "",
           showNotes: false,
           sets: Array.from({ length: ex.sets }, (_, i) => ({
             setNumber: i + 1,
             weight: 0,
             reps: 0,
-            rpe: null,
+            repsLeft: 0,
+            repsRight: 0,
             completed: false,
             isNewPr: false,
           })),
@@ -131,34 +170,26 @@ export default function Log() {
     });
   }
 
-  function addSet(exIdx: number) {
-    setLogs((prev) => {
-      const next = [...prev];
-      const ex = next[exIdx];
-      next[exIdx] = {
-        ...ex,
-        sets: [...ex.sets, { setNumber: ex.sets.length + 1, weight: 0, reps: 0, rpe: null, completed: false, isNewPr: false }],
-      };
-      return next;
-    });
-  }
-
   async function finishWorkout() {
-    const day = (program?.days as any[])?.[0];
+    const day = resolveDay((program?.days as any[]) ?? []);
     await createWorkout.mutateAsync({
       data: {
         date: new Date().toISOString().split("T")[0],
         dayNumber: day?.dayNumber ?? 1,
         weekNumber: program?.weekNumber ?? 1,
         dayLabel: day?.label ?? null,
-        exercisesLogged: logs.map((ex) => ({
+        exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
           name: ex.name,
           muscle: ex.muscle,
-          sets: ex.sets,
+          sets: ex.sets.map((s) =>
+            ex.isUnilateral
+              ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
+              : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
+          ),
           notes: ex.notes || undefined,
         })),
         notes: null,
-      },
+      } as any,
     });
     setLocation("/dashboard");
   }
@@ -171,7 +202,7 @@ export default function Log() {
     );
   }
 
-  const day = (program.days as any[])[0];
+  const day = resolveDay(program.days as any[]);
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
 
   return (
@@ -218,7 +249,9 @@ export default function Log() {
       </motion.div>
 
       <div className="mt-6 space-y-6">
-        {logs.map((ex, exIdx) => (
+        {logs.map((ex, exIdx) => {
+          const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
+          return (
           <motion.div
             key={ex.name}
             initial={{ opacity: 0, y: 10 }}
@@ -232,6 +265,9 @@ export default function Log() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
                   {ex.muscle}
                 </span>
+                {ex.isUnilateral && (
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
+                )}
                 {(() => {
                   const baseline = prBaselineRef.current[ex.name.toLowerCase()];
                   return baseline ? (
@@ -241,25 +277,37 @@ export default function Log() {
               </div>
               <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Target: {ex.targetSets} × {ex.targetReps} @ RPE {ex.targetRpe}
+                Target: {ex.targetSets} × {ex.targetReps}
               </p>
             </div>
 
             <div className="p-4">
-              <div className="grid grid-cols-5 gap-2 mb-2 text-xs text-muted-foreground font-medium">
-                <span>Set</span>
-                <span>Target</span>
-                <span>Weight</span>
-                <span>Reps</span>
-                <span>RPE</span>
-              </div>
+              {/* Column headers */}
+              {ex.isUnilateral ? (
+                <div className="grid grid-cols-[2rem_1fr_1fr_1fr_2rem] gap-2 mb-2 text-xs text-muted-foreground font-medium">
+                  <span>Set</span>
+                  <span>Weight</span>
+                  <span>Reps (L)</span>
+                  <span>Reps (R)</span>
+                  <span></span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[2rem_1fr_1fr_2rem] gap-2 mb-2 text-xs text-muted-foreground font-medium">
+                  <span>Set</span>
+                  <span>Weight</span>
+                  <span>Reps</span>
+                  <span></span>
+                </div>
+              )}
 
               <div className="space-y-2">
-                {ex.sets.map((set, setIdx) => (
+                {ex.sets.map((set, setIdx) => {
+                  const prevStr = formatPrevSet(prevSets?.[setIdx]);
+                  return (
+                  <div key={set.setNumber}>
                   <motion.div
-                    key={set.setNumber}
                     layout
-                    className={`grid grid-cols-5 gap-2 items-center py-1 rounded-lg transition-all ${
+                    className={`grid ${ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr_2rem]" : "grid-cols-[2rem_1fr_1fr_2rem]"} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
                     }`}
                     data-testid={`set-row-${exIdx}-${setIdx}`}
@@ -272,7 +320,6 @@ export default function Log() {
                         </motion.div>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">{ex.targetReps}</span>
                     <input
                       type="number"
                       value={set.weight || ""}
@@ -284,54 +331,64 @@ export default function Log() {
                       }`}
                       data-testid={`input-weight-${exIdx}-${setIdx}`}
                     />
-                    <input
-                      type="number"
-                      value={set.reps || ""}
-                      onChange={(e) => updateSet(exIdx, setIdx, "reps", parseInt(e.target.value) || 0)}
-                      placeholder="0"
-                      disabled={set.completed}
-                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
-                      data-testid={`input-reps-${exIdx}-${setIdx}`}
-                    />
-                    <div className="flex items-center gap-1.5">
+                    {ex.isUnilateral ? (
+                      <>
+                        <input
+                          type="number"
+                          value={set.repsLeft || ""}
+                          onChange={(e) => updateSet(exIdx, setIdx, "repsLeft", parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          disabled={set.completed}
+                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                          data-testid={`input-reps-left-${exIdx}-${setIdx}`}
+                        />
+                        <input
+                          type="number"
+                          value={set.repsRight || ""}
+                          onChange={(e) => updateSet(exIdx, setIdx, "repsRight", parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          disabled={set.completed}
+                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                          data-testid={`input-reps-right-${exIdx}-${setIdx}`}
+                        />
+                      </>
+                    ) : (
                       <input
                         type="number"
-                        value={set.rpe ?? ""}
-                        onChange={(e) => updateSet(exIdx, setIdx, "rpe", parseInt(e.target.value) || 0)}
-                        placeholder="—"
+                        value={set.reps || ""}
+                        onChange={(e) => updateSet(exIdx, setIdx, "reps", parseInt(e.target.value) || 0)}
+                        placeholder="0"
                         disabled={set.completed}
                         className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
-                        data-testid={`input-rpe-${exIdx}-${setIdx}`}
+                        data-testid={`input-reps-${exIdx}-${setIdx}`}
                       />
-                      <button
-                        onClick={() => !set.completed && completeSet(exIdx, setIdx)}
-                        disabled={set.completed}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          set.isNewPr
-                            ? "bg-amber-500/20 text-amber-400"
-                            : set.completed
-                            ? "bg-chart-2/20 text-chart-2"
-                            : "bg-secondary/30 text-muted-foreground hover:bg-primary/20 hover:text-primary"
-                        }`}
-                        data-testid={`button-complete-set-${exIdx}-${setIdx}`}
-                      >
-                        {set.isNewPr ? <Trophy className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={() => !set.completed && completeSet(exIdx, setIdx)}
+                      disabled={set.completed}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        set.isNewPr
+                          ? "bg-amber-500/20 text-amber-400"
+                          : set.completed
+                          ? "bg-chart-2/20 text-chart-2"
+                          : "bg-secondary/30 text-muted-foreground hover:bg-primary/20 hover:text-primary"
+                      }`}
+                      data-testid={`button-complete-set-${exIdx}-${setIdx}`}
+                    >
+                      {set.isNewPr ? <Trophy className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
+                    </button>
                   </motion.div>
-                ))}
+                  {prevStr && (
+                    <p className="text-[11px] text-muted-foreground/60 pl-8 mt-0.5" data-testid={`last-set-${exIdx}-${setIdx}`}>
+                      Last time: {prevStr}
+                    </p>
+                  )}
+                  </div>
+                );})}
               </div>
 
               {/* Actions row */}
-              <div className="flex items-center justify-between mt-3">
-                <button
-                  onClick={() => addSet(exIdx)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  data-testid={`button-add-set-${exIdx}`}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add set
-                </button>
+              <div className="flex items-center justify-end mt-3">
                 <button
                   onClick={() => toggleNotes(exIdx)}
                   className={`flex items-center gap-1.5 text-xs transition-colors ${
@@ -373,7 +430,7 @@ export default function Log() {
               </AnimatePresence>
             </div>
           </motion.div>
-        ))}
+        );})}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border">
