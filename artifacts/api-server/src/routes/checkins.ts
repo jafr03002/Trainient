@@ -117,7 +117,7 @@ Return ONLY valid JSON (no markdown):
       name: e.name,
       sets: e.sets,
       reps: e.reps,
-      rpe: e.rpe,
+      rpe: null,
       restSeconds: e.rest_seconds ?? e.restSeconds,
       cue: e.cue,
       muscle: e.muscle,

@@ -124,7 +124,6 @@ For each day, provide 5–7 exercises. For each exercise provide:
 - Exercise name
 - Sets
 - Rep range (e.g. 8–10)
-- RPE target (6–9)
 - Rest time in seconds
 - One coaching cue (one sentence)
 - Primary muscle group
@@ -141,7 +140,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
 { "program_name": "...", "split_type": "...", "ai_notes": "...",
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
-    "rpe": 8, "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
+    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -160,7 +159,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
       name: e.name,
       sets: e.sets,
       reps: e.reps,
-      rpe: e.rpe,
+      rpe: null,
       restSeconds: e.rest_seconds,
       cue: e.cue,
       muscle: e.muscle,

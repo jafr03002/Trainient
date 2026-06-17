@@ -79,6 +79,9 @@ export interface Exercise {
   /** @nullable */
   cue?: string | null;
   muscle: string;
+  /** @nullable */
+  secondaryMuscle?: string | null;
+  isUnilateral?: boolean;
 }
 
 export interface ProgramDay {
@@ -109,10 +112,17 @@ export interface ManualProgramInput {
 export interface LoggedSet {
   setNumber: number;
   weight: number;
-  reps: number;
   /** @nullable */
-  rpe: number | null;
+  reps?: number | null;
+  /** @nullable */
+  repsLeft?: number | null;
+  /** @nullable */
+  repsRight?: number | null;
+  /** @nullable */
+  rpe?: number | null;
   completed: boolean;
+  /** @nullable */
+  isNewPr?: boolean | null;
 }
 
 export interface LoggedExercise {

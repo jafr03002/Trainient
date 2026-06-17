@@ -547,13 +547,15 @@ components:
       type: object
       required: [name, sets, reps, muscle]
       properties:
-        name:        { type: string }
-        sets:        { type: integer }
-        reps:        { type: string }
-        rpe:         { type: ["integer", "null"] }
-        restSeconds: { type: ["integer", "null"] }
-        cue:         { type: ["string", "null"] }
-        muscle:      { type: string }
+        name:            { type: string }
+        sets:            { type: integer }
+        reps:            { type: string }
+        rpe:             { type: ["integer", "null"] }
+        restSeconds:     { type: ["integer", "null"] }
+        cue:             { type: ["string", "null"] }
+        muscle:          { type: string }
+        secondaryMuscle: { type: ["string", "null"] }
+        isUnilateral:    { type: boolean }
 
     ProgramDay:
       type: object
@@ -598,13 +600,16 @@ components:
     # ── Workouts ──────────────────────────────────────────────────────────────
     LoggedSet:
       type: object
-      required: [setNumber, weight, reps, rpe, completed]
+      required: [setNumber, weight, completed]
       properties:
         setNumber: { type: integer }
         weight:    { type: number }
-        reps:      { type: integer }
+        reps:      { type: ["integer", "null"] }
+        repsLeft:  { type: ["integer", "null"] }
+        repsRight: { type: ["integer", "null"] }
         rpe:       { type: ["integer", "null"] }
         completed: { type: boolean }
+        isNewPr:   { type: ["boolean", "null"] }
 
     LoggedExercise:
       type: object

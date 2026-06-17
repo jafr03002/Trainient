@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Dumbbell, Zap, Info, Plus, Trash2, Save, Loader2 } from "lucide-react";
-import { useGetCurrentProgram, useGetProfile, useCreateManualProgram } from "@workspace/api-client-react";
+import { ChevronDown, ChevronUp, Dumbbell, Info, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
+
+// The 10 allowed muscle options (sections 3 & 4), in order.
+const MUSCLE_OPTIONS = [
+  "Chest", "Shoulders", "Biceps", "Triceps", "Upper Back",
+  "Lats", "Quads", "Hamstrings", "Glutes", "Calves",
+] as const;
 
 type Exercise = {
   name: string;
@@ -14,6 +20,8 @@ type Exercise = {
   restSeconds: number | null;
   cue: string | null;
   muscle: string;
+  secondaryMuscle?: string | null;
+  isUnilateral?: boolean;
 };
 
 type ProgramDay = {
@@ -34,10 +42,20 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
                 {ex.muscle}
               </span>
+              {ex.secondaryMuscle && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary/40 text-muted-foreground border border-border">
+                  {ex.secondaryMuscle}
+                </span>
+              )}
+              {ex.isUnilateral && (
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                  Unilateral
+                </span>
+              )}
             </div>
             <h3 className="font-semibold text-foreground">{ex.name}</h3>
           </div>
@@ -57,12 +75,6 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
             <Dumbbell className="w-4 h-4 text-muted-foreground" />
             <span className="font-semibold text-foreground">{ex.sets} × {ex.reps}</span>
           </div>
-          {ex.rpe && (
-            <div className="flex items-center gap-1.5 text-sm">
-              <Zap className="w-4 h-4 text-muted-foreground" />
-              <span className="text-muted-foreground">RPE {ex.rpe}</span>
-            </div>
-          )}
         </div>
 
         {ex.cue && <p className="text-sm text-muted-foreground mt-3 italic">"{ex.cue}"</p>}
@@ -76,6 +88,9 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
         >
           <div className="text-sm text-muted-foreground">
             <p><span className="font-medium text-foreground">Primary muscle:</span> {ex.muscle}</p>
+            {ex.secondaryMuscle && (
+              <p className="mt-1"><span className="font-medium text-foreground">Secondary muscle:</span> {ex.secondaryMuscle}</p>
+            )}
           </div>
         </motion.div>
       )}
@@ -83,19 +98,54 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
   );
 }
 
-type EditExercise = { name: string; sets: string; reps: string; muscle: string };
+type EditExercise = {
+  name: string;
+  sets: string;
+  reps: string;
+  muscle: string;
+  secondaryMuscle: string;
+  isUnilateral: boolean;
+};
 type EditDay = { label: string; exercises: EditExercise[] };
 
-function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
+function newExercise(): EditExercise {
+  // Section 1: default sets to 2 in the build-your-own flow.
+  return { name: "", sets: "2", reps: "8-12", muscle: "", secondaryMuscle: "", isUnilateral: false };
+}
+
+function programToEditDays(program: { days: unknown }): EditDay[] {
+  const days = (program.days as ProgramDay[]) ?? [];
+  return days.map((d) => ({
+    label: d.label ?? "",
+    exercises: (d.exercises ?? []).map((e) => ({
+      name: e.name ?? "",
+      sets: String(e.sets ?? 2),
+      reps: e.reps ?? "",
+      muscle: e.muscle ?? "",
+      secondaryMuscle: e.secondaryMuscle ?? "",
+      isUnilateral: !!e.isUnilateral,
+    })),
+  }));
+}
+
+type BuilderProps = {
+  onSaved: () => void;
+  onCancel?: () => void;
+  // When provided, the builder edits this existing program instead of creating a new one.
+  editProgram?: { id: number; programName: string; splitType: string; days: unknown } | null;
+};
+
+function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) {
   const createManualProgram = useCreateManualProgram();
   const queryClient = useQueryClient();
-  const [programName, setProgramName] = useState("");
-  const [days, setDays] = useState<EditDay[]>([
-    { label: "", exercises: [{ name: "", sets: "3", reps: "8-12", muscle: "" }] },
-  ]);
+  const [saving, setSaving] = useState(false);
+  const [programName, setProgramName] = useState(editProgram?.programName ?? "");
+  const [days, setDays] = useState<EditDay[]>(
+    editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()] }],
+  );
 
   function addDay() {
-    setDays((d) => [...d, { label: "", exercises: [{ name: "", sets: "3", reps: "8-12", muscle: "" }] }]);
+    setDays((d) => [...d, { label: "", exercises: [newExercise()] }]);
   }
 
   function removeDay(di: number) {
@@ -108,7 +158,7 @@ function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
 
   function addExercise(di: number) {
     setDays((d) => d.map((day, i) =>
-      i === di ? { ...day, exercises: [...day.exercises, { name: "", sets: "3", reps: "8-12", muscle: "" }] } : day
+      i === di ? { ...day, exercises: [...day.exercises, newExercise()] } : day
     ));
   }
 
@@ -118,7 +168,18 @@ function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
     ));
   }
 
-  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string) {
+  function moveExercise(di: number, ei: number, dir: -1 | 1) {
+    setDays((d) => d.map((day, i) => {
+      if (i !== di) return day;
+      const target = ei + dir;
+      if (target < 0 || target >= day.exercises.length) return day;
+      const ex = [...day.exercises];
+      [ex[ei], ex[target]] = [ex[target], ex[ei]];
+      return { ...day, exercises: ex };
+    }));
+  }
+
+  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean) {
     setDays((d) => d.map((day, i) =>
       i === di
         ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, [field]: value } : ex) }
@@ -135,24 +196,40 @@ function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
         .filter((e) => e.name.trim())
         .map((e) => ({
           name: e.name,
-          sets: parseInt(e.sets) || 3,
+          sets: parseInt(e.sets) || 2,
           reps: e.reps,
           rpe: null,
           restSeconds: null,
           cue: null,
-          muscle: e.muscle || "General",
+          muscle: e.muscle || MUSCLE_OPTIONS[0],
+          secondaryMuscle: e.secondaryMuscle || null,
+          isUnilateral: e.isUnilateral,
         })),
     }));
 
-    await createManualProgram.mutateAsync({
-      data: {
-        programName: programName || "My Program",
-        splitType: "Custom",
-        days: programDays as any,
-      },
-    });
-    queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-    onSaved();
+    const body = {
+      programName: programName || "My Program",
+      splitType: editProgram?.splitType || "Custom",
+      days: programDays,
+    };
+
+    setSaving(true);
+    try {
+      if (editProgram) {
+        // Generated useUpdateProgram has a broken URL (literal :id), so call directly.
+        await customFetch(`/api/programs/${editProgram.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else {
+        await createManualProgram.mutateAsync({ data: body as any });
+      }
+      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -188,52 +265,100 @@ function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {day.exercises.map((ex, ei) => (
-              <div key={ei} className="grid grid-cols-12 gap-2 items-center">
-                <input
-                  type="text"
-                  value={ex.name}
-                  onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
-                  placeholder="Exercise name"
-                  className="col-span-4 px-3 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
-                />
-                <input
-                  type="text"
-                  value={ex.muscle}
-                  onChange={(e) => updateExercise(di, ei, "muscle", e.target.value)}
-                  placeholder="Muscle"
-                  className="col-span-3 px-3 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
-                />
-                <input
-                  type="text"
-                  value={ex.sets}
-                  onChange={(e) => updateExercise(di, ei, "sets", e.target.value)}
-                  placeholder="Sets"
-                  className="col-span-2 px-3 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
-                />
-                <input
-                  type="text"
-                  value={ex.reps}
-                  onChange={(e) => updateExercise(di, ei, "reps", e.target.value)}
-                  placeholder="Reps"
-                  className="col-span-2 px-3 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
-                />
-                <button
-                  onClick={() => removeExercise(di, ei)}
-                  className="col-span-1 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+              <div key={ei} className="rounded-lg border border-border/60 bg-secondary/10 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={ex.name}
+                    onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
+                    placeholder="Exercise name"
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground"
+                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveExercise(di, ei, -1)}
+                      disabled={ei === 0}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move up"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveExercise(di, ei, 1)}
+                      disabled={ei === day.exercises.length - 1}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move down"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeExercise(di, ei)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-6">
+                    <label className="text-[11px] text-muted-foreground block mb-1">Primary muscle worked</label>
+                    <select
+                      value={ex.muscle}
+                      onChange={(e) => updateExercise(di, ei, "muscle", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary"
+                    >
+                      <option value="">Select…</option>
+                      {MUSCLE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-[11px] text-muted-foreground block mb-1 text-center">Sets</label>
+                    <input
+                      type="text"
+                      value={ex.sets}
+                      onChange={(e) => updateExercise(di, ei, "sets", e.target.value)}
+                      placeholder="Sets"
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-[11px] text-muted-foreground block mb-1 text-center">Reps</label>
+                    <input
+                      type="text"
+                      value={ex.reps}
+                      onChange={(e) => updateExercise(di, ei, "reps", e.target.value)}
+                      placeholder="Reps"
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div className="col-span-12">
+                    <label className="text-[11px] text-muted-foreground/80 block mb-1">Secondary muscle worked (optional)</label>
+                    <select
+                      value={ex.secondaryMuscle}
+                      onChange={(e) => updateExercise(di, ei, "secondaryMuscle", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border/70 bg-secondary/10 text-muted-foreground text-sm focus:outline-none focus:border-primary"
+                    >
+                      <option value="">None</option>
+                      {MUSCLE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Section 2: subtle unilateral checkbox, low visual weight. */}
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground/80 cursor-pointer w-fit select-none">
+                  <input
+                    type="checkbox"
+                    checked={ex.isUnilateral}
+                    onChange={(e) => updateExercise(di, ei, "isUnilateral", e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border accent-primary"
+                  />
+                  Unilateral (one side at a time)
+                </label>
               </div>
             ))}
-          </div>
-
-          <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground px-0.5 -mt-1">
-            <span className="col-span-4">Exercise</span>
-            <span className="col-span-3">Muscle</span>
-            <span className="col-span-2 text-center">Sets</span>
-            <span className="col-span-2 text-center">Reps</span>
           </div>
 
           <button
@@ -254,17 +379,27 @@ function ManualProgramBuilder({ onSaved }: { onSaved: () => void }) {
         Add training day
       </button>
 
-      <button
-        onClick={handleSave}
-        disabled={createManualProgram.isPending}
-        className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-      >
-        {createManualProgram.isPending ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-        ) : (
-          <><Save className="w-4 h-4" /> Save program</>
+      <div className="flex gap-2">
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="px-5 h-12 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
         )}
-      </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          {saving ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+          ) : (
+            <><Save className="w-4 h-4" /> {editProgram ? "Save changes" : "Save program"}</>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -274,6 +409,7 @@ export default function Program() {
   const profileQuery = useGetProfile();
   const [activeDay, setActiveDay] = useState(0);
   const [building, setBuilding] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const isIndependent = profileQuery.data?.mode === "independent";
 
@@ -313,7 +449,7 @@ export default function Program() {
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                <ManualProgramBuilder onSaved={() => setBuilding(false)} />
+                <ManualProgramBuilder onSaved={() => setBuilding(false)} onCancel={() => setBuilding(false)} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -337,17 +473,48 @@ export default function Program() {
     );
   }
 
+  // Edit mode (independent only) — reuse the builder, prefilled with this program.
+  if (editing && isIndependent) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto space-y-6">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <h1 className="text-2xl font-bold text-foreground">Edit program</h1>
+          <p className="text-muted-foreground mt-1">Change days, exercises, sets and muscles. Past sessions stay as they were.</p>
+        </motion.div>
+        <ManualProgramBuilder
+          editProgram={{ id: program.id, programName: program.programName, splitType: program.splitType, days: program.days }}
+          onSaved={() => { setEditing(false); setActiveDay(0); }}
+          onCancel={() => setEditing(false)}
+        />
+      </div>
+    );
+  }
+
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
-        <p className="text-muted-foreground mt-1">
-          {program.splitType} · Week {program.weekNumber}
-          {!program.aiGenerated && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">Custom</span>}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
+            <p className="text-muted-foreground mt-1">
+              {program.splitType} · Week {program.weekNumber}
+              {!program.aiGenerated && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">Custom</span>}
+            </p>
+          </div>
+          {isIndependent && (
+            <button
+              onClick={() => setEditing(true)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+              data-testid="button-edit-program"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
+        </div>
         {program.aiNotes && (
           <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm text-muted-foreground">
             {program.aiNotes}
