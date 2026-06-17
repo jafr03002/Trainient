@@ -1,8 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
+import { Plus, Check, Loader2, Trophy, MessageSquare, ChevronDown, Trash2 } from "lucide-react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
+
+const MUSCLE_OPTIONS = [
+  "Chest", "Shoulders", "Biceps", "Triceps", "Upper Back",
+  "Lats", "Quads", "Hamstrings", "Glutes", "Calves",
+] as const;
 
 type LoggedSet = {
   setNumber: number;
@@ -82,9 +87,24 @@ export default function Log() {
 
   const sessionBestRef = useRef<Record<string, number>>({});
 
+  // Which program day to log — passed as ?day=<dayNumber> from the program page.
+  const targetDayNumber = (() => {
+    const raw = new URLSearchParams(window.location.search).get("day");
+    const n = raw ? parseInt(raw) : NaN;
+    return Number.isFinite(n) ? n : null;
+  })();
+
+  function resolveDay(days: any[]): any {
+    if (targetDayNumber != null) {
+      const found = days.find((d) => d.dayNumber === targetDayNumber);
+      if (found) return found;
+    }
+    return days[0];
+  }
+
   useEffect(() => {
     if (program?.days) {
-      const day = (program.days as any[])[0];
+      const day = resolveDay(program.days as any[]);
       if (!day) return;
       setLogs(
         day.exercises.map((ex: any) => ({
@@ -118,6 +138,30 @@ export default function Log() {
       };
       return next;
     });
+  }
+
+  function updateExerciseField(exIdx: number, field: "name" | "muscle" | "isUnilateral", value: string | boolean) {
+    setLogs((prev) => prev.map((ex, i) => (i === exIdx ? { ...ex, [field]: value } : ex)));
+  }
+
+  function addExercise() {
+    setLogs((prev) => [
+      ...prev,
+      {
+        name: "",
+        muscle: MUSCLE_OPTIONS[0],
+        isUnilateral: false,
+        targetSets: 2,
+        targetReps: "8-12",
+        notes: "",
+        showNotes: false,
+        sets: [{ setNumber: 1, weight: 0, reps: 0, repsLeft: 0, repsRight: 0, completed: false, isNewPr: false }],
+      },
+    ]);
+  }
+
+  function removeExercise(exIdx: number) {
+    setLogs((prev) => prev.filter((_, i) => i !== exIdx));
   }
 
   function updateNotes(exIdx: number, notes: string) {
@@ -179,14 +223,14 @@ export default function Log() {
   }
 
   async function finishWorkout() {
-    const day = (program?.days as any[])?.[0];
+    const day = resolveDay((program?.days as any[]) ?? []);
     await createWorkout.mutateAsync({
       data: {
         date: new Date().toISOString().split("T")[0],
         dayNumber: day?.dayNumber ?? 1,
         weekNumber: program?.weekNumber ?? 1,
         dayLabel: day?.label ?? null,
-        exercisesLogged: logs.map((ex) => ({
+        exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
           name: ex.name,
           muscle: ex.muscle,
           sets: ex.sets.map((s) =>
@@ -210,7 +254,7 @@ export default function Log() {
     );
   }
 
-  const day = (program.days as any[])[0];
+  const day = resolveDay(program.days as any[]);
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
 
   return (
@@ -270,20 +314,47 @@ export default function Log() {
           >
             <div className="p-4 border-b border-border/50">
               <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
-                  {ex.muscle}
-                </span>
-                {ex.isUnilateral && (
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
-                )}
+                <select
+                  value={MUSCLE_OPTIONS.includes(ex.muscle as any) ? ex.muscle : ""}
+                  onChange={(e) => updateExerciseField(exIdx, "muscle", e.target.value)}
+                  className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20 focus:outline-none"
+                  data-testid={`select-muscle-${exIdx}`}
+                >
+                  {!MUSCLE_OPTIONS.includes(ex.muscle as any) && <option value="">{ex.muscle || "Muscle"}</option>}
+                  {MUSCLE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <label className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/70 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ex.isUnilateral}
+                    onChange={(e) => updateExerciseField(exIdx, "isUnilateral", e.target.checked)}
+                    className="w-3 h-3 rounded border-border accent-primary"
+                  />
+                  Unilateral
+                </label>
                 {(() => {
                   const baseline = prBaselineRef.current[ex.name.toLowerCase()];
                   return baseline ? (
                     <span className="text-xs text-muted-foreground">PR: {baseline} kg</span>
                   ) : null;
                 })()}
+                <button
+                  onClick={() => removeExercise(exIdx)}
+                  className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  data-testid={`button-remove-exercise-${exIdx}`}
+                  title="Remove exercise"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
+              <input
+                type="text"
+                value={ex.name}
+                onChange={(e) => updateExerciseField(exIdx, "name", e.target.value)}
+                placeholder="Exercise name"
+                className="font-semibold text-foreground mt-1 w-full bg-transparent border-0 border-b border-transparent focus:border-border focus:outline-none placeholder:text-muted-foreground/60"
+                data-testid={`input-exercise-name-${exIdx}`}
+              />
               <p className="text-xs text-muted-foreground mt-0.5">
                 Target: {ex.targetSets} × {ex.targetReps}
               </p>
@@ -445,6 +516,15 @@ export default function Log() {
           </motion.div>
         );})}
       </div>
+
+      <button
+        onClick={addExercise}
+        className="w-full mt-4 py-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors flex items-center justify-center gap-2"
+        data-testid="button-add-exercise"
+      >
+        <Plus className="w-4 h-4" />
+        Add exercise
+      </button>
 
       <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border">
         <div className="max-w-3xl mx-auto">

@@ -553,7 +553,7 @@ export default function Program() {
               <h2 className="font-semibold text-foreground">{day.focus}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{day.exercises.length} exercises</p>
             </div>
-            <Link href="/log">
+            <Link href={`/log?day=${day.dayNumber}`}>
               <button
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                 data-testid="button-start-workout-program"
