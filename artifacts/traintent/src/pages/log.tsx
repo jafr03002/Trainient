@@ -1,13 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Check, Loader2, Trophy, MessageSquare, ChevronDown, Trash2 } from "lucide-react";
+import { Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
-
-const MUSCLE_OPTIONS = [
-  "Chest", "Shoulders", "Biceps", "Triceps", "Upper Back",
-  "Lats", "Quads", "Hamstrings", "Glutes", "Calves",
-] as const;
 
 type LoggedSet = {
   setNumber: number;
@@ -32,17 +27,14 @@ type LoggedExercise = {
 
 type PrFlash = { id: number; exercise: string; weight: number };
 
-// Section 10: "last time" summary for an exercise, from its most recent prior log.
-type LastSummary = { weight: number; reps: number; repsLeft: number; repsRight: number; isUnilateral: boolean };
-
-function topSetOf(sets: any[]): any | null {
-  if (!sets || sets.length === 0) return null;
-  return sets.reduce((best: any, s: any) => (!best || (s.weight ?? 0) > (best.weight ?? 0) ? s : best), null);
-}
-
-function formatLast(s: LastSummary): string {
-  if (s.isUnilateral) return `${s.weight}kg × ${s.repsLeft}L / ${s.repsRight}R`;
-  return `${s.weight}kg × ${s.reps}`;
+// Section 10: format a single previous set for the per-set "last time" hint.
+function formatPrevSet(s: any): string | null {
+  if (!s) return null;
+  if (s.repsLeft != null || s.repsRight != null) {
+    return `${s.weight ?? 0}kg × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
+  }
+  if (s.weight == null && s.reps == null) return null;
+  return `${s.weight ?? 0}kg × ${s.reps ?? 0}`;
 }
 
 export default function Log() {
@@ -66,22 +58,14 @@ export default function Log() {
     }
   }, [personalRecords]);
 
-  // Build "last time" lookup from workout history (most recent prior log per exercise).
-  const lastByExercise: Record<string, LastSummary> = {};
+  // Build "last time" lookup from workout history — keep the full set list of the
+  // most recent prior log per exercise, so each set row can show its own match.
+  const lastSetsByExercise: Record<string, any[]> = {};
   for (const log of (history ?? []) as any[]) {
     for (const ex of (log.exercisesLogged as any[]) ?? []) {
       const key = ex.name?.toLowerCase();
-      if (!key || lastByExercise[key]) continue; // history is newest-first; keep first seen
-      const top = topSetOf(ex.sets);
-      if (!top) continue;
-      const isUni = top.repsLeft != null || top.repsRight != null;
-      lastByExercise[key] = {
-        weight: top.weight ?? 0,
-        reps: top.reps ?? 0,
-        repsLeft: top.repsLeft ?? 0,
-        repsRight: top.repsRight ?? 0,
-        isUnilateral: isUni,
-      };
+      if (!key || lastSetsByExercise[key]) continue; // history is newest-first; keep first seen
+      if (Array.isArray(ex.sets) && ex.sets.length > 0) lastSetsByExercise[key] = ex.sets;
     }
   }
 
@@ -140,30 +124,6 @@ export default function Log() {
     });
   }
 
-  function updateExerciseField(exIdx: number, field: "name" | "muscle" | "isUnilateral", value: string | boolean) {
-    setLogs((prev) => prev.map((ex, i) => (i === exIdx ? { ...ex, [field]: value } : ex)));
-  }
-
-  function addExercise() {
-    setLogs((prev) => [
-      ...prev,
-      {
-        name: "",
-        muscle: MUSCLE_OPTIONS[0],
-        isUnilateral: false,
-        targetSets: 2,
-        targetReps: "8-12",
-        notes: "",
-        showNotes: false,
-        sets: [{ setNumber: 1, weight: 0, reps: 0, repsLeft: 0, repsRight: 0, completed: false, isNewPr: false }],
-      },
-    ]);
-  }
-
-  function removeExercise(exIdx: number) {
-    setLogs((prev) => prev.filter((_, i) => i !== exIdx));
-  }
-
   function updateNotes(exIdx: number, notes: string) {
     setLogs((prev) => {
       const next = [...prev];
@@ -205,18 +165,6 @@ export default function Log() {
         sets: next[exIdx].sets.map((s, si) =>
           si === setIdx ? { ...s, completed: true, isNewPr } : s
         ),
-      };
-      return next;
-    });
-  }
-
-  function addSet(exIdx: number) {
-    setLogs((prev) => {
-      const next = [...prev];
-      const ex = next[exIdx];
-      next[exIdx] = {
-        ...ex,
-        sets: [...ex.sets, { setNumber: ex.sets.length + 1, weight: 0, reps: 0, repsLeft: 0, repsRight: 0, completed: false, isNewPr: false }],
       };
       return next;
     });
@@ -302,7 +250,7 @@ export default function Log() {
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
-          const last = lastByExercise[ex.name.toLowerCase()];
+          const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
           return (
           <motion.div
             key={ex.name}
@@ -314,55 +262,23 @@ export default function Log() {
           >
             <div className="p-4 border-b border-border/50">
               <div className="flex items-center gap-2">
-                <select
-                  value={MUSCLE_OPTIONS.includes(ex.muscle as any) ? ex.muscle : ""}
-                  onChange={(e) => updateExerciseField(exIdx, "muscle", e.target.value)}
-                  className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20 focus:outline-none"
-                  data-testid={`select-muscle-${exIdx}`}
-                >
-                  {!MUSCLE_OPTIONS.includes(ex.muscle as any) && <option value="">{ex.muscle || "Muscle"}</option>}
-                  {MUSCLE_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-                <label className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/70 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={ex.isUnilateral}
-                    onChange={(e) => updateExerciseField(exIdx, "isUnilateral", e.target.checked)}
-                    className="w-3 h-3 rounded border-border accent-primary"
-                  />
-                  Unilateral
-                </label>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                  {ex.muscle}
+                </span>
+                {ex.isUnilateral && (
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
+                )}
                 {(() => {
                   const baseline = prBaselineRef.current[ex.name.toLowerCase()];
                   return baseline ? (
                     <span className="text-xs text-muted-foreground">PR: {baseline} kg</span>
                   ) : null;
                 })()}
-                <button
-                  onClick={() => removeExercise(exIdx)}
-                  className="ml-auto p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  data-testid={`button-remove-exercise-${exIdx}`}
-                  title="Remove exercise"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
               </div>
-              <input
-                type="text"
-                value={ex.name}
-                onChange={(e) => updateExerciseField(exIdx, "name", e.target.value)}
-                placeholder="Exercise name"
-                className="font-semibold text-foreground mt-1 w-full bg-transparent border-0 border-b border-transparent focus:border-border focus:outline-none placeholder:text-muted-foreground/60"
-                data-testid={`input-exercise-name-${exIdx}`}
-              />
+              <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Target: {ex.targetSets} × {ex.targetReps}
               </p>
-              {last && (
-                <p className="text-xs text-muted-foreground/70 mt-0.5" data-testid={`last-time-${exIdx}`}>
-                  Last time: {formatLast(last)}
-                </p>
-              )}
             </div>
 
             <div className="p-4">
@@ -385,9 +301,11 @@ export default function Log() {
               )}
 
               <div className="space-y-2">
-                {ex.sets.map((set, setIdx) => (
+                {ex.sets.map((set, setIdx) => {
+                  const prevStr = formatPrevSet(prevSets?.[setIdx]);
+                  return (
+                  <div key={set.setNumber}>
                   <motion.div
-                    key={set.setNumber}
                     layout
                     className={`grid ${ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr_2rem]" : "grid-cols-[2rem_1fr_1fr_2rem]"} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
@@ -460,19 +378,17 @@ export default function Log() {
                       {set.isNewPr ? <Trophy className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
                     </button>
                   </motion.div>
-                ))}
+                  {prevStr && (
+                    <p className="text-[11px] text-muted-foreground/60 pl-8 mt-0.5" data-testid={`last-set-${exIdx}-${setIdx}`}>
+                      Last time: {prevStr}
+                    </p>
+                  )}
+                  </div>
+                );})}
               </div>
 
               {/* Actions row */}
-              <div className="flex items-center justify-between mt-3">
-                <button
-                  onClick={() => addSet(exIdx)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  data-testid={`button-add-set-${exIdx}`}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add set
-                </button>
+              <div className="flex items-center justify-end mt-3">
                 <button
                   onClick={() => toggleNotes(exIdx)}
                   className={`flex items-center gap-1.5 text-xs transition-colors ${
@@ -516,15 +432,6 @@ export default function Log() {
           </motion.div>
         );})}
       </div>
-
-      <button
-        onClick={addExercise}
-        className="w-full mt-4 py-3 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors flex items-center justify-center gap-2"
-        data-testid="button-add-exercise"
-      >
-        <Plus className="w-4 h-4" />
-        Add exercise
-      </button>
 
       <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border">
         <div className="max-w-3xl mx-auto">
