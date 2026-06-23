@@ -27,13 +27,19 @@ type LoggedExercise = {
 
 type PrFlash = { id: number; exercise: string; weight: number };
 
+// A set with no real data (weight and all rep fields zero/empty) — e.g. an
+// abandoned/empty session — should not count as "last time".
+function isEmptySet(s: any): boolean {
+  if (!s) return true;
+  return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
+}
+
 // Section 10: format a single previous set for the per-set "last time" hint.
 function formatPrevSet(s: any): string | null {
-  if (!s) return null;
+  if (isEmptySet(s)) return null;
   if (s.repsLeft != null || s.repsRight != null) {
     return `${s.weight ?? 0}kg × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
   }
-  if (s.weight == null && s.reps == null) return null;
   return `${s.weight ?? 0}kg × ${s.reps ?? 0}`;
 }
 
@@ -65,7 +71,10 @@ export default function Log() {
     for (const ex of (log.exercisesLogged as any[]) ?? []) {
       const key = ex.name?.toLowerCase();
       if (!key || lastSetsByExercise[key]) continue; // history is newest-first; keep first seen
-      if (Array.isArray(ex.sets) && ex.sets.length > 0) lastSetsByExercise[key] = ex.sets;
+      // Only count sessions where this exercise actually has logged data.
+      if (Array.isArray(ex.sets) && ex.sets.some((s: any) => !isEmptySet(s))) {
+        lastSetsByExercise[key] = ex.sets;
+      }
     }
   }
 
