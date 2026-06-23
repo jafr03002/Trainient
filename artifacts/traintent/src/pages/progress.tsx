@@ -57,6 +57,19 @@ export default function Progress() {
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => isRecent(pr.date, 7)).length;
 
+  // Strength Y-axis: lower ≈ 75% of the lowest weight, upper at the top weight,
+  // both snapped to multiples of 5, with a tick at every 5 in between.
+  const strengthBounds = (() => {
+    const data = strengthProgress.data ?? [];
+    if (!data.length) return null;
+    const weights = data.map((p) => p.maxWeight);
+    const lower = Math.max(0, Math.round((Math.min(...weights) * 0.75) / 5) * 5);
+    const upper = Math.ceil(Math.max(...weights) / 5) * 5;
+    const ticks: number[] = [];
+    for (let t = lower; t <= upper; t += 5) ticks.push(t);
+    return { lower, upper, ticks };
+  })();
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -113,11 +126,8 @@ export default function Progress() {
               <YAxis
                 tick={{ fontSize: 11 }}
                 stroke="hsl(var(--muted-foreground))"
-                domain={[
-                  // Lower bound ≈ 75% of the lowest logged weight, rounded to nearest 5.
-                  (dataMin: number) => Math.max(0, Math.round((dataMin * 0.75) / 5) * 5),
-                  "auto",
-                ]}
+                domain={[strengthBounds?.lower ?? 0, strengthBounds?.upper ?? "auto"]}
+                ticks={strengthBounds?.ticks}
                 allowDecimals={false}
               />
               <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} kg`, "Max weight"]} />
