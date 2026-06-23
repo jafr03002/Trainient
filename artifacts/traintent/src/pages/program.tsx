@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Dumbbell, Info, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Dumbbell, Info, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -143,6 +143,17 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
   const [days, setDays] = useState<EditDay[]>(
     editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()] }],
   );
+  const [dragDay, setDragDay] = useState<number | null>(null);
+
+  function moveDay(from: number, to: number) {
+    if (from === to) return;
+    setDays((d) => {
+      const next = [...d];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
 
   function addDay() {
     setDays((d) => [...d, { label: "", exercises: [newExercise()] }]);
@@ -246,8 +257,29 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
       </div>
 
       {days.map((day, di) => (
-        <div key={di} className="p-5 rounded-xl bg-card border border-border space-y-4">
-          <div className="flex items-center gap-3">
+        <div
+          key={di}
+          onDragOver={(e) => { if (dragDay !== null) e.preventDefault(); }}
+          onDrop={() => { if (dragDay !== null) moveDay(dragDay, di); setDragDay(null); }}
+          className={`p-5 rounded-xl bg-card border space-y-4 transition-colors ${
+            dragDay === di ? "border-primary/60 opacity-60" : "border-border"
+          }`}
+          data-testid={`day-card-${di}`}
+        >
+          <div className="flex items-center gap-2">
+            <div
+              draggable
+              onDragStart={() => setDragDay(di)}
+              onDragEnd={() => setDragDay(null)}
+              className="flex items-center gap-2 shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground"
+              title="Drag to reorder"
+              data-testid={`day-drag-${di}`}
+            >
+              <GripVertical className="w-4 h-4" />
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary border border-border text-foreground">
+                Day {di + 1}
+              </span>
+            </div>
             <input
               type="text"
               value={day.label}
@@ -529,12 +561,13 @@ export default function Program() {
             key={d.dayNumber}
             onClick={() => setActiveDay(i)}
             data-testid={`tab-day-${d.dayNumber}`}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
               activeDay === i
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-border/80"
             }`}
           >
+            <span className={`text-xs ${activeDay === i ? "opacity-80" : "opacity-60"}`}>{i + 1}</span>
             {d.label}
           </button>
         ))}

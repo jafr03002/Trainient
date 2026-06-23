@@ -721,20 +721,24 @@ components:
       properties:
         exercise:   { type: string }
         maxWeight:  { type: number }
+        reps:       { type: ["integer", "null"] }
         date:       { type: string }
 
     MuscleVolumeWeek:
       type: object
       required: [week]
       properties:
-        week:       { type: integer }
-        chest:      { type: integer }
-        back:       { type: integer }
-        shoulders:  { type: integer }
-        arms:       { type: integer }
-        legs:       { type: integer }
-        glutes:     { type: integer }
-        core:       { type: integer }
+        week:        { type: integer }
+        chest:       { type: integer }
+        shoulders:   { type: integer }
+        biceps:      { type: integer }
+        triceps:     { type: integer }
+        upperBack:   { type: integer }
+        lats:        { type: integer }
+        quads:       { type: integer }
+        hamstrings:  { type: integer }
+        glutes:      { type: integer }
+        calves:      { type: integer }
 
     # ── Calendar colours ──────────────────────────────────────────────────────
     CalendarColor:

@@ -6,8 +6,63 @@ import { GetStrengthProgressQueryParams } from "@workspace/api-zod";
 
 const router = Router();
 
-type LoggedSet = { weight: number; reps: number; completed: boolean };
+type LoggedSet = {
+  weight: number;
+  reps?: number | null;
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  completed?: boolean;
+};
 type LoggedExercise = { name: string; muscle: string; sets: LoggedSet[] };
+
+// A set counts once it has any logged data — we do NOT require the user to have
+// pressed the "complete" check, since most sets are logged without it.
+function isPerformed(s: LoggedSet): boolean {
+  return (s.weight || 0) > 0 || (s.reps || 0) > 0 || (s.repsLeft || 0) > 0 || (s.repsRight || 0) > 0;
+}
+
+function setReps(s: LoggedSet): number {
+  if (s.reps != null) return s.reps || 0;
+  // Unilateral: use the lower side for a conservative rep count.
+  if (s.repsLeft != null || s.repsRight != null) return Math.min(s.repsLeft || 0, s.repsRight || 0);
+  return 0;
+}
+
+function maxWeight(sets: LoggedSet[]): number {
+  const ws = sets.filter(isPerformed).map((s) => s.weight || 0);
+  return ws.length ? Math.max(0, ...ws) : 0;
+}
+
+// Maps the program's muscle options to the MuscleVolumeWeek keys.
+const MUSCLE_KEY: Record<string, string> = {
+  chest: "chest",
+  shoulders: "shoulders",
+  biceps: "biceps",
+  triceps: "triceps",
+  "upper back": "upperBack",
+  lats: "lats",
+  quads: "quads",
+  hamstrings: "hamstrings",
+  glutes: "glutes",
+  calves: "calves",
+};
+
+// Loose fallback for legacy/free-text muscle values from older logs.
+function muscleKeyOf(muscle: string): string | null {
+  const m = (muscle || "").toLowerCase().trim();
+  if (MUSCLE_KEY[m]) return MUSCLE_KEY[m];
+  if (m.includes("chest") || m.includes("pec")) return "chest";
+  if (m.includes("shoulder") || m.includes("delt")) return "shoulders";
+  if (m.includes("bicep")) return "biceps";
+  if (m.includes("tricep")) return "triceps";
+  if (m.includes("lat")) return "lats";
+  if (m.includes("back") || m.includes("trap") || m.includes("rhomboid")) return "upperBack";
+  if (m.includes("quad")) return "quads";
+  if (m.includes("ham")) return "hamstrings";
+  if (m.includes("glute")) return "glutes";
+  if (m.includes("calf") || m.includes("calve")) return "calves";
+  return null;
+}
 
 router.get("/progress/volume", requireAuth, async (req, res) => {
   const userId = getUserId(req);
@@ -20,9 +75,9 @@ router.get("/progress/volume", requireAuth, async (req, res) => {
     const week = log.weekNumber;
     if (!weekMap[week]) weekMap[week] = { totalSets: 0, totalReps: 0 };
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      const completedSets = ex.sets.filter((s) => s.completed);
-      weekMap[week].totalSets += completedSets.length;
-      weekMap[week].totalReps += completedSets.reduce((acc, s) => acc + (s.reps || 0), 0);
+      const performed = ex.sets.filter(isPerformed);
+      weekMap[week].totalSets += performed.length;
+      weekMap[week].totalReps += performed.reduce((acc, s) => acc + setReps(s), 0);
     }
   }
 
@@ -50,7 +105,7 @@ router.get("/progress/strength", requireAuth, async (req, res) => {
   for (const log of logs) {
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
       if (ex.name.toLowerCase().includes(exerciseName)) {
-        const maxW = Math.max(0, ...ex.sets.filter((s) => s.completed).map((s) => s.weight || 0));
+        const maxW = maxWeight(ex.sets);
         if (maxW > 0) {
           points.push({ date: log.date, maxWeight: maxW, exercise: ex.name });
         }
@@ -67,20 +122,23 @@ router.get("/progress/prs", requireAuth, async (req, res) => {
     where: eq(workoutLogsTable.userId, userId),
   });
 
-  const prMap: Record<string, { maxWeight: number; date: string }> = {};
+  const prMap: Record<string, { maxWeight: number; reps: number; date: string }> = {};
   for (const log of logs) {
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      const maxW = Math.max(0, ...ex.sets.filter((s) => s.completed).map((s) => s.weight || 0));
-      if (maxW > 0) {
-        if (!prMap[ex.name] || maxW > prMap[ex.name].maxWeight) {
-          prMap[ex.name] = { maxWeight: maxW, date: log.date };
-        }
+      // Heaviest performed set for this exercise in this session (keeps its reps).
+      let best: LoggedSet | null = null;
+      for (const s of ex.sets) {
+        if (isPerformed(s) && (s.weight || 0) > (best?.weight || 0)) best = s;
+      }
+      const maxW = best?.weight || 0;
+      if (maxW > 0 && (!prMap[ex.name] || maxW > prMap[ex.name].maxWeight)) {
+        prMap[ex.name] = { maxWeight: maxW, reps: setReps(best!), date: log.date };
       }
     }
   }
 
   res.json(
-    Object.entries(prMap).map(([exercise, { maxWeight, date }]) => ({ exercise, maxWeight, date }))
+    Object.entries(prMap).map(([exercise, { maxWeight, reps, date }]) => ({ exercise, maxWeight, reps, date }))
   );
 });
 
@@ -90,28 +148,22 @@ router.get("/progress/muscle-volume", requireAuth, async (req, res) => {
     where: eq(workoutLogsTable.userId, userId),
   });
 
-  const muscleMap: Record<string, string> = {
-    chest: "chest", pec: "chest",
-    back: "back", lat: "back", rhomboid: "back", trap: "back",
-    shoulder: "shoulders", delt: "shoulders",
-    arm: "arms", bicep: "arms", tricep: "arms",
-    leg: "legs", quad: "legs", hamstring: "legs",
-    glute: "glutes",
-    core: "core", ab: "core",
-  };
+  const emptyWeek = () => ({
+    chest: 0, shoulders: 0, biceps: 0, triceps: 0, upperBack: 0,
+    lats: 0, quads: 0, hamstrings: 0, glutes: 0, calves: 0,
+  });
 
-  const weekMap: Record<number, Record<string, number>> = {};
+  const weekMap: Record<number, ReturnType<typeof emptyWeek>> = {};
   for (const log of logs) {
     const week = log.weekNumber;
-    if (!weekMap[week]) weekMap[week] = { chest: 0, back: 0, shoulders: 0, arms: 0, legs: 0, glutes: 0, core: 0 };
+    if (!weekMap[week]) weekMap[week] = emptyWeek();
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      const completedSets = ex.sets.filter((s) => s.completed).length;
-      const muscleLower = (ex.muscle || "").toLowerCase();
-      let matched = "back";
-      for (const [key, group] of Object.entries(muscleMap)) {
-        if (muscleLower.includes(key)) { matched = group; break; }
+      const performed = ex.sets.filter(isPerformed).length;
+      if (performed === 0) continue;
+      const key = muscleKeyOf(ex.muscle);
+      if (key && key in weekMap[week]) {
+        (weekMap[week] as Record<string, number>)[key] += performed;
       }
-      if (weekMap[week][matched] !== undefined) weekMap[week][matched] += completedSets;
     }
   }
 

@@ -208,18 +208,23 @@ export interface StrengthPoint {
 export interface PersonalRecord {
   exercise: string;
   maxWeight: number;
+  /** @nullable */
+  reps?: number | null;
   date: string;
 }
 
 export interface MuscleVolumeWeek {
   week: number;
   chest?: number;
-  back?: number;
   shoulders?: number;
-  arms?: number;
-  legs?: number;
+  biceps?: number;
+  triceps?: number;
+  upperBack?: number;
+  lats?: number;
+  quads?: number;
+  hamstrings?: number;
   glutes?: number;
-  core?: number;
+  calves?: number;
 }
 
 export interface CalendarColor {
