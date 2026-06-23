@@ -208,6 +208,8 @@ export interface StrengthPoint {
 export interface PersonalRecord {
   exercise: string;
   maxWeight: number;
+  /** @nullable */
+  reps?: number | null;
   date: string;
 }
 

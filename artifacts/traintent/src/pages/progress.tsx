@@ -110,7 +110,16 @@ export default function Progress() {
             <LineChart data={strengthProgress.data}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.4} />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-              <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                stroke="hsl(var(--muted-foreground))"
+                domain={[
+                  // Lower bound ≈ 75% of the lowest logged weight, rounded to nearest 5.
+                  (dataMin: number) => Math.max(0, Math.round((dataMin * 0.75) / 5) * 5),
+                  "auto",
+                ]}
+                allowDecimals={false}
+              />
               <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} kg`, "Max weight"]} />
               <Line type="monotone" dataKey="maxWeight" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
@@ -164,7 +173,7 @@ export default function Progress() {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">Exercise</th>
-                  <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">PR Weight</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">PR</th>
                   <th className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider pb-3">Date</th>
                 </tr>
               </thead>
@@ -198,7 +207,9 @@ export default function Progress() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 text-sm text-right font-bold text-primary">{pr.maxWeight} kg</td>
+                        <td className="py-3 text-sm text-right font-bold text-primary">
+                          {pr.maxWeight} kg{pr.reps ? <span className="text-muted-foreground font-medium"> × {pr.reps}</span> : null}
+                        </td>
                         <td className="py-3 text-sm text-right text-muted-foreground">
                           {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                         </td>

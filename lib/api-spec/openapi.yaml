@@ -721,6 +721,7 @@ components:
       properties:
         exercise:   { type: string }
         maxWeight:  { type: number }
+        reps:       { type: ["integer", "null"] }
         date:       { type: string }
 
     MuscleVolumeWeek:

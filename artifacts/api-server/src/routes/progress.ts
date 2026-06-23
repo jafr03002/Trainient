@@ -122,20 +122,23 @@ router.get("/progress/prs", requireAuth, async (req, res) => {
     where: eq(workoutLogsTable.userId, userId),
   });
 
-  const prMap: Record<string, { maxWeight: number; date: string }> = {};
+  const prMap: Record<string, { maxWeight: number; reps: number; date: string }> = {};
   for (const log of logs) {
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      const maxW = maxWeight(ex.sets);
-      if (maxW > 0) {
-        if (!prMap[ex.name] || maxW > prMap[ex.name].maxWeight) {
-          prMap[ex.name] = { maxWeight: maxW, date: log.date };
-        }
+      // Heaviest performed set for this exercise in this session (keeps its reps).
+      let best: LoggedSet | null = null;
+      for (const s of ex.sets) {
+        if (isPerformed(s) && (s.weight || 0) > (best?.weight || 0)) best = s;
+      }
+      const maxW = best?.weight || 0;
+      if (maxW > 0 && (!prMap[ex.name] || maxW > prMap[ex.name].maxWeight)) {
+        prMap[ex.name] = { maxWeight: maxW, reps: setReps(best!), date: log.date };
       }
     }
   }
 
   res.json(
-    Object.entries(prMap).map(([exercise, { maxWeight, date }]) => ({ exercise, maxWeight, date }))
+    Object.entries(prMap).map(([exercise, { maxWeight, reps, date }]) => ({ exercise, maxWeight, reps, date }))
   );
 });
 

@@ -447,6 +447,7 @@ export const GetStrengthProgressResponse = zod.array(GetStrengthProgressResponse
 export const GetPersonalRecordsResponseItem = zod.object({
   "exercise": zod.string(),
   "maxWeight": zod.number(),
+  "reps": zod.number().nullish(),
   "date": zod.string()
 })
 export const GetPersonalRecordsResponse = zod.array(GetPersonalRecordsResponseItem)
