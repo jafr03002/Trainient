@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, TrendingUp, TrendingDown, Minus, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, MessageSquare } from "lucide-react";
 import { useListWorkouts, useGetCalendarColors } from "@workspace/api-client-react";
 
 const DEFAULT_COLORS = [
@@ -25,16 +25,28 @@ type WorkoutLog = {
 
 type SessionModalProps = {
   session: WorkoutLog;
-  previousSession: WorkoutLog | null;
+  allWorkouts: WorkoutLog[];
   colorHex: string;
   onClose: () => void;
 };
 
-function getTopSet(sets: any[]): any | null {
-  if (!sets || sets.length === 0) return null;
-  return sets.reduce((best: any, s: any) => {
-    return !best || (s.weight ?? 0) > (best.weight ?? 0) ? s : best;
-  }, null);
+// A set with no real data (weight and all rep fields zero/empty).
+function isEmptySet(s: any): boolean {
+  if (!s) return true;
+  return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
+}
+
+function exerciseHasData(ex: any): boolean {
+  return Array.isArray(ex?.sets) && ex.sets.some((s: any) => !isEmptySet(s));
+}
+
+// Per-set progression delta, e.g. "+5kg" / "-2" / "–" (unchanged).
+function deltaText(d: number, unit: string): string {
+  if (d === 0) return "–";
+  return `${d > 0 ? "+" : ""}${Math.round(d * 100) / 100}${unit}`;
+}
+function deltaCls(d: number): string {
+  return d > 0 ? "text-green-400" : d < 0 ? "text-red-400" : "text-muted-foreground/70";
 }
 
 function isUnilateralSet(s: any): boolean {
@@ -53,9 +65,22 @@ function setRepsLabel(s: any): string {
   return `${s.reps ?? 0}`;
 }
 
-function SessionModal({ session, previousSession, colorHex, onClose }: SessionModalProps) {
+function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
-  const prevExercises = (previousSession?.exercisesLogged as any[]) ?? [];
+
+  // Most recent session strictly before this one (by date, then id) that has
+  // real data for the given exercise — skips empty/abandoned sessions.
+  function findPrevExerciseSets(name: string): any[] | null {
+    const priors = allWorkouts
+      .filter((w) => w.id !== session.id)
+      .filter((w) => w.date < session.date || (w.date === session.date && w.id < session.id))
+      .sort((a, b) => (a.date === b.date ? b.id - a.id : b.date.localeCompare(a.date)));
+    for (const w of priors) {
+      const ex = (w.exercisesLogged as any[]).find((e: any) => e.name === name);
+      if (ex && exerciseHasData(ex)) return ex.sets as any[];
+    }
+    return null;
+  }
 
   return (
     <AnimatePresence>
@@ -93,25 +118,7 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
           {/* Exercise list */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
             {exercises.map((ex: any, i: number) => {
-              const topSet = getTopSet(ex.sets);
-              const prevEx = prevExercises.find((pe: any) => pe.name === ex.name);
-              const prevTopSet = prevEx ? getTopSet(prevEx.sets) : null;
-
-              let comparison: { text: string; icon: "up" | "down" | "same" | "first" } = { text: "", icon: "same" };
-              if (!prevTopSet) {
-                comparison = { text: "First time logging this exercise", icon: "first" };
-              } else if (topSet && prevTopSet) {
-                const weightDiff = (topSet.weight ?? 0) - (prevTopSet.weight ?? 0);
-                const prevStr = `${prevTopSet.weight}kg × ${setRepsLabel(prevTopSet)}`;
-                const curStr = `${topSet.weight}kg × ${setRepsLabel(topSet)}`;
-                if (weightDiff > 0) {
-                  comparison = { text: `Last time: ${prevStr} — Today: ${curStr} +${weightDiff}kg`, icon: "up" };
-                } else if (weightDiff < 0) {
-                  comparison = { text: `Last time: ${prevStr} — Today: ${curStr} ${weightDiff}kg`, icon: "down" };
-                } else {
-                  comparison = { text: `Last time: ${prevStr} — Today: ${curStr}`, icon: "same" };
-                }
-              }
+              const prevSets = findPrevExerciseSets(ex.name);
 
               return (
                 <div key={i} className="space-y-2">
@@ -120,37 +127,37 @@ function SessionModal({ session, previousSession, colorHex, onClose }: SessionMo
                     <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
                       {ex.muscle}
                     </span>
+                    {!prevSets && (
+                      <span className="text-[11px] text-muted-foreground/70">First time logging this exercise</span>
+                    )}
                   </div>
                   <h3 className="font-semibold text-foreground">{ex.name}</h3>
 
-                  {/* Sets */}
+                  {/* Sets — with per-set progression vs the previous session */}
                   <div className="space-y-1">
                     {(ex.sets as any[])
-                      .filter((s: any) => s.completed || s.weight > 0)
-                      .map((s: any, si: number) => (
+                      .filter((s: any) => !isEmptySet(s))
+                      .map((s: any, si: number) => {
+                        const prev = prevSets?.find((p: any) => p.setNumber === s.setNumber);
+                        const showDelta = prev && !isEmptySet(prev);
+                        const wd = showDelta ? (s.weight ?? 0) - (prev.weight ?? 0) : 0;
+                        const rd = showDelta ? setReps(s) - setReps(prev) : 0;
+                        return (
                         <div key={si} className={`flex items-center gap-3 text-sm py-0.5 ${s.isNewPr ? "text-amber-400" : "text-muted-foreground"}`}>
                           <span className="w-12 text-xs shrink-0">Set {s.setNumber}</span>
                           <span className={`font-medium ${s.isNewPr ? "text-amber-300" : "text-foreground"}`}>
                             {s.weight}kg × {setRepsLabel(s)}
                           </span>
                           {s.isNewPr && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/20 uppercase tracking-wider">PR</span>}
+                          {showDelta && (
+                            <span className="ml-auto flex items-center gap-2 text-xs" data-testid={`set-delta-${i}-${si}`}>
+                              <span className={deltaCls(wd)}>{deltaText(wd, "kg")}</span>
+                              <span className={deltaCls(rd)}>{deltaText(rd, rd === 0 ? "" : " reps")}</span>
+                            </span>
+                          )}
                         </div>
-                      ))}
+                      );})}
                   </div>
-
-                  {/* Comparison vs previous */}
-                  {comparison.text && (
-                    <div className={`flex items-center gap-1.5 text-xs mt-1 p-2 rounded-lg ${
-                      comparison.icon === "up" ? "bg-green-500/10 text-green-400" :
-                      comparison.icon === "down" ? "bg-red-500/10 text-red-400" :
-                      "bg-secondary/30 text-muted-foreground"
-                    }`}>
-                      {comparison.icon === "up" && <TrendingUp className="w-3.5 h-3.5 shrink-0" />}
-                      {comparison.icon === "down" && <TrendingDown className="w-3.5 h-3.5 shrink-0" />}
-                      {comparison.icon === "same" && <Minus className="w-3.5 h-3.5 shrink-0" />}
-                      {comparison.text}
-                    </div>
-                  )}
 
                   {/* Per-exercise notes */}
                   {ex.notes && (
@@ -200,13 +207,6 @@ export default function Calendar() {
   function nextMonth() { setCurrentDate(new Date(year, month + 1, 1)); }
 
   const monthName = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-
-  function getPreviousSessionOfSameLabel(session: WorkoutLog): WorkoutLog | null {
-    const sameLabel = workouts
-      .filter((w) => w.dayLabel === session.dayLabel && w.id !== session.id && w.date < session.date)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    return sameLabel[0] ?? null;
-  }
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -319,7 +319,7 @@ export default function Calendar() {
       {selectedSession && (
         <SessionModal
           session={selectedSession}
-          previousSession={getPreviousSessionOfSameLabel(selectedSession)}
+          allWorkouts={workouts}
           colorHex={getColor(selectedSession.dayLabel ?? "Workout", colorMap, allLabels)}
           onClose={() => setSelectedSession(null)}
         />
