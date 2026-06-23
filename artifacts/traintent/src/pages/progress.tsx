@@ -14,15 +14,19 @@ import {
 } from "@workspace/api-client-react";
 import { Trophy } from "lucide-react";
 
-const MUSCLE_COLORS: Record<string, string> = {
-  chest: "hsl(217, 91%, 60%)",
-  back: "hsl(142, 71%, 45%)",
-  shoulders: "hsl(280, 68%, 60%)",
-  arms: "hsl(38, 92%, 50%)",
-  legs: "hsl(0, 72%, 51%)",
-  glutes: "hsl(316, 73%, 52%)",
-  core: "hsl(199, 89%, 48%)",
-};
+// Keys match the MuscleVolumeWeek schema; labels/colours for the 10 muscle options.
+const MUSCLE_GROUPS: { key: string; label: string; color: string }[] = [
+  { key: "chest", label: "Chest", color: "hsl(217, 91%, 60%)" },
+  { key: "shoulders", label: "Shoulders", color: "hsl(280, 68%, 60%)" },
+  { key: "biceps", label: "Biceps", color: "hsl(38, 92%, 50%)" },
+  { key: "triceps", label: "Triceps", color: "hsl(24, 90%, 55%)" },
+  { key: "upperBack", label: "Upper Back", color: "hsl(142, 71%, 45%)" },
+  { key: "lats", label: "Lats", color: "hsl(160, 84%, 39%)" },
+  { key: "quads", label: "Quads", color: "hsl(0, 72%, 51%)" },
+  { key: "hamstrings", label: "Hamstrings", color: "hsl(350, 75%, 55%)" },
+  { key: "glutes", label: "Glutes", color: "hsl(316, 73%, 52%)" },
+  { key: "calves", label: "Calves", color: "hsl(199, 89%, 48%)" },
+];
 
 const tooltipStyle = {
   contentStyle: {
@@ -133,8 +137,8 @@ export default function Progress() {
               <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
               <Tooltip {...tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              {Object.entries(MUSCLE_COLORS).map(([muscle, color]) => (
-                <Bar key={muscle} dataKey={muscle} stackId="a" fill={color} radius={[2, 2, 0, 0]} />
+              {MUSCLE_GROUPS.map(({ key, label, color }) => (
+                <Bar key={key} dataKey={key} name={label} stackId="a" fill={color} radius={[2, 2, 0, 0]} />
               ))}
             </BarChart>
           </ResponsiveContainer>

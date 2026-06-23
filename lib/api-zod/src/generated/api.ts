@@ -458,12 +458,15 @@ export const GetPersonalRecordsResponse = zod.array(GetPersonalRecordsResponseIt
 export const GetMuscleVolumeBreakdownResponseItem = zod.object({
   "week": zod.number(),
   "chest": zod.number().optional(),
-  "back": zod.number().optional(),
   "shoulders": zod.number().optional(),
-  "arms": zod.number().optional(),
-  "legs": zod.number().optional(),
+  "biceps": zod.number().optional(),
+  "triceps": zod.number().optional(),
+  "upperBack": zod.number().optional(),
+  "lats": zod.number().optional(),
+  "quads": zod.number().optional(),
+  "hamstrings": zod.number().optional(),
   "glutes": zod.number().optional(),
-  "core": zod.number().optional()
+  "calves": zod.number().optional()
 })
 export const GetMuscleVolumeBreakdownResponse = zod.array(GetMuscleVolumeBreakdownResponseItem)
 
