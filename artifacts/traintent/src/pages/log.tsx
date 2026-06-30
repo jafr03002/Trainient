@@ -215,7 +215,7 @@ export default function Log() {
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto pb-32">
+    <div className="p-6 max-w-3xl mx-auto pb-48 md:pb-32">
       {/* PR Toast Stack */}
       <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
         <AnimatePresence>
@@ -442,7 +442,7 @@ export default function Log() {
         );})}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border">
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border z-40">
         <div className="max-w-3xl mx-auto">
           <button
             onClick={finishWorkout}

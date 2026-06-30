@@ -505,8 +505,9 @@ export default function Program() {
     );
   }
 
-  // Edit mode (independent only) — reuse the builder, prefilled with this program.
-  if (editing && isIndependent) {
+  // Edit mode — reuse the builder, prefilled with this program. Past logged
+  // sessions are snapshots, so editing the program never changes them.
+  if (editing) {
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-6">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -536,16 +537,14 @@ export default function Program() {
               {!program.aiGenerated && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">Custom</span>}
             </p>
           </div>
-          {isIndependent && (
-            <button
-              onClick={() => setEditing(true)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-              data-testid="button-edit-program"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </button>
-          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+            data-testid="button-edit-program"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </button>
         </div>
         {program.aiNotes && (
           <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm text-muted-foreground">
