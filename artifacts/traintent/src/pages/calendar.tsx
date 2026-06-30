@@ -84,7 +84,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -97,10 +97,15 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.22 }}
-          className="relative z-10 w-full max-w-lg max-h-[85vh] flex flex-col bg-card border border-border rounded-t-2xl md:rounded-2xl overflow-hidden"
+          className="relative z-10 w-full max-w-lg max-h-[88vh] flex flex-col bg-card border border-border rounded-t-2xl md:rounded-2xl overflow-hidden"
         >
+          {/* Grab handle (mobile bottom-sheet affordance) */}
+          <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+            <div className="w-10 h-1.5 rounded-full bg-border" />
+          </div>
+
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
+          <div className="flex items-center justify-between px-5 pb-4 pt-2 md:pt-5 border-b border-border shrink-0">
             <div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ background: colorHex }} />
@@ -116,7 +121,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
           </div>
 
           {/* Exercise list */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-8 space-y-6">
             {exercises.map((ex: any, i: number) => {
               const prevSets = findPrevExerciseSets(ex.name);
 
