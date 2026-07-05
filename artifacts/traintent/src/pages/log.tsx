@@ -35,14 +35,16 @@ type WorkoutDraft = {
 
 type ActiveSessionPointer = {
   programId: string | number;
-  weekNumber: number;
   dayNumber: number;
 };
 
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
 
-function draftKey(userId: string, programId: string | number, weekNumber: number, dayNumber: number): string {
-  return `traintent:workout-draft:${userId}:${programId}:${weekNumber}:${dayNumber}`;
+// Keyed on programId + day only — `weekNumber` is now a live calendar
+// calculation (see api-server's trainingWeek helper) that can roll over
+// mid-session, so it can't be used to identify a draft.
+function draftKey(userId: string, programId: string | number, dayNumber: number): string {
+  return `traintent:workout-draft:${userId}:${programId}:${dayNumber}`;
 }
 
 function activeSessionKey(userId: string): string {
@@ -227,13 +229,12 @@ export default function Log() {
     const requestedDay = resolveDay(program.days as any[]);
     if (!requestedDay) return;
 
-    const weekNumber = program.weekNumber ?? 1;
     let day = requestedDay;
 
     const active = loadActiveSession(user.id);
-    if (active && (active.programId !== program.id || active.weekNumber !== weekNumber || active.dayNumber !== requestedDay.dayNumber)) {
-      if (active.programId === program.id && active.weekNumber === weekNumber) {
-        const activeDraft = loadDraft(draftKey(user.id, active.programId, active.weekNumber, active.dayNumber));
+    if (active && (active.programId !== program.id || active.dayNumber !== requestedDay.dayNumber)) {
+      if (active.programId === program.id) {
+        const activeDraft = loadDraft(draftKey(user.id, active.programId, active.dayNumber));
         const activeDayObj = (program.days as any[]).find((d) => d.dayNumber === active.dayNumber);
         if (activeDraft && activeDayObj) {
           day = activeDayObj;
@@ -252,8 +253,8 @@ export default function Log() {
       setLocation(`/log?day=${day.dayNumber}`, { replace: true });
     }
 
-    const key = draftKey(user.id, program.id, weekNumber, day.dayNumber);
-    activeSessionRef.current = { programId: program.id, weekNumber, dayNumber: day.dayNumber };
+    const key = draftKey(user.id, program.id, day.dayNumber);
+    activeSessionRef.current = { programId: program.id, dayNumber: day.dayNumber };
 
     // Already initialized for this exact day (e.g. `program` just refetched
     // after a reconnect) — don't touch in-progress `logs`.

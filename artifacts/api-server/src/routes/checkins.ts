@@ -4,6 +4,7 @@ import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable }
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
 import { openai } from "../lib/openai";
+import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
 
@@ -14,9 +15,12 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
   };
 }
 
-function serializeProgram(p: typeof programsTable.$inferSelect) {
+// `weekNumber` in the API response is always the live calendar week since
+// onboarding — see programs.ts for why the stored column can't be trusted.
+function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   return {
     ...p,
+    weekNumber: trainingWeekNumber(onboardingCompletedAt),
     days: p.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
@@ -139,7 +143,7 @@ Return ONLY valid JSON (no markdown):
   res.status(201).json({
     checkin: serializeCheckin(checkin),
     aiMessage: raw.message,
-    updatedProgram: serializeProgram(updatedProgram),
+    updatedProgram: serializeProgram(updatedProgram, profile?.onboardingCompletedAt),
   });
 });
 

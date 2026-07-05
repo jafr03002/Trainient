@@ -3,12 +3,17 @@ import { eq, desc } from "drizzle-orm";
 import { db, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { openai } from "../lib/openai";
+import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
 
-function serializeProgram(p: typeof programsTable.$inferSelect) {
+// `weekNumber` in the API response is always the live calendar week since
+// onboarding — not the stored column, which is just an insert-order ordinal
+// (used internally for "find the latest program" / check-in versioning).
+function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   return {
     ...p,
+    weekNumber: trainingWeekNumber(onboardingCompletedAt),
     days: p.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
@@ -16,24 +21,30 @@ function serializeProgram(p: typeof programsTable.$inferSelect) {
 
 router.get("/programs/current", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const program = await db.query.programsTable.findFirst({
-    where: eq(programsTable.userId, userId),
-    orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
-  });
+  const [program, profile] = await Promise.all([
+    db.query.programsTable.findFirst({
+      where: eq(programsTable.userId, userId),
+      orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
+    }),
+    db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
+  ]);
   if (!program) {
     res.status(404).json({ error: "No active program" });
     return;
   }
-  res.json(serializeProgram(program));
+  res.json(serializeProgram(program, profile?.onboardingCompletedAt));
 });
 
 router.get("/programs", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const programs = await db.query.programsTable.findMany({
-    where: eq(programsTable.userId, userId),
-    orderBy: [desc(programsTable.weekNumber)],
-  });
-  res.json(programs.map(serializeProgram));
+  const [programs, profile] = await Promise.all([
+    db.query.programsTable.findMany({
+      where: eq(programsTable.userId, userId),
+      orderBy: [desc(programsTable.weekNumber)],
+    }),
+    db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
+  ]);
+  res.json(programs.map((p) => serializeProgram(p, profile?.onboardingCompletedAt)));
 });
 
 // Manual program creation (independent mode)
@@ -45,10 +56,13 @@ router.post("/programs", requireAuth, async (req, res) => {
     return;
   }
 
-  const latestProgram = await db.query.programsTable.findFirst({
-    where: eq(programsTable.userId, userId),
-    orderBy: [desc(programsTable.weekNumber)],
-  });
+  const [latestProgram, profile] = await Promise.all([
+    db.query.programsTable.findFirst({
+      where: eq(programsTable.userId, userId),
+      orderBy: [desc(programsTable.weekNumber)],
+    }),
+    db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
+  ]);
   const newWeekNumber = (latestProgram?.weekNumber ?? 0) + 1;
 
   const [program] = await db
@@ -64,7 +78,7 @@ router.post("/programs", requireAuth, async (req, res) => {
     })
     .returning();
 
-  res.status(201).json(serializeProgram(program));
+  res.status(201).json(serializeProgram(program, profile?.onboardingCompletedAt));
 });
 
 // Update existing manual program
@@ -88,7 +102,8 @@ router.put("/programs/:id", requireAuth, async (req, res) => {
     return;
   }
 
-  res.json(serializeProgram(program));
+  const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
+  res.json(serializeProgram(program, profile?.onboardingCompletedAt));
 });
 
 router.post("/programs/generate", requireAuth, async (req, res) => {
@@ -179,7 +194,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
     })
     .returning();
 
-  res.status(201).json(serializeProgram(program));
+  res.status(201).json(serializeProgram(program, profile.onboardingCompletedAt));
 });
 
 export default router;
