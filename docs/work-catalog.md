@@ -9,7 +9,6 @@ enough to pick up cold. Add new items at the top of the "Backlog" list.
 
 - **[Calibration Phase](#calibration-phase)** — post-onboarding trial period (calibration week(s)) ending in a calibration review before the program officially starts
 - **[Onboarding Alignment & Slim-Down](#onboarding-alignment--slim-down)** — fix muscle-list mismatch, add name, trim unused questions for Independent mode
-- **Phase B — Recurring Split Scheduling** — sections 8–9 of the feature spec (training_schedule table, calendar projection, dashboard rest-day logic, permanent late-log shift). Context in agent memory `independent-mode-features`.
 - **Autoregulation engine** — fatigue + progress rule set (e1RM-based). Spec drafted in chat; not yet a doc.
 - **Data hygiene** — delete the junk empty workout log (`workout_logs.id = 2`, all-zero test session).
 
