@@ -33,6 +33,12 @@ function maxWeight(sets: LoggedSet[]): number {
   return ws.length ? Math.max(0, ...ws) : 0;
 }
 
+// Estimated one-rep max (Epley-style) — PRs are judged on this, not raw
+// weight, so a heavier low-rep set and a lighter high-rep set can be compared.
+function estimatedOneRepMax(weight: number, reps: number): number {
+  return weight * (1 + reps / 30);
+}
+
 // Maps the program's muscle options to the MuscleVolumeWeek keys.
 const MUSCLE_KEY: Record<string, string> = {
   chest: "chest",
@@ -122,17 +128,23 @@ router.get("/progress/prs", requireAuth, async (req, res) => {
     where: eq(workoutLogsTable.userId, userId),
   });
 
-  const prMap: Record<string, { maxWeight: number; reps: number; date: string }> = {};
+  const prMap: Record<string, { maxWeight: number; reps: number; date: string; score: number }> = {};
   for (const log of logs) {
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      // Heaviest performed set for this exercise in this session (keeps its reps).
+      // Best performed set for this exercise in this session, judged by
+      // estimated one-rep max rather than raw weight (keeps its reps).
       let best: LoggedSet | null = null;
+      let bestScore = 0;
       for (const s of ex.sets) {
-        if (isPerformed(s) && (s.weight || 0) > (best?.weight || 0)) best = s;
+        if (!isPerformed(s)) continue;
+        const score = estimatedOneRepMax(s.weight || 0, setReps(s));
+        if (score > bestScore) {
+          best = s;
+          bestScore = score;
+        }
       }
-      const maxW = best?.weight || 0;
-      if (maxW > 0 && (!prMap[ex.name] || maxW > prMap[ex.name].maxWeight)) {
-        prMap[ex.name] = { maxWeight: maxW, reps: setReps(best!), date: log.date };
+      if (best && bestScore > 0 && (!prMap[ex.name] || bestScore > prMap[ex.name].score)) {
+        prMap[ex.name] = { maxWeight: best.weight || 0, reps: setReps(best), date: log.date, score: bestScore };
       }
     }
   }

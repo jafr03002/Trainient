@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
+import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
 
 type LoggedSet = {
@@ -27,11 +28,122 @@ type LoggedExercise = {
 
 type PrFlash = { id: number; exercise: string; weight: number };
 
+type WorkoutDraft = {
+  logs: LoggedExercise[];
+  savedAt: number;
+};
+
+type ActiveSessionPointer = {
+  programId: string | number;
+  weekNumber: number;
+  dayNumber: number;
+};
+
+const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
+
+function draftKey(userId: string, programId: string | number, weekNumber: number, dayNumber: number): string {
+  return `traintent:workout-draft:${userId}:${programId}:${weekNumber}:${dayNumber}`;
+}
+
+function activeSessionKey(userId: string): string {
+  return `traintent:workout-draft:active:${userId}`;
+}
+
+// In-progress workout data lives only in memory otherwise, so a lost network
+// connection (which triggers a page/data reload) wipes out everything the
+// user has logged so far. Mirror it to localStorage as they go and restore
+// it on the next mount so a reconnect never erases a session mid-workout.
+function loadDraft(key: string): WorkoutDraft | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as WorkoutDraft;
+    if (!parsed || !Array.isArray(parsed.logs)) return null;
+    if (Date.now() - (parsed.savedAt ?? 0) > DRAFT_MAX_AGE_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(key: string, logs: LoggedExercise[]) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ logs, savedAt: Date.now() } as WorkoutDraft));
+  } catch {
+    // localStorage unavailable (e.g. private browsing) — degrade to in-memory only
+  }
+}
+
+function clearDraft(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+function loadActiveSession(userId: string): ActiveSessionPointer | null {
+  try {
+    const raw = window.localStorage.getItem(activeSessionKey(userId));
+    if (!raw) return null;
+    return JSON.parse(raw) as ActiveSessionPointer;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveSession(userId: string, pointer: ActiveSessionPointer) {
+  try {
+    window.localStorage.setItem(activeSessionKey(userId), JSON.stringify(pointer));
+  } catch {
+    // ignore
+  }
+}
+
+function clearActiveSession(userId: string) {
+  try {
+    window.localStorage.removeItem(activeSessionKey(userId));
+  } catch {
+    // ignore
+  }
+}
+
 // A set with no real data (weight and all rep fields zero/empty) — e.g. an
-// abandoned/empty session — should not count as "last time".
+// abandoned/empty session — should not count as "last time" or as "started".
 function isEmptySet(s: any): boolean {
   if (!s) return true;
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
+}
+
+function hasLoggedData(logs: LoggedExercise[]): boolean {
+  return logs.some((ex) => ex.notes.trim() !== "" || ex.sets.some((s) => !isEmptySet(s)));
+}
+
+function buildFreshLogs(day: any): LoggedExercise[] {
+  return day.exercises.map((ex: any) => ({
+    name: ex.name,
+    muscle: ex.muscle,
+    isUnilateral: !!ex.isUnilateral,
+    targetSets: ex.sets,
+    targetReps: ex.reps,
+    notes: "",
+    showNotes: false,
+    sets: Array.from({ length: ex.sets }, (_, i) => ({
+      setNumber: i + 1,
+      weight: 0,
+      reps: 0,
+      repsLeft: 0,
+      repsRight: 0,
+      completed: false,
+      isNewPr: false,
+    })),
+  }));
+}
+
+// Estimated one-rep max (Epley-style) — PRs are judged on this, not raw
+// weight, so a heavier low-rep set and a lighter high-rep set can be compared.
+function estimatedOneRepMax(weight: number, reps: number): number {
+  return weight * (1 + reps / 30);
 }
 
 // Section 10: format a single previous set for the per-set "last time" hint.
@@ -45,20 +157,32 @@ function formatPrevSet(s: any): string | null {
 
 export default function Log() {
   const [, setLocation] = useLocation();
+  const { user } = useUser();
   const { data: program } = useGetCurrentProgram();
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
+  const [activeDay, setActiveDay] = useState<any>(null);
+  const [resumedElsewhere, setResumedElsewhere] = useState(false);
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
+  const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const flashIdRef = useRef(0);
+
+  // Tracks which draft key `logs` currently reflects, so a refetch of
+  // `program` (e.g. on network reconnect) doesn't clobber in-progress data —
+  // the seed/rehydrate effect below only runs again if the day actually changes.
+  const initializedKeyRef = useRef<string | null>(null);
+  const currentDraftKeyRef = useRef<string | null>(null);
+  const activeSessionRef = useRef<ActiveSessionPointer | null>(null);
 
   const prBaselineRef = useRef<Record<string, number>>({});
   useEffect(() => {
     if (personalRecords) {
       const map: Record<string, number> = {};
       for (const pr of personalRecords) {
-        map[pr.exercise.toLowerCase()] = pr.maxWeight;
+        map[pr.exercise.toLowerCase()] = estimatedOneRepMax(pr.maxWeight, pr.reps ?? 0);
       }
       prBaselineRef.current = map;
     }
@@ -95,39 +219,103 @@ export default function Log() {
     return days[0];
   }
 
+  // Only one workout session can be in progress at a time. If a different day
+  // already has an unfinished, unsaved draft, keep the user in that session
+  // instead of silently starting a new one (which would orphan the old one).
   useEffect(() => {
-    if (program?.days) {
-      const day = resolveDay(program.days as any[]);
-      if (!day) return;
-      setLogs(
-        day.exercises.map((ex: any) => ({
-          name: ex.name,
-          muscle: ex.muscle,
-          isUnilateral: !!ex.isUnilateral,
-          targetSets: ex.sets,
-          targetReps: ex.reps,
-          notes: "",
-          showNotes: false,
-          sets: Array.from({ length: ex.sets }, (_, i) => ({
-            setNumber: i + 1,
-            weight: 0,
-            reps: 0,
-            repsLeft: 0,
-            repsRight: 0,
-            completed: false,
-            isNewPr: false,
-          })),
-        }))
-      );
-    }
-  }, [program]);
+    if (!program?.days || !user?.id) return;
+    const requestedDay = resolveDay(program.days as any[]);
+    if (!requestedDay) return;
 
-  function updateSet(exIdx: number, setIdx: number, field: keyof LoggedSet, value: number | boolean) {
+    const weekNumber = program.weekNumber ?? 1;
+    let day = requestedDay;
+
+    const active = loadActiveSession(user.id);
+    if (active && (active.programId !== program.id || active.weekNumber !== weekNumber || active.dayNumber !== requestedDay.dayNumber)) {
+      if (active.programId === program.id && active.weekNumber === weekNumber) {
+        const activeDraft = loadDraft(draftKey(user.id, active.programId, active.weekNumber, active.dayNumber));
+        const activeDayObj = (program.days as any[]).find((d) => d.dayNumber === active.dayNumber);
+        if (activeDraft && activeDayObj) {
+          day = activeDayObj;
+        } else {
+          clearActiveSession(user.id);
+        }
+      } else {
+        clearActiveSession(user.id);
+      }
+    }
+
+    setActiveDay(day);
+    const wasRedirected = day.dayNumber !== requestedDay.dayNumber;
+    setResumedElsewhere(wasRedirected);
+    if (wasRedirected) {
+      setLocation(`/log?day=${day.dayNumber}`, { replace: true });
+    }
+
+    const key = draftKey(user.id, program.id, weekNumber, day.dayNumber);
+    activeSessionRef.current = { programId: program.id, weekNumber, dayNumber: day.dayNumber };
+
+    // Already initialized for this exact day (e.g. `program` just refetched
+    // after a reconnect) — don't touch in-progress `logs`.
+    if (initializedKeyRef.current === key) return;
+
+    initializedKeyRef.current = key;
+    currentDraftKeyRef.current = key;
+
+    const draft = loadDraft(key);
+    if (draft) {
+      setLogs(draft.logs);
+      return;
+    }
+
+    setLogs(buildFreshLogs(day));
+  }, [program, user?.id]);
+
+  // Mirror every change to localStorage so a reconnect/reload can restore the
+  // in-progress session instead of losing it. Only once real data has been
+  // entered — an untouched sheet shouldn't block starting a different day.
+  useEffect(() => {
+    const key = currentDraftKeyRef.current;
+    if (!key || logs.length === 0 || !hasLoggedData(logs)) return;
+    saveDraft(key, logs);
+    if (user?.id && activeSessionRef.current) {
+      saveActiveSession(user.id, activeSessionRef.current);
+    }
+  }, [logs]);
+
+  // Sets are saved implicitly by typing — no separate "confirm" step. Weight
+  // and reps together mark a set as logged, and PR detection runs inline.
+  function updateSet(exIdx: number, setIdx: number, field: "weight" | "reps" | "repsLeft" | "repsRight", value: number) {
+    const ex = logs[exIdx];
+    const set = ex.sets[setIdx];
+    const merged = { ...set, [field]: value };
+
+    const hasReps = ex.isUnilateral ? merged.repsLeft > 0 && merged.repsRight > 0 : merged.reps > 0;
+    const completed = merged.weight > 0 && hasReps;
+
+    let isNewPr = false;
+    if (completed) {
+      const nameKey = ex.name.toLowerCase();
+      const reps = ex.isUnilateral ? Math.min(merged.repsLeft, merged.repsRight) : merged.reps;
+      const score = estimatedOneRepMax(merged.weight, reps);
+      const baseline = prBaselineRef.current[nameKey] ?? 0;
+      const sessionBest = sessionBestRef.current[nameKey] ?? 0;
+      const currentBest = Math.max(baseline, sessionBest);
+      isNewPr = score > currentBest;
+
+      if (isNewPr && !set.isNewPr) {
+        sessionBestRef.current[nameKey] = score;
+        const id = ++flashIdRef.current;
+        setPrFlashes((f) => [...f, { id, exercise: ex.name, weight: merged.weight }]);
+        setTimeout(() => setPrFlashes((f) => f.filter((x) => x.id !== id)), 4000);
+      }
+    }
+
     setLogs((prev) => {
       const next = [...prev];
       next[exIdx] = {
         ...next[exIdx],
-        sets: next[exIdx].sets.map((s, si) => si === setIdx ? { ...s, [field]: value } : s),
+        sets: next[exIdx].sets.map((s, si) => (si === setIdx ? { ...merged, completed, isNewPr } : s)),
       };
       return next;
     });
@@ -149,44 +337,13 @@ export default function Log() {
     });
   }
 
-  function completeSet(exIdx: number, setIdx: number) {
-    const ex = logs[exIdx];
-    const set = ex.sets[setIdx];
-    const weight = set.weight ?? 0;
-    const nameKey = ex.name.toLowerCase();
-
-    const baseline = prBaselineRef.current[nameKey] ?? 0;
-    const sessionBest = sessionBestRef.current[nameKey] ?? 0;
-    const currentBest = Math.max(baseline, sessionBest);
-    const isNewPr = weight > 0 && weight > currentBest;
-
-    if (isNewPr) {
-      sessionBestRef.current[nameKey] = weight;
-      const id = ++flashIdRef.current;
-      setPrFlashes((f) => [...f, { id, exercise: ex.name, weight }]);
-      setTimeout(() => setPrFlashes((f) => f.filter((x) => x.id !== id)), 4000);
-    }
-
-    setLogs((prev) => {
-      const next = [...prev];
-      next[exIdx] = {
-        ...next[exIdx],
-        sets: next[exIdx].sets.map((s, si) =>
-          si === setIdx ? { ...s, completed: true, isNewPr } : s
-        ),
-      };
-      return next;
-    });
-  }
-
   async function finishWorkout() {
-    const day = resolveDay((program?.days as any[]) ?? []);
     await createWorkout.mutateAsync({
       data: {
         date: new Date().toISOString().split("T")[0],
-        dayNumber: day?.dayNumber ?? 1,
+        dayNumber: activeDay?.dayNumber ?? 1,
         weekNumber: program?.weekNumber ?? 1,
-        dayLabel: day?.label ?? null,
+        dayLabel: activeDay?.label ?? null,
         exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
           name: ex.name,
           muscle: ex.muscle,
@@ -200,10 +357,28 @@ export default function Log() {
         notes: null,
       } as any,
     });
+    if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
+    if (user?.id) clearActiveSession(user.id);
     setLocation("/dashboard");
   }
 
-  if (!program) {
+  function handleFinishClick() {
+    const allSetsComplete = logs.every((ex) => ex.sets.every((s) => s.completed));
+    if (allSetsComplete) {
+      finishWorkout();
+    } else {
+      setShowIncompleteConfirm(true);
+    }
+  }
+
+  function cancelWorkout() {
+    if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
+    if (user?.id) clearActiveSession(user.id);
+    setShowCancelConfirm(false);
+    setLocation("/program");
+  }
+
+  if (!program || !activeDay) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
         <div className="text-muted-foreground text-sm">Loading workout...</div>
@@ -211,7 +386,7 @@ export default function Log() {
     );
   }
 
-  const day = resolveDay(program.days as any[]);
+  const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
 
   return (
@@ -242,24 +417,38 @@ export default function Log() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
-            <p className="text-muted-foreground mt-1">{day?.focus}</p>
+            {resumedElsewhere && (
+              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
+                Resuming your in-progress session — finish it before starting a new one.
+              </p>
+            )}
           </div>
-          {sessionPrCount > 0 && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold"
+          <div className="flex items-center gap-2">
+            {sessionPrCount > 0 && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold"
+              >
+                <Trophy className="w-4 h-4" />
+                {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
+              </motion.div>
+            )}
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="text-xs text-muted-foreground hover:text-red-400 transition-colors px-2 py-1.5"
+              data-testid="button-cancel-workout"
             >
-              <Trophy className="w-4 h-4" />
-              {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
-            </motion.div>
-          )}
+              Cancel workout
+            </button>
+          </div>
         </div>
       </motion.div>
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
+          const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
           return (
           <motion.div
             key={ex.name}
@@ -277,12 +466,6 @@ export default function Log() {
                 {ex.isUnilateral && (
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
                 )}
-                {(() => {
-                  const baseline = prBaselineRef.current[ex.name.toLowerCase()];
-                  return baseline ? (
-                    <span className="text-xs text-muted-foreground">PR: {baseline} kg</span>
-                  ) : null;
-                })()}
               </div>
               <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -293,19 +476,17 @@ export default function Log() {
             <div className="p-4">
               {/* Column headers */}
               {ex.isUnilateral ? (
-                <div className="grid grid-cols-[2rem_1fr_1fr_1fr_2rem] gap-2 mb-2 text-xs text-muted-foreground font-medium">
+                <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
                   <span>Set</span>
                   <span>Weight</span>
                   <span>Reps (L)</span>
                   <span>Reps (R)</span>
-                  <span></span>
                 </div>
               ) : (
-                <div className="grid grid-cols-[2rem_1fr_1fr_2rem] gap-2 mb-2 text-xs text-muted-foreground font-medium">
+                <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
                   <span>Set</span>
                   <span>Weight</span>
                   <span>Reps</span>
-                  <span></span>
                 </div>
               )}
 
@@ -316,7 +497,7 @@ export default function Log() {
                   <div key={set.setNumber}>
                   <motion.div
                     layout
-                    className={`grid ${ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr_2rem]" : "grid-cols-[2rem_1fr_1fr_2rem]"} gap-2 items-center py-1 rounded-lg transition-all ${
+                    className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
                     }`}
                     data-testid={`set-row-${exIdx}-${setIdx}`}
@@ -334,8 +515,7 @@ export default function Log() {
                       value={set.weight || ""}
                       onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
                       placeholder="0"
-                      disabled={set.completed}
-                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none disabled:opacity-50 transition-colors ${
+                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none transition-colors ${
                         set.isNewPr ? "border-amber-500/40 focus:border-amber-400" : "border-border focus:border-primary"
                       }`}
                       data-testid={`input-weight-${exIdx}-${setIdx}`}
@@ -347,8 +527,7 @@ export default function Log() {
                           value={set.repsLeft || ""}
                           onChange={(e) => updateSet(exIdx, setIdx, "repsLeft", parseInt(e.target.value) || 0)}
                           placeholder="0"
-                          disabled={set.completed}
-                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
                           data-testid={`input-reps-left-${exIdx}-${setIdx}`}
                         />
                         <input
@@ -356,8 +535,7 @@ export default function Log() {
                           value={set.repsRight || ""}
                           onChange={(e) => updateSet(exIdx, setIdx, "repsRight", parseInt(e.target.value) || 0)}
                           placeholder="0"
-                          disabled={set.completed}
-                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
                           data-testid={`input-reps-right-${exIdx}-${setIdx}`}
                         />
                       </>
@@ -367,25 +545,10 @@ export default function Log() {
                         value={set.reps || ""}
                         onChange={(e) => updateSet(exIdx, setIdx, "reps", parseInt(e.target.value) || 0)}
                         placeholder="0"
-                        disabled={set.completed}
-                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary disabled:opacity-50"
+                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
                         data-testid={`input-reps-${exIdx}-${setIdx}`}
                       />
                     )}
-                    <button
-                      onClick={() => !set.completed && completeSet(exIdx, setIdx)}
-                      disabled={set.completed}
-                      className={`p-1.5 rounded-lg transition-colors ${
-                        set.isNewPr
-                          ? "bg-amber-500/20 text-amber-400"
-                          : set.completed
-                          ? "bg-chart-2/20 text-chart-2"
-                          : "bg-secondary/30 text-muted-foreground hover:bg-primary/20 hover:text-primary"
-                      }`}
-                      data-testid={`button-complete-set-${exIdx}-${setIdx}`}
-                    >
-                      {set.isNewPr ? <Trophy className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
-                    </button>
                   </motion.div>
                   {prevStr && (
                     <p className="text-[11px] text-muted-foreground/60 pl-8 mt-0.5" data-testid={`last-set-${exIdx}-${setIdx}`}>
@@ -445,7 +608,7 @@ export default function Log() {
       <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border z-40">
         <div className="max-w-3xl mx-auto">
           <button
-            onClick={finishWorkout}
+            onClick={handleFinishClick}
             disabled={createWorkout.isPending}
             className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
             data-testid="button-finish-workout"
@@ -460,6 +623,96 @@ export default function Log() {
           </button>
         </div>
       </div>
+
+      {/* Incomplete-sets confirmation */}
+      <AnimatePresence>
+        {showIncompleteConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowIncompleteConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.22 }}
+              className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+            >
+              <div>
+                <h3 className="font-semibold text-foreground">Not every set is logged</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Looks like some sets are still missing a weight or rep count. Finish anyway, or go back and fill them in?
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowIncompleteConfirm(false)}
+                  className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium hover:bg-secondary/30 transition-colors"
+                  data-testid="button-keep-logging"
+                >
+                  Keep logging
+                </button>
+                <button
+                  onClick={() => { setShowIncompleteConfirm(false); finishWorkout(); }}
+                  className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+                  data-testid="button-finish-anyway"
+                >
+                  Finish anyway
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Cancel-workout confirmation */}
+      <AnimatePresence>
+        {showCancelConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowCancelConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.22 }}
+              className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+            >
+              <div>
+                <h3 className="font-semibold text-foreground">Discard this workout?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Everything you've logged in this session will be lost — it won't be saved.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium hover:bg-secondary/30 transition-colors"
+                  data-testid="button-keep-workout"
+                >
+                  Keep logging
+                </button>
+                <button
+                  onClick={cancelWorkout}
+                  className="flex-1 h-11 rounded-xl bg-red-500/90 text-white font-semibold hover:bg-red-500 transition-colors"
+                  data-testid="button-discard-workout"
+                >
+                  Discard workout
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
