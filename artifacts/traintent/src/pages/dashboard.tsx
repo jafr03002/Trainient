@@ -1,14 +1,13 @@
 import { useUser } from "@clerk/react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Flame, Dumbbell, CalendarCheck, TrendingUp, ArrowRight, ChevronRight } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { CalendarCheck, Trophy, ArrowRight, ChevronRight } from "lucide-react";
 import {
   useGetWorkoutStats,
   useGetCurrentProgram,
   useGetLatestCheckin,
   useGetRecentWorkouts,
-  useGetVolumeProgress,
+  useGetPersonalRecords,
   useGetProfile,
 } from "@workspace/api-client-react";
 
@@ -26,13 +25,29 @@ function daysSince(dateStr: string | null | undefined): number {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+// Rotates daily rather than on every render/refresh, so it feels like a
+// deliberate rotation instead of random flicker.
+const START_WORKOUT_LINES = [
+  "Ready to start your workout?",
+  "Let's get moving.",
+  "Time to put in the work.",
+  "Your workout is waiting.",
+  "Show up. Get stronger.",
+];
+
+function startWorkoutLine(): string {
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return START_WORKOUT_LINES[dayOfYear % START_WORKOUT_LINES.length];
+}
+
 export default function Dashboard() {
   const { user } = useUser();
   const stats = useGetWorkoutStats();
   const program = useGetCurrentProgram();
   const latestCheckin = useGetLatestCheckin();
   const recentWorkouts = useGetRecentWorkouts();
-  const volumeProgress = useGetVolumeProgress();
+  const personalRecords = useGetPersonalRecords();
   const profileQuery = useGetProfile();
 
   const profile = profileQuery.data;
@@ -52,34 +67,10 @@ export default function Dashboard() {
     return daysSinceCheckin >= 7;
   })();
 
-  const statCards = [
-    {
-      label: "Current week",
-      value: stats.data?.currentWeek ?? "—",
-      icon: CalendarCheck,
-      color: "text-primary",
-    },
-    {
-      label: "Workouts logged",
-      value: stats.data?.totalLogged ?? "—",
-      icon: Dumbbell,
-      color: "text-chart-2",
-    },
-    {
-      label: "Last session",
-      value: stats.data?.lastSessionDate
-        ? new Date(stats.data.lastSessionDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
-        : "No sessions yet",
-      icon: TrendingUp,
-      color: "text-chart-3",
-    },
-    {
-      label: "Streak",
-      value: stats.data?.streakDays ? `${stats.data.streakDays}d` : "0d",
-      icon: Flame,
-      color: "text-orange-400",
-    },
-  ];
+  const recentPrCount = (personalRecords.data ?? []).filter((pr) => daysSince(pr.date) <= 7).length;
+  const progressionMessage = recentPrCount > 0
+    ? `New PR${recentPrCount > 1 ? "s" : ""} this week — keep it up!`
+    : "No new PRs yet this week";
 
   const nextDay = program.data?.days?.[0] as any;
 
@@ -119,24 +110,29 @@ export default function Dashboard() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <motion.div
-              key={card.label}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-              className="p-4 rounded-xl bg-card border border-border"
-              data-testid={`stat-${card.label.toLowerCase().replace(/\s+/g, "-")}`}
-            >
-              <Icon className={`w-5 h-5 mb-3 ${card.color}`} />
-              <div className="text-2xl font-bold text-foreground">{stats.isLoading ? "—" : card.value}</div>
-              <div className="text-xs text-muted-foreground mt-1">{card.label}</div>
-            </motion.div>
-          );
-        })}
+      <div className="grid grid-cols-2 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-card border border-border"
+          data-testid="stat-current-week"
+        >
+          <CalendarCheck className="w-5 h-5 mb-3 text-primary" />
+          <div className="text-2xl font-bold text-foreground">{stats.isLoading ? "—" : stats.data?.currentWeek ?? "—"}</div>
+          <div className="text-xs text-muted-foreground mt-1">Current week</div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+          className="p-4 rounded-xl bg-card border border-border"
+          data-testid="card-progression"
+        >
+          <Trophy className="w-5 h-5 mb-3 text-amber-400" />
+          <div className="text-2xl font-bold text-foreground">{personalRecords.isLoading ? "—" : recentPrCount}</div>
+          <div className="text-xs text-muted-foreground mt-1">{progressionMessage}</div>
+        </motion.div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -162,13 +158,7 @@ export default function Dashboard() {
             </div>
           ) : nextDay ? (
             <div>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-lg font-bold text-foreground">{nextDay.label}</span>
-                <span className="text-sm text-muted-foreground">{nextDay.focus}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {nextDay.exercises?.length ?? 0} exercises
-              </p>
+              <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
               <Link href="/log">
                 <button
                   className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
@@ -199,13 +189,12 @@ export default function Dashboard() {
             <div className="space-y-3">
               {recentWorkouts.data.map((w) => {
                 const label = (w as any).dayLabel ?? "Workout";
-                const totalSets = (w.exercisesLogged as any[]).reduce((acc: number, e: any) => acc + (e.sets?.length ?? 0), 0);
                 return (
                   <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0" data-testid={`session-${w.id}`}>
                     <div>
                       <div className="text-sm font-medium text-foreground">{label}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(w.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · {totalSets} sets
+                        {new Date(w.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                       </div>
                     </div>
                   </div>
@@ -215,31 +204,6 @@ export default function Dashboard() {
           )}
         </motion.div>
       </div>
-
-      {/* Volume chart */}
-      {volumeProgress.data && volumeProgress.data.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
-          className="p-5 rounded-xl bg-card border border-border"
-          data-testid="chart-volume"
-        >
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-6">Weekly volume</h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={volumeProgress.data}>
-              <XAxis dataKey="week" tickFormatter={(v) => `Wk ${v}`} stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
-              <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }}
-                labelFormatter={(v) => `Week ${v}`}
-                formatter={(v: number) => [`${v} sets`, "Volume"]}
-              />
-              <Line type="monotone" dataKey="totalSets" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </motion.div>
-      )}
     </div>
   );
 }
