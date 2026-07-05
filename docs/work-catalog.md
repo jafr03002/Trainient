@@ -101,3 +101,12 @@ redirects to `/dashboard`. Independent mode skips generation.
 - A name is captured and persisted to `userProfiles.name`.
 - Independent-mode flow no longer asks for data it can't use (or clearly frames it).
 - No regression to the AI-mode generate-program path.
+
+### Dashboard renewal
+- Remove the workouts logged card
+- Remove the last session card
+- Remove the workout streak card 
+- Add a progression card. Not sure what it contains a motivation on the progress made this week or new PRs that week? something short but motivating
+- Remove how many sets were done on "recent sessions"
+- remove weekly volume
+
