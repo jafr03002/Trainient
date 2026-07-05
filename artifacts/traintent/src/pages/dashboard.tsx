@@ -25,6 +25,22 @@ function daysSince(dateStr: string | null | undefined): number {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+// Rotates daily rather than on every render/refresh, so it feels like a
+// deliberate rotation instead of random flicker.
+const START_WORKOUT_LINES = [
+  "Ready to start your workout?",
+  "Let's get moving.",
+  "Time to put in the work.",
+  "Your workout is waiting.",
+  "Show up. Get stronger.",
+];
+
+function startWorkoutLine(): string {
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return START_WORKOUT_LINES[dayOfYear % START_WORKOUT_LINES.length];
+}
+
 export default function Dashboard() {
   const { user } = useUser();
   const stats = useGetWorkoutStats();
@@ -142,13 +158,7 @@ export default function Dashboard() {
             </div>
           ) : nextDay ? (
             <div>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-lg font-bold text-foreground">{nextDay.label}</span>
-                <span className="text-sm text-muted-foreground">{nextDay.focus}</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                {nextDay.exercises?.length ?? 0} exercises
-              </p>
+              <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
               <Link href="/log">
                 <button
                   className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
