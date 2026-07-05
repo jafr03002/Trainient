@@ -5,12 +5,7 @@ import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, customFetc
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
-
-// The 10 allowed muscle options (sections 3 & 4), in order.
-const MUSCLE_OPTIONS = [
-  "Chest", "Shoulders", "Biceps", "Triceps", "Upper Back",
-  "Lats", "Quads", "Hamstrings", "Glutes", "Calves",
-] as const;
+import { MUSCLE_OPTIONS } from "@/lib/muscles";
 
 type Exercise = {
   name: string;

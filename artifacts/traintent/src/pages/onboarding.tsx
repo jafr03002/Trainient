@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCreateProfile, useGenerateProgram } from "@workspace/api-client-react";
+import { MUSCLE_OPTIONS } from "@/lib/muscles";
 
 const GOALS = [
   { value: "hypertrophy", label: "Build muscle", sub: "Hypertrophy" },
@@ -23,7 +24,7 @@ const EQUIPMENT = [
   "Smith machine", "Resistance bands", "Pull-up bar", "Home gym", "No equipment",
 ];
 
-const MUSCLES = ["Chest", "Back", "Shoulders", "Arms", "Legs", "Glutes", "Core", "No preference"];
+const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 
 const SPLIT_HINTS: Record<number, string> = {
   2: "Upper / Lower split",
@@ -33,8 +34,26 @@ const SPLIT_HINTS: Record<number, string> = {
   6: "Push / Pull / Legs × 2 — high frequency",
 };
 
+// Everyone gets mode + the profile basics also editable later in Settings
+// (name, age, weight). Everything else is AI-coaching input — it's only
+// meaningful when the AI is the one building/adjusting your program, so
+// Independent mode skips straight to the review step.
+type StepKey =
+  | "mode" | "name" | "bodyStats"
+  | "goal" | "experience" | "trainingDays" | "equipment" | "details" | "priorityMuscles"
+  | "review";
+
+function stepsFor(mode: string): StepKey[] {
+  const base: StepKey[] = ["mode", "name", "bodyStats"];
+  if (mode === "ai") {
+    return [...base, "goal", "experience", "trainingDays", "equipment", "details", "priorityMuscles", "review"];
+  }
+  return [...base, "review"];
+}
+
 type FormState = {
   mode: string;
+  name: string;
   goal: string;
   experience: string;
   trainingDays: number;
@@ -49,6 +68,7 @@ type FormState = {
 
 const INITIAL: FormState = {
   mode: "",
+  name: "",
   goal: "",
   experience: "",
   trainingDays: 4,
@@ -68,15 +88,23 @@ export default function Onboarding() {
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
 
-  const totalSteps = 8;
+  // Recomputed from form.mode on every render — switching modes (only
+  // possible while on the first step) never clears already-entered fields,
+  // it just changes which steps are shown, so going back to Independent
+  // after filling in AI questions (or vice versa) keeps everything intact.
+  const steps = stepsFor(form.mode);
+  const currentStep = steps[step];
+  const totalSteps = steps.length;
   const progress = ((step + 1) / totalSteps) * 100;
 
   function canAdvance() {
-    if (step === 0) return !!form.mode;
-    if (step === 1) return !!form.goal;
-    if (step === 2) return !!form.experience;
-    if (step === 4) return form.mode === "independent" || form.equipment.length > 0;
-    return true;
+    switch (currentStep) {
+      case "mode": return !!form.mode;
+      case "goal": return !!form.goal;
+      case "experience": return !!form.experience;
+      case "equipment": return form.equipment.length > 0;
+      default: return true;
+    }
   }
 
   function toggleEquipment(item: string) {
@@ -104,6 +132,7 @@ export default function Onboarding() {
     await createProfile.mutateAsync({
       data: {
         mode: form.mode,
+        name: form.name || undefined,
         goal: form.goal,
         experience: form.experience,
         trainingDays: form.trainingDays,
@@ -160,8 +189,8 @@ export default function Onboarding() {
               exit="exit"
               transition={{ duration: 0.22 }}
             >
-              {/* Step 0 — Mode selection */}
-              {step === 0 && (
+              {/* Mode selection */}
+              {currentStep === "mode" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">How do you want to train?</h2>
                   <p className="text-muted-foreground mb-8">Choose your mode — you can switch later in Settings.</p>
@@ -209,118 +238,27 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Step 1 — Goal */}
-              {step === 1 && (
+              {/* Name */}
+              {currentStep === "name" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
-                  <p className="text-muted-foreground mb-8">This shapes your program and tracking.</p>
-                  <div className="grid grid-cols-1 gap-3">
-                    {GOALS.map((g) => (
-                      <button
-                        key={g.value}
-                        data-testid={`goal-${g.value}`}
-                        onClick={() => setForm((f) => ({ ...f, goal: g.value }))}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          form.goal === g.value
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border bg-card text-foreground hover:border-border/80 hover:bg-secondary/30"
-                        }`}
-                      >
-                        <div className="font-semibold">{g.label}</div>
-                        <div className="text-sm text-muted-foreground mt-0.5">{g.sub}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2 — Experience */}
-              {step === 2 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Your experience level</h2>
-                  <p className="text-muted-foreground mb-8">Honest answers lead to better programs.</p>
-                  <div className="grid grid-cols-1 gap-3">
-                    {EXPERIENCE.map((e) => (
-                      <button
-                        key={e.value}
-                        data-testid={`experience-${e.value}`}
-                        onClick={() => setForm((f) => ({ ...f, experience: e.value }))}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          form.experience === e.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                        }`}
-                      >
-                        <div className="font-semibold text-foreground">{e.label}</div>
-                        <div className="text-sm text-muted-foreground mt-0.5">{e.sub}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3 — Training days */}
-              {step === 3 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Training days per week</h2>
-                  <p className="text-muted-foreground mb-8">How many days can you commit to?</p>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-5xl font-bold text-primary">{form.trainingDays}</span>
-                    <span className="text-muted-foreground">days / week</span>
-                  </div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">What should we call you?</h2>
+                  <p className="text-muted-foreground mb-8">Optional — you can change this later in Settings.</p>
                   <input
-                    type="range"
-                    min={2}
-                    max={6}
-                    value={form.trainingDays}
-                    onChange={(e) => setForm((f) => ({ ...f, trainingDays: parseInt(e.target.value) }))}
-                    className="w-full accent-primary mb-4"
-                    data-testid="training-days-slider"
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Your name"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    data-testid="input-name"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mb-6">
-                    {[2, 3, 4, 5, 6].map((n) => <span key={n}>{n}</span>)}
-                  </div>
-                  {form.mode === "ai" && (
-                    <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
-                      {SPLIT_HINTS[form.trainingDays]}
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* Step 4 — Equipment (skip for independent) */}
-              {step === 4 && (
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
-                  <p className="text-muted-foreground mb-8">
-                    {form.mode === "ai"
-                      ? "Select everything you have access to."
-                      : "Optional — helps with progress tracking."}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {EQUIPMENT.map((item) => (
-                      <button
-                        key={item}
-                        data-testid={`equipment-${item.toLowerCase().replace(/\s+/g, "-")}`}
-                        onClick={() => toggleEquipment(item)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                          form.equipment.includes(item)
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5 — Body stats */}
-              {step === 5 && (
+              {/* Body stats — age + weight, same as what's editable in Settings */}
+              {currentStep === "bodyStats" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Body stats</h2>
-                  <p className="text-muted-foreground mb-8">Optional — helps calibrate your program.</p>
+                  <p className="text-muted-foreground mb-8">Optional — you can change this later in Settings.</p>
                   <div className="space-y-5">
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Age</label>
@@ -332,28 +270,6 @@ export default function Onboarding() {
                         className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                         data-testid="input-age"
                       />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Sex <span className="text-muted-foreground font-normal">(optional)</span></label>
-                      <div className="flex gap-2">
-                        {["Male", "Female"].map((s) => (
-                          <button
-                            key={s}
-                            data-testid={`sex-${s.toLowerCase()}`}
-                            onClick={() => setForm((f) => ({
-                              ...f,
-                              sex: f.sex === s.toLowerCase() ? "" : s.toLowerCase(),
-                            }))}
-                            className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                              form.sex === s.toLowerCase()
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-card text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Weight</label>
@@ -384,6 +300,139 @@ export default function Onboarding() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Goal — AI mode only */}
+              {currentStep === "goal" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
+                  <p className="text-muted-foreground mb-8">This shapes your program and tracking.</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {GOALS.map((g) => (
+                      <button
+                        key={g.value}
+                        data-testid={`goal-${g.value}`}
+                        onClick={() => setForm((f) => ({ ...f, goal: g.value }))}
+                        className={`p-4 rounded-xl border text-left transition-all ${
+                          form.goal === g.value
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-card text-foreground hover:border-border/80 hover:bg-secondary/30"
+                        }`}
+                      >
+                        <div className="font-semibold">{g.label}</div>
+                        <div className="text-sm text-muted-foreground mt-0.5">{g.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Experience — AI mode only */}
+              {currentStep === "experience" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Your experience level</h2>
+                  <p className="text-muted-foreground mb-8">Honest answers lead to better programs.</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {EXPERIENCE.map((e) => (
+                      <button
+                        key={e.value}
+                        data-testid={`experience-${e.value}`}
+                        onClick={() => setForm((f) => ({ ...f, experience: e.value }))}
+                        className={`p-4 rounded-xl border text-left transition-all ${
+                          form.experience === e.value
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
+                        }`}
+                      >
+                        <div className="font-semibold text-foreground">{e.label}</div>
+                        <div className="text-sm text-muted-foreground mt-0.5">{e.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Training days — AI mode only */}
+              {currentStep === "trainingDays" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Training days per week</h2>
+                  <p className="text-muted-foreground mb-8">How many days can you commit to?</p>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-5xl font-bold text-primary">{form.trainingDays}</span>
+                    <span className="text-muted-foreground">days / week</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={2}
+                    max={6}
+                    value={form.trainingDays}
+                    onChange={(e) => setForm((f) => ({ ...f, trainingDays: parseInt(e.target.value) }))}
+                    className="w-full accent-primary mb-4"
+                    data-testid="training-days-slider"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mb-6">
+                    {[2, 3, 4, 5, 6].map((n) => <span key={n}>{n}</span>)}
+                  </div>
+                  <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
+                    {SPLIT_HINTS[form.trainingDays]}
+                  </div>
+                </div>
+              )}
+
+              {/* Equipment — AI mode only */}
+              {currentStep === "equipment" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
+                  <p className="text-muted-foreground mb-8">Select everything you have access to.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {EQUIPMENT.map((item) => (
+                      <button
+                        key={item}
+                        data-testid={`equipment-${item.toLowerCase().replace(/\s+/g, "-")}`}
+                        onClick={() => toggleEquipment(item)}
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                          form.equipment.includes(item)
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sex + injuries — AI mode only, only meaningful for the AI prompt */}
+              {currentStep === "details" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">A bit more for your AI coach</h2>
+                  <p className="text-muted-foreground mb-8">Optional — helps tailor your program.</p>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Sex <span className="text-muted-foreground font-normal">(optional)</span></label>
+                      <div className="flex gap-2">
+                        {["Male", "Female"].map((s) => (
+                          <button
+                            key={s}
+                            data-testid={`sex-${s.toLowerCase()}`}
+                            onClick={() => setForm((f) => ({
+                              ...f,
+                              sex: f.sex === s.toLowerCase() ? "" : s.toLowerCase(),
+                            }))}
+                            className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                              form.sex === s.toLowerCase()
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Injuries or limitations</label>
                       <textarea
@@ -399,8 +448,8 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Step 6 — Priority muscles */}
-              {step === 6 && (
+              {/* Priority muscles — AI mode only */}
+              {currentStep === "priorityMuscles" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Priority muscle groups</h2>
                   <p className="text-muted-foreground mb-8">Pick up to 3. Extra volume goes here.</p>
@@ -428,8 +477,8 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Step 7 — Review & finish */}
-              {step === 7 && (
+              {/* Review & finish */}
+              {currentStep === "review" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">
                     {form.mode === "ai" ? "Ready to build your program" : "You're all set"}
@@ -442,9 +491,10 @@ export default function Onboarding() {
                   <div className="space-y-3 mb-8">
                     {[
                       { label: "Mode", value: form.mode === "ai" ? "AI Coach" : "Independent" },
+                      form.name && { label: "Name", value: form.name },
                       form.goal && { label: "Goal", value: GOALS.find((g) => g.value === form.goal)?.label },
                       form.experience && { label: "Experience", value: EXPERIENCE.find((e) => e.value === form.experience)?.label },
-                      { label: "Training days", value: `${form.trainingDays} days/week` },
+                      form.mode === "ai" && { label: "Training days", value: `${form.trainingDays} days/week` },
                       form.equipment.length > 0 && { label: "Equipment", value: form.equipment.join(", ") },
                       form.age && { label: "Age", value: form.age },
                       form.sex && { label: "Sex", value: form.sex },
