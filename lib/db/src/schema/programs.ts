@@ -8,7 +8,7 @@ export const programsTable = pgTable("programs", {
   weekNumber: integer("week_number").notNull(),
   programName: text("program_name").notNull(),
   splitType: text("split_type").notNull(),
-  aiNotes: text("ai_notes").notNull().default(""),
+  programHighlights: jsonb("program_highlights").notNull().default([]),
   days: jsonb("days").notNull().default([]),
   aiGenerated: boolean("ai_generated").notNull().default(true),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),

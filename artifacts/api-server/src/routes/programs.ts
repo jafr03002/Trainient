@@ -72,7 +72,7 @@ router.post("/programs", requireAuth, async (req, res) => {
       weekNumber: newWeekNumber,
       programName,
       splitType,
-      aiNotes: "",
+      programHighlights: [],
       days,
       aiGenerated: false,
     })
@@ -151,8 +151,16 @@ Apply these rules:
 - Add extra sets to priority muscle groups (15–20% more volume)
 - Use progressive overload logic: rep ranges are designed to be beaten week over week
 
+Also produce 3–5 "program highlights" — short explanations of why the program looks the
+way it does. Each highlight MUST tie back to a concrete input from the profile above (the
+chosen split and why it fits the training-days/experience combo, an extra-volume bump for a
+priority muscle group, an exercise substitution or omission made for an injury, the
+progression logic used for this experience level, etc). Do not write generic filler —
+every highlight should reference a specific choice this program actually makes.
+
 Return ONLY valid JSON (no markdown, no explanation) structured as:
-{ "program_name": "...", "split_type": "...", "ai_notes": "...",
+{ "program_name": "...", "split_type": "...",
+  "program_highlights": [ { "title": "...", "detail": "..." } ],
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
     "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
@@ -181,6 +189,11 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
     })),
   }));
 
+  const programHighlights = (raw.program_highlights ?? []).map((h: any) => ({
+    title: h.title,
+    detail: h.detail,
+  }));
+
   const [program] = await db
     .insert(programsTable)
     .values({
@@ -188,7 +201,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
       weekNumber: newWeekNumber,
       programName: raw.program_name,
       splitType: raw.split_type,
-      aiNotes: raw.ai_notes,
+      programHighlights,
       days,
       aiGenerated: true,
     })
