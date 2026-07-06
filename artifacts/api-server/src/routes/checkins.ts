@@ -103,7 +103,8 @@ Adjustment rules:
 - Apply any specific notes the user left
 
 Return ONLY valid JSON (no markdown):
-{ "message": "...", "updated_program": { "program_name": "...", "split_type": "...", "ai_notes": "...", "days": [...same structure as above...] } }`;
+{ "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
+  "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...] } }`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -128,6 +129,11 @@ Return ONLY valid JSON (no markdown):
     })),
   }));
 
+  const updatedHighlights = (raw.updated_program.program_highlights ?? []).map((h: any) => ({
+    title: h.title,
+    detail: h.detail,
+  }));
+
   const [updatedProgram] = await db
     .insert(programsTable)
     .values({
@@ -135,7 +141,7 @@ Return ONLY valid JSON (no markdown):
       weekNumber: currentProgram.weekNumber + 1,
       programName: raw.updated_program.program_name,
       splitType: raw.updated_program.split_type,
-      aiNotes: raw.updated_program.ai_notes,
+      programHighlights: updatedHighlights,
       days: updatedDays,
     })
     .returning();

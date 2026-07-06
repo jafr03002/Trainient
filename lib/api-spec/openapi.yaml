@@ -569,16 +569,26 @@ components:
           items:
             $ref: "#/components/schemas/Exercise"
 
+    ProgramHighlight:
+      type: object
+      required: [title, detail]
+      properties:
+        title:  { type: string }
+        detail: { type: string }
+
     Program:
       type: object
-      required: [id, userId, weekNumber, programName, splitType, aiNotes, days, aiGenerated, generatedAt]
+      required: [id, userId, weekNumber, programName, splitType, programHighlights, days, aiGenerated, generatedAt]
       properties:
         id:           { type: integer }
         userId:       { type: string }
         weekNumber:   { type: integer }
         programName:  { type: string }
         splitType:    { type: string }
-        aiNotes:      { type: string }
+        programHighlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgramHighlight"
         aiGenerated:  { type: boolean }
         days:
           type: array

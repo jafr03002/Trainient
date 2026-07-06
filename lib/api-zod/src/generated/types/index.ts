@@ -26,6 +26,7 @@ export * from './personalRecord';
 export * from './portalSession';
 export * from './program';
 export * from './programDay';
+export * from './programHighlight';
 export * from './strengthPoint';
 export * from './subscription';
 export * from './userProfile';

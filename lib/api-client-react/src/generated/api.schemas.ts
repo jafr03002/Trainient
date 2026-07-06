@@ -91,13 +91,18 @@ export interface ProgramDay {
   exercises: Exercise[];
 }
 
+export interface ProgramHighlight {
+  title: string;
+  detail: string;
+}
+
 export interface Program {
   id: number;
   userId: string;
   weekNumber: number;
   programName: string;
   splitType: string;
-  aiNotes: string;
+  programHighlights: ProgramHighlight[];
   aiGenerated: boolean;
   days: ProgramDay[];
   generatedAt: string;
