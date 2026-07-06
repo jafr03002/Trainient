@@ -147,7 +147,7 @@ export default function Onboarding() {
     });
 
     if (form.mode === "ai") {
-      await generateProgram.mutateAsync();
+      await generateProgram.mutateAsync({});
     }
 
     setLocation("/dashboard");
