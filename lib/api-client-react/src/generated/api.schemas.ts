@@ -254,6 +254,7 @@ export interface MuscleVolumeWeek {
   hamstrings?: number;
   glutes?: number;
   calves?: number;
+  core?: number;
 }
 
 export interface CalendarColor {

@@ -487,7 +487,8 @@ export const GetMuscleVolumeBreakdownResponseItem = zod.object({
   "quads": zod.number().optional(),
   "hamstrings": zod.number().optional(),
   "glutes": zod.number().optional(),
-  "calves": zod.number().optional()
+  "calves": zod.number().optional(),
+  "core": zod.number().optional()
 })
 export const GetMuscleVolumeBreakdownResponse = zod.array(GetMuscleVolumeBreakdownResponseItem)
 

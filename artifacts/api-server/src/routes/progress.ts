@@ -51,6 +51,7 @@ const MUSCLE_KEY: Record<string, string> = {
   hamstrings: "hamstrings",
   glutes: "glutes",
   calves: "calves",
+  core: "core",
 };
 
 // Loose fallback for legacy/free-text muscle values from older logs.
@@ -67,6 +68,7 @@ function muscleKeyOf(muscle: string): string | null {
   if (m.includes("ham")) return "hamstrings";
   if (m.includes("glute")) return "glutes";
   if (m.includes("calf") || m.includes("calve")) return "calves";
+  if (m.includes("core") || m.includes("abs") || m.includes("abdom") || m.includes("oblique")) return "core";
   return null;
 }
 
@@ -162,7 +164,7 @@ router.get("/progress/muscle-volume", requireAuth, async (req, res) => {
 
   const emptyWeek = () => ({
     chest: 0, shoulders: 0, biceps: 0, triceps: 0, upperBack: 0,
-    lats: 0, quads: 0, hamstrings: 0, glutes: 0, calves: 0,
+    lats: 0, quads: 0, hamstrings: 0, glutes: 0, calves: 0, core: 0,
   });
 
   const weekMap: Record<number, ReturnType<typeof emptyWeek>> = {};

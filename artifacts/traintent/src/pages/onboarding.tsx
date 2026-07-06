@@ -3,8 +3,12 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile, useGenerateProgram } from "@workspace/api-client-react";
+import { useCreateProfile, useGenerateProgram, type Program } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
+import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
+import { MuscleVolumeChart } from "@/components/onboarding/MuscleVolumeChart";
+import { ProgramHighlights } from "@/components/onboarding/ProgramHighlights";
+import { SatisfactionGate, type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 
 const GOALS = [
   { value: "hypertrophy", label: "Build muscle", sub: "Hypertrophy" },
@@ -84,6 +88,9 @@ const INITIAL: FormState = {
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [phase, setPhase] = useState<"form" | "generating" | "presentation">("form");
+  const [program, setProgram] = useState<Program | null>(null);
+  const [regenerateCount, setRegenerateCount] = useState(0);
   const [, setLocation] = useLocation();
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
@@ -129,28 +136,47 @@ export default function Onboarding() {
   }
 
   async function handleFinish() {
-    await createProfile.mutateAsync({
-      data: {
-        mode: form.mode,
-        name: form.name || undefined,
-        goal: form.goal,
-        experience: form.experience,
-        trainingDays: form.trainingDays,
-        equipment: form.equipment,
-        age: form.age ? parseInt(form.age) : undefined,
-        sex: form.sex || undefined,
-        weight: form.weight ? parseFloat(form.weight) : undefined,
-        weightUnit: form.weightUnit,
-        injuries: form.injuries || undefined,
-        priorityMuscles: form.priorityMuscles,
-      },
-    });
+    try {
+      await createProfile.mutateAsync({
+        data: {
+          mode: form.mode,
+          name: form.name || undefined,
+          goal: form.goal,
+          experience: form.experience,
+          trainingDays: form.trainingDays,
+          equipment: form.equipment,
+          age: form.age ? parseInt(form.age) : undefined,
+          sex: form.sex || undefined,
+          weight: form.weight ? parseFloat(form.weight) : undefined,
+          weightUnit: form.weightUnit,
+          injuries: form.injuries || undefined,
+          priorityMuscles: form.priorityMuscles,
+        },
+      });
 
-    if (form.mode === "ai") {
-      await generateProgram.mutateAsync({});
+      if (form.mode === "ai") {
+        setPhase("generating");
+        const result = await generateProgram.mutateAsync({});
+        setProgram(result);
+        setPhase("presentation");
+      } else {
+        setLocation("/dashboard");
+      }
+    } catch {
+      setPhase("form");
     }
+  }
 
-    setLocation("/dashboard");
+  async function handleRegenerateFeedback(feedback: ProgramFeedback) {
+    setPhase("generating");
+    setRegenerateCount((c) => c + 1);
+    try {
+      const result = await generateProgram.mutateAsync({ data: { feedback } });
+      setProgram(result);
+    } catch {
+      // keep the previous program on screen; the error banner below reports it
+    }
+    setPhase("presentation");
   }
 
   const isPending = createProfile.isPending || generateProgram.isPending;
@@ -163,6 +189,78 @@ export default function Onboarding() {
   };
 
   const selectedMuscleCount = form.priorityMuscles.filter((m) => m !== "No preference").length;
+
+  if (phase === "generating") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="w-full max-w-lg">
+          <GeneratingScreen />
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "presentation" && program) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center px-4 py-12">
+          <div className="w-full max-w-lg space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-1">{program.programName}</h2>
+              <p className="text-muted-foreground">{program.splitType}</p>
+            </div>
+
+            <ProgramHighlights highlights={program.programHighlights} />
+
+            <div>
+              <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                Weekly volume
+              </h3>
+              <MuscleVolumeChart days={program.days} />
+            </div>
+
+            <div className="space-y-5">
+              {program.days.map((day) => (
+                <div key={day.dayNumber}>
+                  {program.days.length > 1 && (
+                    <h4 className="text-sm font-semibold text-foreground mb-2">
+                      {day.label} — {day.focus}
+                    </h4>
+                  )}
+                  <div className="space-y-1">
+                    {day.exercises.map((ex) => (
+                      <div
+                        key={ex.name}
+                        className="flex items-center justify-between text-sm py-1.5 border-b border-border/40 last:border-0"
+                      >
+                        <span className="text-foreground">{ex.name}</span>
+                        <span className="text-muted-foreground shrink-0 ml-3">
+                          {ex.sets} × {ex.reps}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {generateProgram.isError && (
+              <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                Something went wrong regenerating your program. Please try again.
+              </div>
+            )}
+
+            <SatisfactionGate
+              onSatisfied={() => setLocation("/dashboard")}
+              onSubmitFeedback={handleRegenerateFeedback}
+              isSubmitting={generateProgram.isPending}
+              showRegenerateNudge={regenerateCount >= 3}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

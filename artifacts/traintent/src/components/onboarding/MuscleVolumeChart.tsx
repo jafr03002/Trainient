@@ -1,22 +1,8 @@
 import { motion } from "framer-motion";
+import { MUSCLE_COLORS } from "@/lib/muscles";
 
 type Exercise = { sets: number; muscle: string };
 type ProgramDay = { exercises: Exercise[] };
-
-// Same palette as the progress-page muscle-volume chart, keyed by label
-// instead of camelCase field name.
-const MUSCLE_COLORS: Record<string, string> = {
-  Chest: "hsl(217, 91%, 60%)",
-  Shoulders: "hsl(280, 68%, 60%)",
-  Biceps: "hsl(38, 92%, 50%)",
-  Triceps: "hsl(24, 90%, 55%)",
-  "Upper Back": "hsl(142, 71%, 45%)",
-  Lats: "hsl(160, 84%, 39%)",
-  Quads: "hsl(0, 72%, 51%)",
-  Hamstrings: "hsl(350, 75%, 55%)",
-  Glutes: "hsl(316, 73%, 52%)",
-  Calves: "hsl(199, 89%, 48%)",
-};
 
 function computeWeeklyVolume(days: ProgramDay[]): { muscle: string; sets: number }[] {
   const totals = new Map<string, number>();

@@ -13,19 +13,22 @@ import {
   getGetStrengthProgressQueryKey,
 } from "@workspace/api-client-react";
 import { Trophy } from "lucide-react";
+import { MUSCLE_COLORS } from "@/lib/muscles";
 
-// Keys match the MuscleVolumeWeek schema; labels/colours for the 10 muscle options.
+// Keys match the MuscleVolumeWeek schema; colours come from the shared
+// MUSCLE_COLORS map (keyed by label) so this can't drift out of sync with it.
 const MUSCLE_GROUPS: { key: string; label: string; color: string }[] = [
-  { key: "chest", label: "Chest", color: "hsl(217, 91%, 60%)" },
-  { key: "shoulders", label: "Shoulders", color: "hsl(280, 68%, 60%)" },
-  { key: "biceps", label: "Biceps", color: "hsl(38, 92%, 50%)" },
-  { key: "triceps", label: "Triceps", color: "hsl(24, 90%, 55%)" },
-  { key: "upperBack", label: "Upper Back", color: "hsl(142, 71%, 45%)" },
-  { key: "lats", label: "Lats", color: "hsl(160, 84%, 39%)" },
-  { key: "quads", label: "Quads", color: "hsl(0, 72%, 51%)" },
-  { key: "hamstrings", label: "Hamstrings", color: "hsl(350, 75%, 55%)" },
-  { key: "glutes", label: "Glutes", color: "hsl(316, 73%, 52%)" },
-  { key: "calves", label: "Calves", color: "hsl(199, 89%, 48%)" },
+  { key: "chest", label: "Chest", color: MUSCLE_COLORS.Chest },
+  { key: "shoulders", label: "Shoulders", color: MUSCLE_COLORS.Shoulders },
+  { key: "biceps", label: "Biceps", color: MUSCLE_COLORS.Biceps },
+  { key: "triceps", label: "Triceps", color: MUSCLE_COLORS.Triceps },
+  { key: "upperBack", label: "Upper Back", color: MUSCLE_COLORS["Upper Back"] },
+  { key: "lats", label: "Lats", color: MUSCLE_COLORS.Lats },
+  { key: "quads", label: "Quads", color: MUSCLE_COLORS.Quads },
+  { key: "hamstrings", label: "Hamstrings", color: MUSCLE_COLORS.Hamstrings },
+  { key: "glutes", label: "Glutes", color: MUSCLE_COLORS.Glutes },
+  { key: "calves", label: "Calves", color: MUSCLE_COLORS.Calves },
+  { key: "core", label: "Core", color: MUSCLE_COLORS.Core },
 ];
 
 const tooltipStyle = {

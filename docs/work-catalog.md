@@ -210,3 +210,15 @@ not parallelizable with them.
 - Motivation highlights reference the user's actual inputs, not generic boilerplate.
 - Declining triggers the structured feedback UI, and submitting it regenerates the program
   incorporating that feedback.
+
+### Independent mode, UI fix on logediting workout
+-Creating/editing a workout. Fix the UI here so that it is easy to make out the difference between the excerices/days the bland gray user intyerface makes it all kind of blend toghether. Lets have a discussion using lavish on this, Im thinking a border of different colors around each excercse card would be the best.
+
+### Add muscle group
+- Add core to the muscle group list across trainient
+
+### Creating/edit workout confirmation
+- After reating a program or editing existing when pressing save workout. If missing workout name or primary muscle group worked on an instance remind them that it isn't filled you can pass without entering muscle group but not pass if it doesnt have a name.
+
+### Create program saving
+- Information being written when creating a program or editing a program shall be saved in \program until it is saved. Even if the page reloads 

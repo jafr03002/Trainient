@@ -780,6 +780,7 @@ components:
         hamstrings:  { type: integer }
         glutes:      { type: integer }
         calves:      { type: integer }
+        core:        { type: integer }
 
     # ── Calendar colours ──────────────────────────────────────────────────────
     CalendarColor:
