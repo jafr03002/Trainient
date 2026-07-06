@@ -114,6 +114,30 @@ export interface ManualProgramInput {
   days: ProgramDay[];
 }
 
+export type ProgramFeedbackCategoriesItem = typeof ProgramFeedbackCategoriesItem[keyof typeof ProgramFeedbackCategoriesItem];
+
+
+export const ProgramFeedbackCategoriesItem = {
+  training_days: 'training_days',
+  exercises: 'exercises',
+  sets: 'sets',
+  split: 'split',
+  order: 'order',
+  session_length: 'session_length',
+  equipment: 'equipment',
+  priority_muscles: 'priority_muscles',
+  overall_volume: 'overall_volume',
+} as const;
+
+export interface ProgramFeedback {
+  categories: ProgramFeedbackCategoriesItem[];
+  note: string;
+}
+
+export interface GenerateProgramInput {
+  feedback?: ProgramFeedback;
+}
+
 export interface LoggedSet {
   setNumber: number;
   weight: number;

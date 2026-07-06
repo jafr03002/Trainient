@@ -185,6 +185,17 @@ export const CreateManualProgramBody = zod.object({
 
 
 /**
+ * @summary Trigger AI generation of a new program based on user profile
+ */
+export const GenerateProgramBody = zod.object({
+  "feedback": zod.object({
+  "categories": zod.array(zod.enum(['training_days', 'exercises', 'sets', 'split', 'order', 'session_length', 'equipment', 'priority_muscles', 'overall_volume'])),
+  "note": zod.string()
+}).optional()
+})
+
+
+/**
  * @summary Update a manual program (add/edit days and exercises)
  */
 export const UpdateProgramBody = zod.object({

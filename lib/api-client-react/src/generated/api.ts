@@ -27,6 +27,7 @@ import type {
   CheckinResult,
   CheckoutInput,
   CheckoutSession,
+  GenerateProgramInput,
   GetStrengthProgressParams,
   GetWorkoutsByDayLabelParams,
   HealthStatus,
@@ -591,14 +592,15 @@ export const getGenerateProgramUrl = () => {
 /**
  * @summary Trigger AI generation of a new program based on user profile
  */
-export const generateProgram = async ( options?: RequestInit): Promise<Program> => {
+export const generateProgram = async (generateProgramInput?: GenerateProgramInput, options?: RequestInit): Promise<Program> => {
 
   return customFetch<Program>(getGenerateProgramUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateProgramInput,)
   }
 );}
 
@@ -606,8 +608,8 @@ export const generateProgram = async ( options?: RequestInit): Promise<Program> 
 
 
 export const getGenerateProgramMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext> => {
 
 const mutationKey = ['generateProgram'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -619,10 +621,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateProgram>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateProgram>>, {data?: BodyType<GenerateProgramInput>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  generateProgram(requestOptions)
+          return  generateProgram(data,requestOptions)
         }
 
 
@@ -633,18 +635,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type GenerateProgramMutationResult = NonNullable<Awaited<ReturnType<typeof generateProgram>>>
-
+    export type GenerateProgramMutationBody = BodyType<GenerateProgramInput> | undefined
     export type GenerateProgramMutationError = ErrorType<unknown>
 
     /**
  * @summary Trigger AI generation of a new program based on user profile
  */
 export const useGenerateProgram = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateProgram>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof generateProgram>>,
         TError,
-        void,
+        {data?: BodyType<GenerateProgramInput>},
         TContext
       > => {
       return useMutation(getGenerateProgramMutationOptions(options));

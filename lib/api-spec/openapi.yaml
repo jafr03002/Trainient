@@ -142,6 +142,11 @@ paths:
       operationId: generateProgram
       tags: [programs]
       summary: Trigger AI generation of a new program based on user profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateProgramInput"
       responses:
         "201":
           description: Program generated
@@ -606,6 +611,32 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProgramDay"
+
+    ProgramFeedback:
+      type: object
+      required: [categories, note]
+      properties:
+        categories:
+          type: array
+          items:
+            type: string
+            enum:
+              - training_days
+              - exercises
+              - sets
+              - split
+              - order
+              - session_length
+              - equipment
+              - priority_muscles
+              - overall_volume
+        note: { type: string }
+
+    GenerateProgramInput:
+      type: object
+      properties:
+        feedback:
+          $ref: "#/components/schemas/ProgramFeedback"
 
     # ── Workouts ──────────────────────────────────────────────────────────────
     LoggedSet:

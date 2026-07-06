@@ -108,6 +108,7 @@ router.put("/programs/:id", requireAuth, async (req, res) => {
 
 router.post("/programs/generate", requireAuth, async (req, res) => {
   const userId = getUserId(req);
+  const feedback: { categories?: string[]; note?: string } | undefined = req.body?.feedback;
 
   const profile = await db.query.userProfilesTable.findFirst({
     where: eq(userProfilesTable.userId, userId),
@@ -122,6 +123,18 @@ router.post("/programs/generate", requireAuth, async (req, res) => {
     orderBy: [desc(programsTable.weekNumber)],
   });
   const newWeekNumber = (latestProgram?.weekNumber ?? 0) + 1;
+
+  const hasFeedback = !!feedback && ((feedback.categories?.length ?? 0) > 0 || !!feedback.note);
+  const feedbackBlock = hasFeedback
+    ? `\n\nThe client reviewed a previously generated program and asked for changes before accepting it:
+- Categories to revisit: ${feedback!.categories?.length ? feedback!.categories.join(", ") : "unspecified"}
+- Additional notes: ${feedback!.note || "none"}
+
+Here is the program they are reacting to, for reference:
+${JSON.stringify(latestProgram?.days ?? [])}
+
+Generate a new version of the program that directly addresses this feedback, while still following all the rules above.`
+    : "";
 
   const systemPrompt = `You are an expert strength and conditioning coach with deep knowledge of hypertrophy, powerlifting, and evidence-based training. You write structured, intelligent training programs tailored to the individual.
 
@@ -163,7 +176,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
   "program_highlights": [ { "title": "...", "detail": "..." } ],
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
-    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
+    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }${feedbackBlock}`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
