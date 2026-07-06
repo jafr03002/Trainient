@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProgramDay } from './programDay';
+import type { ProgramHighlight } from './programHighlight';
 
 export interface Program {
   id: number;
@@ -13,7 +14,7 @@ export interface Program {
   weekNumber: number;
   programName: string;
   splitType: string;
-  aiNotes: string;
+  programHighlights: ProgramHighlight[];
   aiGenerated: boolean;
   days: ProgramDay[];
   generatedAt: string;

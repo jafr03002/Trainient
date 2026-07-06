@@ -541,9 +541,17 @@ export default function Program() {
             Edit
           </button>
         </div>
-        {program.aiNotes && (
-          <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm text-muted-foreground">
-            {program.aiNotes}
+        {program.programHighlights.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {program.programHighlights.map((h, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm"
+              >
+                <span className="font-semibold text-foreground">{h.title}</span>
+                <span className="text-muted-foreground"> — {h.detail}</span>
+              </div>
+            ))}
           </div>
         )}
       </motion.div>

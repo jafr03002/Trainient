@@ -99,7 +99,10 @@ export const GetCurrentProgramResponse = zod.object({
   "weekNumber": zod.number(),
   "programName": zod.string(),
   "splitType": zod.string(),
-  "aiNotes": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
@@ -130,7 +133,10 @@ export const ListProgramsResponseItem = zod.object({
   "weekNumber": zod.number(),
   "programName": zod.string(),
   "splitType": zod.string(),
-  "aiNotes": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
@@ -219,7 +225,10 @@ export const UpdateProgramResponse = zod.object({
   "weekNumber": zod.number(),
   "programName": zod.string(),
   "splitType": zod.string(),
-  "aiNotes": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),

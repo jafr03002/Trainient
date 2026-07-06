@@ -29,6 +29,7 @@ export * from './program';
 export * from './programDay';
 export * from './programFeedback';
 export * from './programFeedbackCategoriesItem';
+export * from './programHighlight';
 export * from './strengthPoint';
 export * from './subscription';
 export * from './userProfile';
