@@ -224,6 +224,7 @@ not parallelizable with them.
 - Information being written when creating a program or editing a program shall be saved in \program until it is saved. Even if the page reloads
 
 ### Weekly progress card deck (scratched)
+
 **Status:** scratched — explored via `/lavish`, not being pursued right now. Kept here so the
 exploration isn't lost if it comes back up.
 
@@ -232,6 +233,7 @@ exploration isn't lost if it comes back up.
 for that week.
 
 **Decisions made during the design pass, in case this gets picked back up:**
+
 - Progression is defined the same way as PR tracking: Epley-formula estimated 1RM, per exercise,
   per set. Compare each exercise's best e1RM this week vs. last week.
 - Card headline = the best-improved exercise (name + %), not total volume. Total sets is demoted
@@ -246,4 +248,4 @@ for that week.
   `artifacts/api-server/src/routes/progress.ts`, not a reuse of an existing route.
 - Open/unresolved when shelved: exact placement on `/progress` (top of page vs. between the two
   existing charts vs. replacing the muscle-volume chart entirely), how far back the deck should
-  reach, and whether each week needs a deep-linkable URL. 
+  reach, and whether each week needs a deep-linkable URL.
