@@ -221,4 +221,31 @@ not parallelizable with them.
 - After reating a program or editing existing when pressing save workout. If missing workout name or primary muscle group worked on an instance remind them that it isn't filled you can pass without entering muscle group but not pass if it doesnt have a name.
 
 ### Create program saving
-- Information being written when creating a program or editing a program shall be saved in \program until it is saved. Even if the page reloads 
+- Information being written when creating a program or editing a program shall be saved in \program until it is saved. Even if the page reloads
+
+### Weekly progress card deck (scratched)
+
+**Status:** scratched — explored via `/lavish`, not being pursued right now. Kept here so the
+exploration isn't lost if it comes back up.
+
+**Concept:** A vertical card per week (Week N), fanned out like a hand of cards on `/progress`
+(not the dashboard). Click a card and it expands into a centered, backdrop-blurred detail view
+for that week.
+
+**Decisions made during the design pass, in case this gets picked back up:**
+
+- Progression is defined the same way as PR tracking: Epley-formula estimated 1RM, per exercise,
+  per set. Compare each exercise's best e1RM this week vs. last week.
+- Card headline = the best-improved exercise (name + %), not total volume. Total sets is demoted
+  to a small secondary figure, never the headline.
+- Expanded view leads with a top-3 ranked list of most-improved exercises, plus two aggregate
+  percentages: % of tracked lifts that progressed vs. % that regressed week-over-week.
+- Reuses the existing muscle-volume breakdown (donut + legend, from `GET /progress/muscle-volume`)
+  as secondary detail inside the expanded card, not the headline.
+- PR count gets a trophy icon, matching the existing `Trophy` usage elsewhere in the app.
+- Backend gap: nothing today diffs e1RM week-over-week — `/progress/prs` computes e1RM per
+  exercise but there's no aggregation comparing two weeks. Would be new work in
+  `artifacts/api-server/src/routes/progress.ts`, not a reuse of an existing route.
+- Open/unresolved when shelved: exact placement on `/progress` (top of page vs. between the two
+  existing charts vs. replacing the muscle-volume chart entirely), how far back the deck should
+  reach, and whether each week needs a deep-linkable URL.
