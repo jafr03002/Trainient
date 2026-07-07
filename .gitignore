@@ -52,3 +52,12 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local agent / tooling state — keep out of the repo.
+# Ignore the tooling dirs wholesale, then re-include only the files we track.
+.no-mistakes/
+.agents/*
+!.agents/memory/
+.claude/
+.lavish/*
+!.lavish/progress-card.html

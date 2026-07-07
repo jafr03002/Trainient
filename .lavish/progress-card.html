@@ -1,0 +1,456 @@
+<title>Weekly Progress Card Deck — /progress</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          background: 'hsl(var(--background))',
+          foreground: 'hsl(var(--foreground))',
+          border: 'hsl(var(--border))',
+          card: 'hsl(var(--card))',
+          'card-foreground': 'hsl(var(--card-foreground))',
+          muted: 'hsl(var(--muted))',
+          'muted-foreground': 'hsl(var(--muted-foreground))',
+          primary: 'hsl(var(--primary))',
+          'primary-foreground': 'hsl(var(--primary-foreground))',
+          secondary: 'hsl(var(--secondary))',
+          amber: { 400: '#fbbf24', 500: '#f59e0b' },
+        },
+        fontFamily: { sans: ['Inter', 'ui-sans-serif', 'sans-serif'] },
+      },
+    },
+  };
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --background: 0 0% 100%; --foreground: 240 10% 3.9%;
+    --border: 240 5.9% 90%; --card: 0 0% 100%; --card-foreground: 240 10% 3.9%;
+    --muted: 240 4.8% 95.9%; --muted-foreground: 240 3.8% 46.1%;
+    --primary: 217 91% 60%; --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+  }
+  .dark {
+    --background: 240 10% 4%; --foreground: 0 0% 98%;
+    --border: 240 10% 12%; --card: 240 10% 6%; --card-foreground: 0 0% 98%;
+    --muted: 240 10% 12%; --muted-foreground: 240 5% 65%;
+    --primary: 217 91% 60%; --primary-foreground: 0 0% 98%;
+    --secondary: 240 10% 12%;
+  }
+  body { font-family: 'Inter', sans-serif; }
+  .icon { width: 1.25rem; height: 1.25rem; }
+  label:has(input:checked) .pick-ring { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+  .pick-badge { opacity: 0; transition: opacity .15s ease; }
+  label:has(input:checked) .pick-badge { opacity: 1; }
+
+  .deck-card {
+    width: 168px; height: 232px; flex-shrink: 0;
+    transition: transform .18s ease, box-shadow .18s ease;
+    box-shadow: 0 6px 16px -6px rgba(0,0,0,.4);
+  }
+  .deck-card:hover { transform: translateY(-14px); z-index: 30 !important; box-shadow: 0 16px 28px -10px rgba(0,0,0,.55); }
+  .deck-wrap { padding: 24px 8px 8px; }
+
+  #modal-panel { transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .2s ease; }
+  #modal-backdrop { transition: opacity .25s ease, backdrop-filter .25s ease; }
+</style>
+
+<body class="dark bg-background text-foreground min-h-screen">
+<div class="max-w-6xl mx-auto p-6 md:p-10 space-y-12">
+
+  <!-- Header -->
+  <header class="space-y-3">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Design discussion · progress.tsx (not dashboard.tsx)</p>
+        <h1 class="text-3xl font-bold">Weekly progress — a card deck</h1>
+        <p class="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
+          A vertical card per week, fanned like a hand of cards. Click any card and it expands to the center
+          with the background blurred, showing that week's full detail. Lives on
+          <code class="px-1 rounded bg-muted text-foreground text-xs">/progress</code>, not the dashboard.
+          <span class="font-semibold text-foreground">Try it — click a card below.</span>
+        </p>
+      </div>
+      <button onclick="document.documentElement.classList.toggle('dark')"
+        class="shrink-0 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted transition-colors">
+        Toggle light / dark
+      </button>
+    </div>
+  </header>
+
+  <!-- The deck -->
+  <section class="space-y-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">The deck (click a card)</h2>
+    <div class="deck-wrap flex items-end w-fit">
+      <div class="deck-card relative rounded-2xl border border-border bg-card p-3.5 flex flex-col cursor-pointer" style="z-index:1" onclick="openWeek(2)">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Week 2</div>
+        <div class="mt-2.5">
+          <div class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Top lift</div>
+          <div class="flex items-baseline gap-1 mt-1 min-w-0">
+            <span class="text-sm font-bold leading-tight truncate min-w-0">Squat</span>
+            <span class="text-sm font-bold text-primary shrink-0">+3%</span>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div class="flex h-1.5 rounded-full overflow-hidden w-full" id="split-2"></div>
+          <div class="flex items-center justify-between text-[9px] text-muted-foreground mt-1 leading-none">
+            <span>40% ▲</span><span>20% ▼</span>
+          </div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center justify-between text-[11px] text-muted-foreground leading-none">
+          <span class="inline-flex items-center gap-1"><svg class="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>0</span>
+          <span class="text-muted-foreground/70">42 sets</span>
+        </div>
+      </div>
+
+      <div class="deck-card relative rounded-2xl border border-border bg-card p-3.5 flex flex-col cursor-pointer" style="margin-left:-120px; z-index:2" onclick="openWeek(3)">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Week 3</div>
+        <div class="mt-2.5">
+          <div class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Top lift</div>
+          <div class="flex items-baseline gap-1 mt-1 min-w-0">
+            <span class="text-sm font-bold leading-tight truncate min-w-0">Overhead Press</span>
+            <span class="text-sm font-bold text-primary shrink-0">+9%</span>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div class="flex h-1.5 rounded-full overflow-hidden w-full" id="split-3"></div>
+          <div class="flex items-center justify-between text-[9px] text-muted-foreground mt-1 leading-none">
+            <span>55% ▲</span><span>18% ▼</span>
+          </div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center justify-between text-[11px] text-muted-foreground leading-none">
+          <span class="inline-flex items-center gap-1"><svg class="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>1</span>
+          <span class="text-muted-foreground/70">46 sets</span>
+        </div>
+      </div>
+
+      <div class="deck-card relative rounded-2xl border border-border bg-card p-3.5 flex flex-col cursor-pointer" style="margin-left:-120px; z-index:3" onclick="openWeek(4)">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Week 4</div>
+        <div class="mt-2.5">
+          <div class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Top lift</div>
+          <div class="flex items-baseline gap-1 mt-1 min-w-0">
+            <span class="text-sm font-bold leading-tight truncate min-w-0">Deadlift</span>
+            <span class="text-sm font-bold text-primary shrink-0">+11%</span>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div class="flex h-1.5 rounded-full overflow-hidden w-full" id="split-4"></div>
+          <div class="flex items-center justify-between text-[9px] text-muted-foreground mt-1 leading-none">
+            <span>70% ▲</span><span>10% ▼</span>
+          </div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center justify-between text-[11px] text-muted-foreground leading-none">
+          <span class="inline-flex items-center gap-1"><svg class="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>2</span>
+          <span class="text-muted-foreground/70">51 sets</span>
+        </div>
+      </div>
+
+      <div class="deck-card relative rounded-2xl border border-border bg-card p-3.5 flex flex-col cursor-pointer" style="margin-left:-120px; z-index:4" onclick="openWeek(5)">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Week 5</div>
+        <div class="mt-2.5">
+          <div class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Top lift</div>
+          <div class="flex items-baseline gap-1 mt-1 min-w-0">
+            <span class="text-sm font-bold leading-tight truncate min-w-0">Squat</span>
+            <span class="text-sm font-bold text-primary shrink-0">+2%</span>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div class="flex h-1.5 rounded-full overflow-hidden w-full" id="split-5"></div>
+          <div class="flex items-center justify-between text-[9px] text-muted-foreground mt-1 leading-none">
+            <span>30% ▲</span><span>35% ▼</span>
+          </div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center justify-between text-[11px] text-muted-foreground leading-none">
+          <span class="inline-flex items-center gap-1"><svg class="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>0</span>
+          <span class="text-muted-foreground/70">40 sets</span>
+        </div>
+      </div>
+
+      <div class="deck-card relative rounded-2xl border-2 border-primary/60 bg-card p-3.5 flex flex-col cursor-pointer" style="margin-left:-120px; z-index:5" onclick="openWeek(6)">
+        <div class="flex items-start justify-between leading-none">
+          <div class="text-[10px] font-semibold uppercase tracking-wider text-primary">Week 6</div>
+          <span class="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground uppercase tracking-wider">Now</span>
+        </div>
+        <div class="mt-2.5">
+          <div class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">Top lift</div>
+          <div class="flex items-baseline gap-1 mt-1 min-w-0">
+            <span class="text-sm font-bold leading-tight truncate min-w-0">Bench Press</span>
+            <span class="text-sm font-bold text-primary shrink-0">+6%</span>
+          </div>
+        </div>
+        <div class="mt-2.5">
+          <div class="flex h-1.5 rounded-full overflow-hidden w-full" id="split-6"></div>
+          <div class="flex items-center justify-between text-[9px] text-muted-foreground mt-1 leading-none">
+            <span>68% ▲</span><span>12% ▼</span>
+          </div>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center justify-between text-[11px] text-muted-foreground leading-none">
+          <span class="inline-flex items-center gap-1 text-amber-400 font-semibold"><svg class="w-3 h-3 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>3</span>
+          <span class="text-muted-foreground/70">58 sets</span>
+        </div>
+      </div>
+    </div>
+    <p class="text-xs text-muted-foreground max-w-xl">
+      Progression is the headline (best-improved lift + progressed/regressed split); total sets is present but
+      demoted to a small secondary line, per feedback. Hover lifts a card above its neighbors; click opens it.
+    </p>
+  </section>
+
+  <!-- Modal -->
+  <div id="modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md opacity-0 pointer-events-none" onclick="if(event.target===this) closeModal()">
+    <div id="modal-panel" class="w-[92vw] max-w-md rounded-2xl border border-border bg-card p-6 opacity-0 scale-95 max-h-[85vh] overflow-y-auto">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <div id="m-week" class="text-xs font-semibold uppercase tracking-wider text-primary">Week 6</div>
+          <div class="text-2xl font-bold mt-0.5">Weekly progression</div>
+        </div>
+        <button onclick="closeModal()" class="shrink-0 w-8 h-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors" aria-label="Close">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="mb-5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Top progressed lifts</div>
+        <div id="m-top3" class="space-y-1.5"></div>
+      </div>
+
+      <div class="mb-5">
+        <div class="flex h-2 rounded-full overflow-hidden w-full mb-1.5" id="m-split"></div>
+        <div class="flex items-center justify-between text-xs">
+          <span id="m-pct-up" class="font-semibold">68% progressed</span>
+          <span id="m-pct-down" class="font-semibold text-red-400">12% regressed</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 mb-5 text-center">
+        <div class="p-2 rounded-lg bg-muted/50">
+          <div id="m-prs" class="text-lg font-bold text-amber-400 inline-flex items-center gap-1">3</div>
+          <div class="text-[10px] text-muted-foreground uppercase tracking-wider">PRs</div>
+        </div>
+        <div class="p-2 rounded-lg bg-muted/50">
+          <div id="m-streak" class="text-lg font-bold">12</div>
+          <div class="text-[10px] text-muted-foreground uppercase tracking-wider">Streak</div>
+        </div>
+        <div class="p-2 rounded-lg bg-muted/30">
+          <div id="m-sets" class="text-sm font-semibold text-muted-foreground">58</div>
+          <div class="text-[10px] text-muted-foreground uppercase tracking-wider">Sets (secondary)</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 mb-5">
+        <div id="m-donut" class="relative w-20 h-20 shrink-0 rounded-full"></div>
+        <div id="m-legend" class="text-xs space-y-1 flex-1 min-w-0"></div>
+      </div>
+
+      <div class="mb-5">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">% progressed — last 5 weeks</div>
+        <svg id="m-spark" viewBox="0 0 200 48" class="w-full h-12" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Personal records this week</div>
+        <div id="m-prlist" class="space-y-1.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progression definition — now confirmed -->
+  <section class="space-y-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Progression — confirmed</h2>
+    <div class="p-4 rounded-xl border border-primary/30 bg-primary/5 max-w-2xl text-sm leading-relaxed">
+      <p>
+        Same rule as PR tracking: estimated 1RM via the Epley formula, per exercise, per set. For each exercise
+        logged in both this week and last week, compare best e1RM week-over-week. Rank the top 3 improved
+        exercises on the card (shown above). Roll the rest up into two headline percentages —
+        <span class="font-semibold text-foreground">% of tracked lifts that progressed</span> and
+        <span class="font-semibold text-foreground">% that regressed</span> — vs. last week.
+        Total volume (sets) stays visible but demoted to a small secondary figure, never the headline number.
+      </p>
+      <p class="text-xs text-muted-foreground mt-2">
+        Backend note: this needs a new aggregation — /progress/prs already computes e1RM per exercise, but
+        nothing currently diffs it week-over-week. That's new work in progress.ts, not a reuse of an existing route.
+      </p>
+    </div>
+  </section>
+
+  <!-- Where it lives -->
+  <section class="space-y-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Where in /progress does the deck sit?</h2>
+    <form data-lavish-question="deck-placement" onsubmit="event.preventDefault();
+      const v = new FormData(event.currentTarget).get('placement');
+      if (v) window.lavish.queuePrompt('Place the weekly card deck: ' + v, { tag: 'choice', text: 'Deck placement: ' + v, element: event.currentTarget, data: { question: 'deck-placement', answer: v } });"
+      class="space-y-2 max-w-2xl">
+      <label class="pick-ring flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/50">
+        <input type="radio" name="placement" value="At the top of /progress, above the strength chart" class="mt-1" checked>
+        <span>
+          <span class="font-semibold text-sm block">At the top, above "Strength over time"</span>
+          <span class="text-xs text-muted-foreground">First thing you see — fits now that progression, not the muscle chart, is the headline story.</span>
+        </span>
+      </label>
+      <label class="pick-ring flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/50">
+        <input type="radio" name="placement" value="Between the strength chart and the muscle-volume chart" class="mt-1">
+        <span>
+          <span class="font-semibold text-sm block">Between the two existing charts</span>
+          <span class="text-xs text-muted-foreground">Bridges "Strength over time" (per-exercise) and the muscle-volume chart (aggregate).</span>
+        </span>
+      </label>
+      <label class="pick-ring flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/50">
+        <input type="radio" name="placement" value="Replaces the muscle-volume bar chart entirely" class="mt-1">
+        <span>
+          <span class="font-semibold text-sm block">Replace the muscle-volume chart entirely</span>
+          <span class="text-xs text-muted-foreground">The expanded card's donut already covers per-muscle detail — the stacked bar chart becomes redundant.</span>
+        </span>
+      </label>
+      <button type="submit" class="pick-badge text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground">Queue this answer</button>
+    </form>
+  </section>
+
+  <!-- Extra content in expanded view -->
+  <section class="space-y-3">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Anything else in the expanded view?</h2>
+    <form data-lavish-question="extra-metrics" onsubmit="event.preventDefault();
+      const fd = new FormData(event.currentTarget);
+      const picked = fd.getAll('extra');
+      if (picked.length) window.lavish.queuePrompt('Also include these in the expanded week card: ' + picked.join(', ') + '.',
+        { tag: 'choice', text: 'Extras: ' + picked.join(', '), element: event.currentTarget, data: { question: 'extra-metrics', answer: picked } });"
+      class="space-y-2 max-w-2xl">
+      <label class="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card cursor-pointer text-sm">
+        <input type="checkbox" name="extra" value="List of PRs hit that week" checked>
+        List of PRs hit that week (shown in the mockup above)
+      </label>
+      <label class="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card cursor-pointer text-sm">
+        <input type="checkbox" name="extra" value="Progressed % sparkline across recent weeks, open card highlighted" checked>
+        Progressed % sparkline across recent weeks
+      </label>
+      <label class="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card cursor-pointer text-sm">
+        <input type="checkbox" name="extra" value="Deep-link / shareable URL per week (e.g. /progress?week=6)">
+        Deep-link per week so it can be shared/bookmarked
+      </label>
+      <label class="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card cursor-pointer text-sm">
+        <input type="checkbox" name="extra" value="Keyboard left/right arrows to move between weeks while expanded">
+        Left/right arrow keys to flip between weeks while a card is open
+      </label>
+      <button type="submit" class="pick-badge text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground">Queue this answer</button>
+    </form>
+  </section>
+
+  <footer class="text-xs text-muted-foreground border-t border-border pt-4">
+    Nothing here is implemented yet. Click through the deck to get a feel for the interaction, then annotate or
+    queue answers above. Free-form comments on any element are welcome too.
+  </footer>
+
+</div>
+
+<script>
+  const MUSCLES = [
+    { label: 'Quads', color: 'hsl(0,72%,51%)', pct: 24.1 },
+    { label: 'Chest', color: 'hsl(217,91%,60%)', pct: 20.7 },
+    { label: 'Lats', color: 'hsl(160,84%,39%)', pct: 17.2 },
+    { label: 'Hamstrings', color: 'hsl(350,75%,55%)', pct: 13.8 },
+    { label: 'Shoulders', color: 'hsl(280,68%,60%)', pct: 12.1 },
+    { label: 'Other', color: 'hsl(240,5%,55%)', pct: 12.1 },
+  ];
+
+  const PROGRESS_COLOR = 'hsl(142,71%,55%)';
+  const REGRESS_COLOR = 'hsl(0,72%,58%)';
+  const FLAT_COLOR = 'hsl(var(--muted-foreground))';
+
+  const WEEKS = {
+    2: { sets: 42, prs: 0, streak: 4, prList: [], pctProgressed: 40, pctRegressed: 20,
+         top3: [{ exercise: 'Squat', pct: '+3%' }] },
+    3: { sets: 46, prs: 1, streak: 7, prList: ['Overhead Press · 42.5kg × 6'], pctProgressed: 55, pctRegressed: 18,
+         top3: [{ exercise: 'Overhead Press', pct: '+9%' }, { exercise: 'Row', pct: '+2%' }] },
+    4: { sets: 51, prs: 2, streak: 9, prList: ['Deadlift · 140kg × 3', 'Barbell Row · 70kg × 8'], pctProgressed: 70, pctRegressed: 10,
+         top3: [{ exercise: 'Deadlift', pct: '+11%' }, { exercise: 'Barbell Row', pct: '+7%' }, { exercise: 'Bench Press', pct: '+4%' }] },
+    5: { sets: 40, prs: 0, streak: 3, prList: [], pctProgressed: 30, pctRegressed: 35,
+         top3: [{ exercise: 'Squat', pct: '+2%' }] },
+    6: { sets: 58, prs: 3, streak: 12, prList: ['Bench Press · 85kg × 5', 'Squat · 120kg × 5', 'Pull-up · +20kg × 6'], pctProgressed: 68, pctRegressed: 12,
+         top3: [{ exercise: 'Bench Press', pct: '+6%' }, { exercise: 'Squat', pct: '+5%' }, { exercise: 'Pull-up', pct: '+4%' }] },
+  };
+
+  function buildSplit(el, up, down) {
+    const flat = Math.max(0, 100 - up - down);
+    el.innerHTML = `<div style="width:${up}%;background:${PROGRESS_COLOR}"></div><div style="width:${down}%;background:${REGRESS_COLOR}"></div><div style="width:${flat}%;background:${FLAT_COLOR}"></div>`;
+  }
+  [2,3,4,5,6].forEach(w => buildSplit(document.getElementById('split-' + w), WEEKS[w].pctProgressed, WEEKS[w].pctRegressed));
+
+  function buildDonut(sets) {
+    let acc = 0;
+    const stops = MUSCLES.map(m => {
+      const from = acc; acc += m.pct;
+      return `${m.color} ${from}% ${acc}%`;
+    }).join(', ');
+    return `conic-gradient(${stops})`;
+  }
+
+  const trophySvg = '<svg class="w-3.5 h-3.5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
+
+  const backdrop = document.getElementById('modal-backdrop');
+  const panel = document.getElementById('modal-panel');
+
+  function openWeek(w) {
+    const data = WEEKS[w];
+    document.getElementById('m-week').textContent = 'Week ' + w;
+
+    document.getElementById('m-top3').innerHTML = data.top3.length
+      ? data.top3.map((t, i) => `<div class="flex items-center gap-2 text-sm"><span class="w-5 h-5 rounded-full bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">${i + 1}</span><span class="flex-1 truncate">${t.exercise}</span><span class="font-semibold" style="color:${PROGRESS_COLOR}">${t.pct}</span></div>`).join('')
+      : '<div class="text-sm text-muted-foreground">No tracked improvements this week.</div>';
+
+    buildSplit(document.getElementById('m-split'), data.pctProgressed, data.pctRegressed);
+    document.getElementById('m-pct-up').textContent = data.pctProgressed + '% progressed';
+    document.getElementById('m-pct-up').style.color = PROGRESS_COLOR;
+    document.getElementById('m-pct-down').textContent = data.pctRegressed + '% regressed';
+
+    document.getElementById('m-prs').innerHTML = trophySvg + data.prs;
+    document.getElementById('m-streak').textContent = data.streak;
+    document.getElementById('m-sets').textContent = data.sets;
+
+    const donut = document.getElementById('m-donut');
+    donut.style.background = buildDonut(data.sets);
+    donut.innerHTML = `<div class="absolute inset-[8px] rounded-full bg-card flex items-center justify-center"><span class="text-sm font-bold">${data.sets}</span></div>`;
+
+    document.getElementById('m-legend').innerHTML = MUSCLES.map(m =>
+      `<div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0" style="background:${m.color}"></span><span class="text-muted-foreground truncate">${m.label} · ${Math.round(data.sets * m.pct / 100)}</span></div>`
+    ).join('');
+
+    const weekNums = [2,3,4,5,6];
+    const vals = weekNums.map(k => WEEKS[k].pctProgressed);
+    const min = Math.min(...vals), max = Math.max(...vals), range = (max - min) || 1;
+    const pts = weekNums.map((k, i) => {
+      const x = 8 + i * 46;
+      const y = 6 + (max - WEEKS[k].pctProgressed) / range * 34;
+      return { x, y, current: k === w };
+    });
+    const line = pts.map(p => `${p.x},${p.y}`).join(' ');
+    const dots = pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${p.current ? 4 : 2.5}" fill="${p.current ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}"/>`).join('');
+    document.getElementById('m-spark').innerHTML =
+      `<polyline points="${line}" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>${dots}`;
+
+    document.getElementById('m-prlist').innerHTML = data.prList.length
+      ? data.prList.map(pr => `<div class="flex items-center gap-2 text-sm">${trophySvg}<span>${pr}</span></div>`).join('')
+      : '<div class="text-sm text-muted-foreground">No PRs this week.</div>';
+
+    backdrop.classList.remove('opacity-0', 'pointer-events-none');
+    panel.classList.remove('opacity-0', 'scale-95');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    backdrop.classList.add('opacity-0', 'pointer-events-none');
+    panel.classList.add('opacity-0', 'scale-95');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+</script>
+</body>
