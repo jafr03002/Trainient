@@ -206,7 +206,6 @@ export default function Onboarding() {
           <PresentationDeck
             program={program}
             goal={form.goal}
-            trainingDays={form.trainingDays}
             onSatisfied={() => setLocation("/dashboard")}
             onSubmitFeedback={handleRegenerateFeedback}
             isSubmitting={generateProgram.isPending}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import type { Program } from "@workspace/api-client-react";
@@ -114,7 +114,6 @@ function SessionRow({ day, color }: { day: ProgramDay; color: string }) {
 export function PresentationDeck({
   program,
   goal,
-  trainingDays,
   onSatisfied,
   onSubmitFeedback,
   isSubmitting,
@@ -123,7 +122,6 @@ export function PresentationDeck({
 }: {
   program: Program;
   goal: string;
-  trainingDays: number;
   onSatisfied: () => void;
   onSubmitFeedback: (feedback: ProgramFeedback) => void;
   isSubmitting?: boolean;
@@ -131,6 +129,10 @@ export function PresentationDeck({
   error?: boolean;
 }) {
   const [card, setCard] = useState(0);
+
+  useEffect(() => {
+    setCard(0);
+  }, [program.id, program.generatedAt]);
 
   const days = program.days;
   const week = scheduleFor(days);
@@ -176,11 +178,15 @@ export function PresentationDeck({
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-3">{program.programName}</h2>
                   <div className="flex flex-wrap gap-2">
-                    {program.splitType.split(/[\/,]/).map((part) => (
-                      <span key={part} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                        {part.trim()}
-                      </span>
-                    ))}
+                    {program.splitType
+                      .split(/[\/,]/)
+                      .map((part) => part.trim())
+                      .filter(Boolean)
+                      .map((part, i) => (
+                        <span key={i} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                          {part}
+                        </span>
+                      ))}
                   </div>
                 </div>
                 <ProgramHighlights highlights={program.programHighlights} />
@@ -253,7 +259,7 @@ export function PresentationDeck({
                     ))}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2">
-                    {trainingDays} training days a week, with rest spread between them.
+                    {days.length} training days a week, with rest spread between them.
                   </p>
                 </div>
               </>
