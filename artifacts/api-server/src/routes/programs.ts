@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { openai } from "../lib/openai";
@@ -21,13 +21,15 @@ function serializeProgram(p: typeof programsTable.$inferSelect, onboardingComple
 
 router.get("/programs/current", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const [program, profile] = await Promise.all([
-    db.query.programsTable.findFirst({
-      where: eq(programsTable.userId, userId),
-      orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
-    }),
-    db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
-  ]);
+  const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
+  // Independent and AI mode each own a separate program lineage (aiGenerated
+  // false/true) so switching modes never surfaces or edits the other mode's
+  // program — "current" resolves within the active mode's lineage only.
+  const wantAiGenerated = profile?.mode !== "independent";
+  const program = await db.query.programsTable.findFirst({
+    where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, wantAiGenerated)),
+    orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
+  });
   if (!program) {
     res.status(404).json({ error: "No active program" });
     return;
@@ -91,13 +93,17 @@ router.put("/programs/:id", requireAuth, async (req, res) => {
     return;
   }
 
+  // Scoped to userId + aiGenerated=false in the WHERE itself (not checked
+  // after the fact) so this can never touch another user's row, and an
+  // AI-generated program can never be edited even if the client is stale
+  // or bypasses the UI.
   const [program] = await db
     .update(programsTable)
     .set({ programName, splitType, days })
-    .where(eq(programsTable.id, id))
+    .where(and(eq(programsTable.id, id), eq(programsTable.userId, userId), eq(programsTable.aiGenerated, false)))
     .returning();
 
-  if (!program || program.userId !== userId) {
+  if (!program) {
     res.status(404).json({ error: "Program not found" });
     return;
   }

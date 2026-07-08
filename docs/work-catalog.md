@@ -9,6 +9,7 @@ enough to pick up cold. Add new items at the top of the "Backlog" list.
 
 - **[Program Presentation & Evaluation Gate](#program-presentation--evaluation-gate)** — post-generation loading screen, program display with muscle-volume breakdown, AI motivation, and a satisfied/not-satisfied gate. Implements steps 1-2 of Calibration Phase below; split into independent subtasks.
 - **[Calibration Phase](#calibration-phase)** — post-onboarding trial period (calibration week(s)) ending in a calibration review before the program officially starts
+- **[Independent / AI Program Separation](#independent--ai-program-separation)** — scope `/programs/current` and program editing to the active mode's program lineage; split the AI-mode empty state into profile-incomplete vs. ready-to-generate
 - **[Onboarding Alignment & Slim-Down](#onboarding-alignment--slim-down)** — fix muscle-list mismatch, add name, trim unused questions for Independent mode
 - **Autoregulation engine** — fatigue + progress rule set (e1RM-based). Spec drafted in chat; not yet a doc.
 - **Data hygiene** — delete the junk empty workout log (`workout_logs.id = 2`, all-zero test session).
@@ -103,6 +104,41 @@ back to Independent and forward to AI again.
 - ~~A name is captured and persisted to `userProfiles.name`.~~ done
 - ~~Independent-mode flow no longer asks for data it can't use.~~ done
 - No regression to the AI-mode generate-program path.
+
+---
+
+## Independent / AI Program Separation
+
+**Status:** done · **Area:** `artifacts/api-server/src/routes/programs.ts`,
+`artifacts/traintent/src/pages/program.tsx`, `artifacts/traintent/src/pages/onboarding.tsx`
+
+### Context
+Independent and AI mode each own a separate program lineage, keyed by the existing
+`programs.aiGenerated` flag — switching modes never surfaces or edits the other mode's
+program:
+
+- `GET /programs/current` resolves the latest program within the active mode's lineage
+  (`aiGenerated` matching the profile's mode) instead of globally-latest across both.
+- `PUT /programs/:id` is scoped to `userId` + `aiGenerated = false` in the query's `WHERE`
+  itself, so it can never touch another user's row and can never edit an AI-generated program
+  — even from a stale client. This also fixed a pre-existing bug where ownership was checked
+  *after* the update ran instead of being part of the `WHERE`.
+- `/program`'s Edit button and edit-draft auto-resume are hidden entirely in AI mode; editing
+  only exists for Independent-mode (manual) programs.
+- The AI-mode empty state now branches on whether the profile has `goal` + `experience` set:
+  - **Profile incomplete** (e.g. onboarded via Independent mode, then switched to AI in
+    Settings) — "Set up AI coaching" resumes onboarding straight into the AI-only questions,
+    prefilling name/age/sex/weight/mode from the existing profile so the finish-step upsert
+    doesn't clobber them.
+  - **Ready to generate** — "Generate my program" calls `POST /programs/generate` directly
+    from `/program`, no onboarding detour.
+
+### Acceptance sketch
+- Switching modes never shows or lets you edit the other mode's program.
+- Editing (button + resume-from-draft) is unreachable in AI mode.
+- An AI-mode profile missing goal/experience is routed to resume onboarding, not a dead-end
+  "no program" screen; a complete AI-mode profile with no program yet can generate one without
+  leaving `/program`.
 
 ---
 

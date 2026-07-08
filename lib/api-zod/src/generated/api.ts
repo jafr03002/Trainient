@@ -100,7 +100,7 @@ export const UpdateProfileResponse = zod.object({
 
 
 /**
- * @summary Get the user's current active program
+ * @summary Get the user's current active program within their active mode's program lineage (Independent vs. AI)
  */
 export const GetCurrentProgramResponse = zod.object({
   "id": zod.number(),
@@ -205,7 +205,7 @@ export const GenerateProgramBody = zod.object({
 
 
 /**
- * @summary Update a manual program (add/edit days and exercises)
+ * @summary Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
  */
 export const UpdateProgramBody = zod.object({
   "programName": zod.string(),
