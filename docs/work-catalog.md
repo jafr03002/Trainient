@@ -72,6 +72,41 @@ below instead.
   duration is met.
 - Review outcomes correctly route to: start program / extend phase / reprogram.
 
+### AI mode dashboard: weekly check-in vs. calibration review card
+- The "Time for your weekly check-in" dashboard card must not show if no program has been
+  generated yet, and must not show while the client is in the calibration phase.
+- During calibration, a "Calibration review" card takes its place — same icon/placement as the
+  weekly check-in card, but with calibration-specific copy (e.g. "calibrated and ready to…";
+  exact wording TBD).
+- The calibration review card first appears after the calibration week minimum (1 week) has
+  elapsed, and **stays visible** even after the client opens it and isn't ready yet / cancels out
+  of the review — declining doesn't dismiss it.
+- After 2 weeks in calibration, the card's copy changes to something else (TBD).
+- After 2.5 weeks, the card adds a countdown ("4, 3, 2, 1 days left") warning that the client will
+  be routed straight into the calibration-review screen on next login once time's up.
+- Open: exact card copy/visual design for each stage — to be worked out via `/lavish`.
+
+### Progress (as of 2026-07-08)
+Barely started — one schema field added, nothing wired up yet:
+
+- `calibrationCompletedAt: timestamp` added to `userProfilesTable`
+  (`lib/db/src/schema/userProfiles.ts`), plus the matching `openapi.yaml` field and
+  `profile.ts` serializer entry. **Still uncommitted, no migration generated, and nothing
+  reads or writes it yet.** A single "completed" timestamp likely isn't enough on its own —
+  see the "Data model" open question above (need to represent in-progress vs. ready state,
+  and when calibration *started*, not just when it ended).
+- The existing weekly check-in banner (`artifacts/traintent/src/pages/dashboard.tsx`,
+  `showCheckinBanner`, ~line 56) has **no calibration awareness at all**: it shows for any
+  AI-mode user once `onboardingCompletedAt` is set and they're 6+ days past that, full stop.
+  It does not check whether a program has been generated, or whether the client is in
+  calibration — both required by this spec.
+- No "Calibration review" card component exists anywhere.
+- No staged-copy logic (week-1 vs week-2 vs the 2.5-week countdown) exists.
+
+Suggested next steps when picked back up: resolve the "Data model" open question first (likely
+needs `calibrationStartedAt` + a status enum, not just `calibrationCompletedAt`), then run a
+`/lavish` pass on the card's copy/visual states per stage before touching `dashboard.tsx`.
+
 ---
 
 ## Onboarding Alignment & Slim-Down
