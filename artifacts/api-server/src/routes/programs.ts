@@ -142,8 +142,11 @@ User profile:
 - Goal: ${profile.goal}
 - Experience: ${profile.experience}
 - Training days per week: ${profile.trainingDays}
+- Preferred rest days: ${(profile.restDays as string[]).length ? (profile.restDays as string[]).join(", ") : "no preference"}
 - Equipment: ${(profile.equipment as string[]).join(", ")}
 - Age: ${profile.age ?? "not provided"}, Sex: ${profile.sex ?? "not provided"}, Weight: ${profile.weight ?? "not provided"} ${profile.weightUnit ?? "kg"}
+- Long-term goal weight: ${profile.goalWeight != null ? `${profile.goalWeight} ${profile.weightUnit ?? "kg"}` : "not provided"}
+- Daily activity level (outside training): ${profile.activityLevel ?? "not provided"}
 - Injuries/limitations: ${profile.injuries ?? "none"}
 - Priority muscle groups: ${(profile.priorityMuscles as string[]).join(", ")}
 

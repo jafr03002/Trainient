@@ -27,6 +27,11 @@ export interface UserProfile {
   /** @nullable */
   weightUnit?: string | null;
   /** @nullable */
+  goalWeight?: number | null;
+  /** @nullable */
+  activityLevel?: string | null;
+  restDays?: string[];
+  /** @nullable */
   injuries?: string | null;
   priorityMuscles: string[];
   onboardingComplete: boolean;
@@ -50,6 +55,11 @@ export interface UserProfileInput {
   weight?: number | null;
   /** @nullable */
   weightUnit?: string | null;
+  /** @nullable */
+  goalWeight?: number | null;
+  /** @nullable */
+  activityLevel?: string | null;
+  restDays?: string[];
   /** @nullable */
   injuries?: string | null;
   priorityMuscles?: string[];

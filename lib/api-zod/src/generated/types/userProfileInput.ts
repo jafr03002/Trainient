@@ -22,6 +22,11 @@ export interface UserProfileInput {
   /** @nullable */
   weightUnit?: string | null;
   /** @nullable */
+  goalWeight?: number | null;
+  /** @nullable */
+  activityLevel?: string | null;
+  restDays?: string[];
+  /** @nullable */
   injuries?: string | null;
   priorityMuscles?: string[];
 }

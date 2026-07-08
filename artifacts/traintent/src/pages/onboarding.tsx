@@ -10,10 +10,39 @@ import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 
 const GOALS = [
-  { value: "hypertrophy", label: "Build muscle", sub: "Hypertrophy" },
-  { value: "strength", label: "Get stronger", sub: "Strength" },
-  { value: "fat_loss", label: "Lose fat & get lean", sub: "Fat loss" },
-  { value: "general", label: "General fitness", sub: "Overall health" },
+  { value: "gain_weight", label: "Gain weight", sub: "Build muscle in a surplus" },
+  { value: "lose_weight", label: "Lose weight", sub: "Lean out while keeping muscle" },
+  { value: "general", label: "General fitness", sub: "Overall health & consistency" },
+];
+
+// Goals that ask for a long-term target weight (via a popup on selection).
+const WEIGHT_GOALS = new Set(["gain_weight", "lose_weight"]);
+
+// Older profiles stored these slugs; alias them so review/label lookups still resolve.
+const LEGACY_GOAL_LABELS: Record<string, string> = {
+  hypertrophy: "Build muscle",
+  strength: "Get stronger",
+  fat_loss: "Lose fat & get lean",
+};
+
+function goalLabel(value: string): string | undefined {
+  return GOALS.find((g) => g.value === value)?.label ?? LEGACY_GOAL_LABELS[value];
+}
+
+const ACTIVITY = [
+  { value: "low", label: "Low", sub: "Fewer than 6,000 steps a day" },
+  { value: "moderate", label: "Moderate", sub: "6,000 – 9,999 steps a day" },
+  { value: "high", label: "High", sub: "10,000 – 12,500+ steps a day" },
+];
+
+const WEEKDAYS = [
+  { value: "mon", label: "Mon" },
+  { value: "tue", label: "Tue" },
+  { value: "wed", label: "Wed" },
+  { value: "thu", label: "Thu" },
+  { value: "fri", label: "Fri" },
+  { value: "sat", label: "Sat" },
+  { value: "sun", label: "Sun" },
 ];
 
 const EXPERIENCE = [
@@ -43,13 +72,13 @@ const SPLIT_HINTS: Record<number, string> = {
 // Independent mode skips straight to the review step.
 type StepKey =
   | "mode" | "name" | "bodyStats"
-  | "goal" | "experience" | "trainingDays" | "equipment" | "details" | "priorityMuscles"
+  | "goal" | "experience" | "activity" | "trainingDays" | "restDays" | "equipment" | "details" | "priorityMuscles"
   | "review";
 
 function stepsFor(mode: string): StepKey[] {
   const base: StepKey[] = ["mode", "name", "bodyStats"];
   if (mode === "ai") {
-    return [...base, "goal", "experience", "trainingDays", "equipment", "details", "priorityMuscles", "review"];
+    return [...base, "goal", "experience", "activity", "trainingDays", "restDays", "equipment", "details", "priorityMuscles", "review"];
   }
   return [...base, "review"];
 }
@@ -58,8 +87,11 @@ type FormState = {
   mode: string;
   name: string;
   goal: string;
+  goalWeight: string;
   experience: string;
+  activityLevel: string;
   trainingDays: number;
+  restDays: string[];
   equipment: string[];
   age: string;
   sex: string;
@@ -73,8 +105,11 @@ const INITIAL: FormState = {
   mode: "",
   name: "",
   goal: "",
+  goalWeight: "",
   experience: "",
+  activityLevel: "",
   trainingDays: 4,
+  restDays: [],
   equipment: [],
   age: "",
   sex: "",
@@ -87,6 +122,7 @@ const INITIAL: FormState = {
 export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [showGoalWeight, setShowGoalWeight] = useState(false);
   const [phase, setPhase] = useState<"form" | "generating" | "presentation">("form");
   const [program, setProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
@@ -111,6 +147,22 @@ export default function Onboarding() {
       case "equipment": return form.equipment.length > 0;
       default: return true;
     }
+  }
+
+  // Selecting a weight goal opens the target-weight popup; picking General
+  // fitness clears any previously entered target.
+  function selectGoal(value: string) {
+    setForm((f) => ({ ...f, goal: value, goalWeight: WEIGHT_GOALS.has(value) ? f.goalWeight : "" }));
+    if (WEIGHT_GOALS.has(value)) setShowGoalWeight(true);
+  }
+
+  function toggleRestDay(value: string) {
+    setForm((f) => ({
+      ...f,
+      restDays: f.restDays.includes(value)
+        ? f.restDays.filter((d) => d !== value)
+        : [...f.restDays, value],
+    }));
   }
 
   function toggleEquipment(item: string) {
@@ -141,8 +193,11 @@ export default function Onboarding() {
           mode: form.mode,
           name: form.name || undefined,
           goal: form.goal,
+          goalWeight: form.goalWeight ? parseFloat(form.goalWeight) : undefined,
           experience: form.experience,
+          activityLevel: form.activityLevel || undefined,
           trainingDays: form.trainingDays,
+          restDays: form.restDays,
           equipment: form.equipment,
           age: form.age ? parseInt(form.age) : undefined,
           sex: form.sex || undefined,
@@ -219,6 +274,67 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {showGoalWeight && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60"
+          onClick={() => setShowGoalWeight(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-primary/40 bg-card p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-foreground mb-1">What weight do you want to reach?</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Saved as your long-term goal weight
+              {form.weight ? ` (now: ${form.weight} ${form.weightUnit})` : ""}. You can skip this.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                autoFocus
+                value={form.goalWeight}
+                onChange={(e) => setForm((f) => ({ ...f, goalWeight: e.target.value }))}
+                placeholder={`Target ${form.weightUnit}`}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                data-testid="input-goal-weight"
+              />
+              <div className="flex rounded-xl border border-border overflow-hidden">
+                {["kg", "lbs"].map((u) => (
+                  <button
+                    key={u}
+                    data-testid={`goal-weight-unit-${u}`}
+                    onClick={() => setForm((f) => ({ ...f, weightUnit: u }))}
+                    className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                      form.weightUnit === u
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <Button
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={() => { setForm((f) => ({ ...f, goalWeight: "" })); setShowGoalWeight(false); }}
+                data-testid="button-skip-goal-weight"
+              >
+                Skip
+              </Button>
+              <Button
+                className="flex-1 h-11"
+                onClick={() => setShowGoalWeight(false)}
+                data-testid="button-save-goal-weight"
+              >
+                Save target
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="w-full h-1 bg-secondary/40">
         <motion.div
           className="h-full bg-primary"
@@ -361,13 +477,15 @@ export default function Onboarding() {
               {currentStep === "goal" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
-                  <p className="text-muted-foreground mb-8">This shapes your program and tracking.</p>
+                  <p className="text-muted-foreground mb-8">
+                    Shapes your program and targets. Every option is built around building or keeping muscle.
+                  </p>
                   <div className="grid grid-cols-1 gap-3">
                     {GOALS.map((g) => (
                       <button
                         key={g.value}
                         data-testid={`goal-${g.value}`}
-                        onClick={() => setForm((f) => ({ ...f, goal: g.value }))}
+                        onClick={() => selectGoal(g.value)}
                         className={`p-4 rounded-xl border text-left transition-all ${
                           form.goal === g.value
                             ? "border-primary bg-primary/10 text-foreground"
@@ -376,8 +494,56 @@ export default function Onboarding() {
                       >
                         <div className="font-semibold">{g.label}</div>
                         <div className="text-sm text-muted-foreground mt-0.5">{g.sub}</div>
+                        {form.goal === g.value && WEIGHT_GOALS.has(g.value) && (
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            <span className="text-muted-foreground">Goal weight:</span>
+                            <span className="font-medium text-foreground">
+                              {form.goalWeight ? `${form.goalWeight} ${form.weightUnit}` : "Not set"}
+                            </span>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="text-primary underline underline-offset-2"
+                              data-testid="link-edit-goal-weight"
+                              onClick={(e) => { e.stopPropagation(); setShowGoalWeight(true); }}
+                            >
+                              Edit
+                            </span>
+                          </div>
+                        )}
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Activity level — AI mode only */}
+              {currentStep === "activity" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">How active are your days?</h2>
+                  <p className="text-muted-foreground mb-8">
+                    Outside of training — this tells your coach how much you recover and burn.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {ACTIVITY.map((a) => (
+                      <button
+                        key={a.value}
+                        data-testid={`activity-${a.value}`}
+                        onClick={() => setForm((f) => ({ ...f, activityLevel: f.activityLevel === a.value ? "" : a.value }))}
+                        className={`p-4 rounded-xl border text-left transition-all ${
+                          form.activityLevel === a.value
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
+                        }`}
+                      >
+                        <div className="font-semibold text-foreground">{a.label}</div>
+                        <div className="text-sm text-muted-foreground mt-0.5">{a.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-3 rounded-xl bg-secondary/30 border border-border text-xs text-muted-foreground flex gap-2">
+                    <span>💡</span>
+                    <span>Not sure? Your phone's built-in step tracker (Apple Health, Google Fit, Samsung Health) shows your daily average.</span>
                   </div>
                 </div>
               )}
@@ -431,6 +597,36 @@ export default function Onboarding() {
                   <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
                     {SPLIT_HINTS[form.trainingDays]}
                   </div>
+                </div>
+              )}
+
+              {/* Preferred rest days — AI mode only */}
+              {currentStep === "restDays" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Any preferred rest days?</h2>
+                  <p className="text-muted-foreground mb-8">
+                    You picked {form.trainingDays} training days — choose the days you'd like to keep free. Optional.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {WEEKDAYS.map((d) => (
+                      <button
+                        key={d.value}
+                        data-testid={`rest-${d.value}`}
+                        onClick={() => toggleRestDay(d.value)}
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                          form.restDays.includes(d.value)
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {form.restDays.length} of {7 - form.trainingDays} rest days chosen
+                    {form.restDays.length > 7 - form.trainingDays ? " — more than your schedule needs" : ""}
+                  </p>
                 </div>
               )}
 
@@ -545,9 +741,12 @@ export default function Onboarding() {
                     {[
                       { label: "Mode", value: form.mode === "ai" ? "AI Coach" : "Independent" },
                       form.name && { label: "Name", value: form.name },
-                      form.goal && { label: "Goal", value: GOALS.find((g) => g.value === form.goal)?.label },
+                      form.goal && { label: "Goal", value: goalLabel(form.goal) },
+                      form.goalWeight && { label: "Goal weight", value: `${form.goalWeight} ${form.weightUnit}` },
                       form.experience && { label: "Experience", value: EXPERIENCE.find((e) => e.value === form.experience)?.label },
+                      form.activityLevel && { label: "Activity level", value: ACTIVITY.find((a) => a.value === form.activityLevel)?.label },
                       form.mode === "ai" && { label: "Training days", value: `${form.trainingDays} days/week` },
+                      form.restDays.length > 0 && { label: "Rest days", value: form.restDays.map((d) => WEEKDAYS.find((w) => w.value === d)?.label).join(", ") },
                       form.equipment.length > 0 && { label: "Equipment", value: form.equipment.join(", ") },
                       form.age && { label: "Age", value: form.age },
                       form.sex && { label: "Sex", value: form.sex },
