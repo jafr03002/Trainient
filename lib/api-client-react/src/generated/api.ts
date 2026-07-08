@@ -365,7 +365,7 @@ export const getGetCurrentProgramUrl = () => {
 }
 
 /**
- * @summary Get the user's current active program
+ * @summary Get the user's current active program within their active mode's program lineage (Independent vs. AI)
  */
 export const getCurrentProgram = async ( options?: RequestInit): Promise<Program> => {
 
@@ -412,7 +412,7 @@ export type GetCurrentProgramQueryError = ErrorType<void>
 
 
 /**
- * @summary Get the user's current active program
+ * @summary Get the user's current active program within their active mode's program lineage (Independent vs. AI)
  */
 
 export function useGetCurrentProgram<TData = Awaited<ReturnType<typeof getCurrentProgram>>, TError = ErrorType<void>>(
@@ -661,7 +661,7 @@ export const getUpdateProgramUrl = () => {
 }
 
 /**
- * @summary Update a manual program (add/edit days and exercises)
+ * @summary Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
  */
 export const updateProgram = async (manualProgramInput: ManualProgramInput, options?: RequestInit): Promise<Program> => {
 
@@ -710,7 +710,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateProgramMutationError = ErrorType<unknown>
 
     /**
- * @summary Update a manual program (add/edit days and exercises)
+ * @summary Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
  */
 export const useUpdateProgram = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProgram>>, TError,{data: BodyType<ManualProgramInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

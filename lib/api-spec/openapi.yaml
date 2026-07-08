@@ -94,7 +94,7 @@ paths:
     get:
       operationId: getCurrentProgram
       tags: [programs]
-      summary: Get the user's current active program
+      summary: Get the user's current active program within their active mode's program lineage (Independent vs. AI)
       responses:
         "200":
           description: Current program
@@ -159,7 +159,7 @@ paths:
     put:
       operationId: updateProgram
       tags: [programs]
-      summary: Update a manual program (add/edit days and exercises)
+      summary: Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
       requestBody:
         required: true
         content:
