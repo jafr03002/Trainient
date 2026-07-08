@@ -211,6 +211,29 @@ not parallelizable with them.
 - Declining triggers the structured feedback UI, and submitting it regenerates the program
   incorporating that feedback.
 
+### As built
+The presentation now ships as a click-through **card deck**
+(`src/components/onboarding/PresentationDeck.tsx`) instead of one long scroll — five cards
+navigated with Back/Next and a progress bar, reused inside `onboarding.tsx`'s `presentation`
+phase (which no longer imports `MuscleVolumeChart` / `ProgramHighlights` / `SatisfactionGate`
+directly):
+
+1. **Program & split** — program name, split-type pills, and `programHighlights` as the
+   profile-aware rationale.
+2. **Timeline** — a goal-keyed arc of training phases with one-line motives. Template-driven
+   client-side (keyed off the onboarding `goal`), *not* model-generated — an accepted
+   first-pass simplification.
+3. **Balance & schedule** — the `MuscleVolumeChart` plus a one-week schedule strip whose
+   weekday placement is derived client-side from the training-day count (rest days spread),
+   not a model/DB field.
+4. **Sessions** — every training day as a tap-to-expand row showing its full exercise list
+   (replaces the earlier "day tabs" display in the acceptance sketch above).
+5. **Gate** — the existing `SatisfactionGate` as the closing card.
+
+The deck is onboarding-only and receives `goal` + the program from onboarding form state. The
+timeline and schedule content is illustrative default UX — client-side only, with no backend or
+schema changes.
+
 ### Independent mode, UI fix on logediting workout
 -Creating/editing a workout. Fix the UI here so that it is easy to make out the difference between the excerices/days the bland gray user intyerface makes it all kind of blend toghether. Lets have a discussion using lavish on this, Im thinking a border of different colors around each excercse card would be the best.
 

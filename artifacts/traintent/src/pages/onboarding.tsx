@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useCreateProfile, useGenerateProgram, type Program } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
-import { MuscleVolumeChart } from "@/components/onboarding/MuscleVolumeChart";
-import { ProgramHighlights } from "@/components/onboarding/ProgramHighlights";
-import { SatisfactionGate, type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
+import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
+import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 
 const GOALS = [
   { value: "hypertrophy", label: "Build muscle", sub: "Hypertrophy" },
@@ -204,59 +203,15 @@ export default function Onboarding() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <div className="flex-1 flex flex-col items-center px-4 py-12">
-          <div className="w-full max-w-lg space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-1">{program.programName}</h2>
-              <p className="text-muted-foreground">{program.splitType}</p>
-            </div>
-
-            <ProgramHighlights highlights={program.programHighlights} />
-
-            <div>
-              <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                Weekly volume
-              </h3>
-              <MuscleVolumeChart days={program.days} />
-            </div>
-
-            <div className="space-y-5">
-              {program.days.map((day) => (
-                <div key={day.dayNumber}>
-                  {program.days.length > 1 && (
-                    <h4 className="text-sm font-semibold text-foreground mb-2">
-                      {day.label} — {day.focus}
-                    </h4>
-                  )}
-                  <div className="space-y-1">
-                    {day.exercises.map((ex) => (
-                      <div
-                        key={ex.name}
-                        className="flex items-center justify-between text-sm py-1.5 border-b border-border/40 last:border-0"
-                      >
-                        <span className="text-foreground">{ex.name}</span>
-                        <span className="text-muted-foreground shrink-0 ml-3">
-                          {ex.sets} × {ex.reps}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {generateProgram.isError && (
-              <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                Something went wrong regenerating your program. Please try again.
-              </div>
-            )}
-
-            <SatisfactionGate
-              onSatisfied={() => setLocation("/dashboard")}
-              onSubmitFeedback={handleRegenerateFeedback}
-              isSubmitting={generateProgram.isPending}
-              showRegenerateNudge={regenerateCount >= 3}
-            />
-          </div>
+          <PresentationDeck
+            program={program}
+            goal={form.goal}
+            onSatisfied={() => setLocation("/dashboard")}
+            onSubmitFeedback={handleRegenerateFeedback}
+            isSubmitting={generateProgram.isPending}
+            showRegenerateNudge={regenerateCount >= 3}
+            error={generateProgram.isError}
+          />
         </div>
       </div>
     );
