@@ -139,11 +139,18 @@ export default function Onboarding() {
   const totalSteps = steps.length;
   const progress = ((step + 1) / totalSteps) * 100;
 
+  // A user may keep at most (7 - trainingDays + 1) days free: the strict number
+  // of off-days plus one day of scheduling slack. More than that can't be
+  // programmed around their committed days.
+  const maxRestDays = 7 - form.trainingDays + 1;
+  const tooManyRestDays = form.restDays.length > maxRestDays;
+
   function canAdvance() {
     switch (currentStep) {
       case "mode": return !!form.mode;
       case "goal": return !!form.goal;
       case "experience": return !!form.experience;
+      case "restDays": return !tooManyRestDays;
       case "equipment": return form.equipment.length > 0;
       default: return true;
     }
@@ -608,25 +615,37 @@ export default function Onboarding() {
                     You picked {form.trainingDays} training days — choose the days you'd like to keep free. Optional.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {WEEKDAYS.map((d) => (
-                      <button
-                        key={d.value}
-                        data-testid={`rest-${d.value}`}
-                        onClick={() => toggleRestDay(d.value)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                          form.restDays.includes(d.value)
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                        }`}
-                      >
-                        {d.label}
-                      </button>
-                    ))}
+                    {WEEKDAYS.map((d) => {
+                      const selected = form.restDays.includes(d.value);
+                      return (
+                        <button
+                          key={d.value}
+                          data-testid={`rest-${d.value}`}
+                          onClick={() => toggleRestDay(d.value)}
+                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                            selected
+                              ? tooManyRestDays
+                                ? "border-destructive bg-destructive/10 text-destructive"
+                                : "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {form.restDays.length} of {7 - form.trainingDays} rest days chosen
-                    {form.restDays.length > 7 - form.trainingDays ? " — more than your schedule needs" : ""}
-                  </p>
+                  {tooManyRestDays ? (
+                    <p className="text-xs font-medium text-destructive" data-testid="text-rest-warning">
+                      Too many rest days to program around your {form.trainingDays} training days — remove one to continue.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {form.restDays.length === 0
+                        ? "No preference — your coach schedules your days."
+                        : `${form.restDays.length} of ${7 - form.trainingDays} rest days selected.`}
+                    </p>
+                  )}
                 </div>
               )}
 
