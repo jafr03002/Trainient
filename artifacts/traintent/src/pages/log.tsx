@@ -192,6 +192,8 @@ export default function Log() {
 
   // Build "last time" lookup from workout history — keep the full set list of the
   // most recent prior log per exercise, so each set row can show its own match.
+  // Also capture that session's note (per-exercise, not per-set) to surface under
+  // the last set's hint.
   const lastSetsByExercise: Record<string, any[]> = {};
   const lastNoteByExercise: Record<string, string> = {};
   for (const log of (history ?? []) as any[]) {
