@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile, useGenerateProgram, type Program } from "@workspace/api-client-react";
+import { useCreateProfile, useGenerateProgram, useGetProfile, type Program } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
@@ -129,6 +129,32 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
+  const profileQuery = useGetProfile();
+
+  // A profile that's in AI mode but missing goal/experience means AI
+  // coaching was never set up — either the user onboarded through
+  // Independent mode (which skips those questions entirely) and later
+  // switched modes in Settings, or a previous AI setup attempt didn't
+  // finish. Either way, mode/name/bodyStats are already saved, so resume
+  // straight into the AI-only questions instead of re-asking for them.
+  const resumeInitRef = useRef(false);
+  useEffect(() => {
+    if (resumeInitRef.current || profileQuery.isLoading) return;
+    resumeInitRef.current = true;
+    const profile = profileQuery.data;
+    if (!profile || profile.mode !== "ai" || (profile.goal && profile.experience)) return;
+
+    setForm((f) => ({
+      ...f,
+      mode: "ai",
+      name: profile.name ?? "",
+      age: profile.age != null ? String(profile.age) : "",
+      sex: profile.sex ?? "",
+      weight: profile.weight != null ? String(profile.weight) : "",
+      weightUnit: profile.weightUnit ?? "kg",
+    }));
+    setStep(stepsFor("ai").indexOf("goal"));
+  }, [profileQuery.isLoading, profileQuery.data]);
 
   // Recomputed from form.mode on every render — switching modes (only
   // possible while on the first step) never clears already-entered fields,
