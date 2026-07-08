@@ -192,7 +192,10 @@ export default function Log() {
 
   // Build "last time" lookup from workout history — keep the full set list of the
   // most recent prior log per exercise, so each set row can show its own match.
+  // Also capture that session's note (per-exercise, not per-set) to surface under
+  // the last set's hint.
   const lastSetsByExercise: Record<string, any[]> = {};
+  const lastNoteByExercise: Record<string, string> = {};
   for (const log of (history ?? []) as any[]) {
     for (const ex of (log.exercisesLogged as any[]) ?? []) {
       const key = ex.name?.toLowerCase();
@@ -200,6 +203,7 @@ export default function Log() {
       // Only count sessions where this exercise actually has logged data.
       if (Array.isArray(ex.sets) && ex.sets.some((s: any) => !isEmptySet(s))) {
         lastSetsByExercise[key] = ex.sets;
+        if (ex.notes) lastNoteByExercise[key] = ex.notes;
       }
     }
   }
@@ -449,6 +453,7 @@ export default function Log() {
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
+          const prevNote = lastNoteByExercise[ex.name.toLowerCase()];
           const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
           return (
           <motion.div
@@ -554,6 +559,11 @@ export default function Log() {
                   {prevStr && (
                     <p className="text-[11px] text-muted-foreground/60 pl-8 mt-0.5" data-testid={`last-set-${exIdx}-${setIdx}`}>
                       Last time: {prevStr}
+                    </p>
+                  )}
+                  {prevStr && prevNote && setIdx === ex.sets.length - 1 && (
+                    <p className="text-[11px] text-primary/80 pl-8 mt-0.5" data-testid={`last-note-${exIdx}`}>
+                      Note: {prevNote}
                     </p>
                   )}
                   </div>
