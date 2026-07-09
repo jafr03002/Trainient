@@ -399,6 +399,14 @@ export const GetWorkoutsByDayLabelResponse = zod.array(GetWorkoutsByDayLabelResp
 
 
 /**
+ * @summary Delete a logged workout session
+ */
+export const DeleteWorkoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
  * @summary List all check-ins for the user
  */
 export const ListCheckinsResponseItem = zod.object({

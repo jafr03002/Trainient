@@ -43,6 +43,7 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - Stripe API version: `2026-05-27.dahlia` (Stripe v22.x)
 - Clerk ClerkProvider redirect props: `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` (not `afterSignInUrl`)
 - Raw body middleware for Stripe webhook must be registered before `express.json()` for the `/api/subscriptions/webhook` path
+- Deleting a workout (`DELETE /workouts/:id`) needs no cascade cleanup — sets/exercises/notes live as embedded JSON on the row, and PRs/stats/progress charts are all computed from `workout_logs` at read time, so callers just invalidate the relevant queries after the mutation
 
 ## Product
 
@@ -54,6 +55,7 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - **Workout Logger** — live set tracking with weight/reps/RPE inputs, rest timer, finish + save
 - **Weekly Check-in** — 5 questions (energy, sleep, soreness, completion, notes) → GPT-4o adjusts next week's program
 - **Progress** — strength chart, muscle volume breakdown bar chart, personal records table
+- **Calendar** — logged-session history grid; tapping a day opens a session detail modal (exercises, "Last time" hints) with a delete-session action
 - **Settings** — profile edit, subscription status, Stripe checkout/portal, sign out
 
 ## User preferences
