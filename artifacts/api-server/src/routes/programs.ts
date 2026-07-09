@@ -172,6 +172,8 @@ Apply these rules:
 - Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
   your own judgement of what's appropriate for this client's sex, weight, and experience level,
   per the guidance above
+- Name the program in plain language after its split (e.g. "Push Pull Legs", "Upper/Lower
+  Split") — never append training-method jargon like "Hypertrophy" or "Strength" to the name
 
 Also produce 3–5 "program highlights" — short explanations of why the program looks the
 way it does. Each highlight MUST tie back to a concrete input from the profile above (the
