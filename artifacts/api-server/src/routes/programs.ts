@@ -2,7 +2,8 @@ import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
-import { openai } from "../lib/openai";
+import { anthropic } from "../lib/anthropic";
+import { generateProgramOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -187,14 +188,22 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
     "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }${feedbackBlock}`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: systemPrompt }],
-    response_format: { type: "json_object" },
+  const completion = await anthropic.messages.create({
+    model: "claude-opus-4-8",
     max_tokens: 4000,
+    thinking: { type: "adaptive" },
+    output_config: {
+      effort: "medium",
+      format: { type: "json_schema", schema: generateProgramOutputSchema },
+    },
+    messages: [{ role: "user", content: systemPrompt }],
   });
 
-  const raw = JSON.parse(completion.choices[0].message.content!);
+  const textBlock = completion.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Expected a text block in Claude's program-generation response");
+  }
+  const raw = JSON.parse(textBlock.text);
 
   const days = raw.days.map((d: any) => ({
     dayNumber: d.day_number,
