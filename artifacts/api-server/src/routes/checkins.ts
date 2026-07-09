@@ -6,6 +6,7 @@ import { SubmitCheckinBody } from "@workspace/api-zod";
 import { anthropic } from "../lib/anthropic";
 import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
+import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
 
 const router = Router();
 
@@ -125,10 +126,13 @@ Adjustment rules:
 - High soreness: swap high-impact exercises for lower-impact alternatives
 - Bodyweight trend vs the client's goal weight: if it's moving the wrong direction relative to their goal, factor that into volume/intensity guidance; if there's not enough data, ignore this signal
 - Apply any specific notes the user left
+- Re-evaluate short-term phase and energy balance for next week given the bodyweight trend and this week's adherence — do not just repeat last week's values if the trend suggests the phase should progress (e.g. bulk → deload after several weeks, or a diet nearing its goal weight → maintenance)
 
 Return ONLY valid JSON (no markdown):
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
-  "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...] } }`;
+  "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...],
+  "short_term_phase": "...", "energy_balance": "...", "short_term_goal_weight": null,
+  "daily_step_target": "...", "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
 
   const completion = await anthropic.messages.create({
     model: "claude-opus-4-8",
@@ -171,6 +175,14 @@ Return ONLY valid JSON (no markdown):
     .values({
       userId,
       weekNumber: currentProgram.weekNumber + 1,
+      longTermPhase: longTermPhaseFor(profile?.goal ?? ""),
+      shortTermPhase: raw.updated_program.short_term_phase,
+      energyBalance: raw.updated_program.energy_balance,
+      trainingWorkload: trainingWorkloadFor(updatedDays),
+      longTermGoalWeight: profile?.goalWeight,
+      shortTermGoalWeight: raw.updated_program.short_term_goal_weight,
+      dailyStepTarget: raw.updated_program.daily_step_target,
+      cardioIntensity: cardioIntensityFrom(raw.updated_program.cardio_intensity),
       programName: raw.updated_program.program_name,
       splitType: raw.updated_program.split_type,
       programHighlights: updatedHighlights,

@@ -830,6 +830,55 @@ export default function Program() {
             ))}
           </div>
         )}
+        {program.aiGenerated && (program.shortTermPhase || program.energyBalance || program.cardioIntensity || program.dailyStepTarget || program.trainingWorkload) && (
+          <div className="mt-3 p-4 rounded-xl bg-card border border-border space-y-3" data-testid="program-monitoring">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program monitoring</h2>
+            <div className="flex flex-wrap gap-2">
+              {program.shortTermPhase && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border font-medium capitalize">
+                  {program.shortTermPhase.replace(/_/g, " ")}
+                </span>
+              )}
+              {program.energyBalance && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border font-medium capitalize">
+                  {program.energyBalance.replace(/_/g, " ")} energy balance
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {program.trainingWorkload && (
+                <div>
+                  <div className="text-xs text-muted-foreground">Training workload</div>
+                  <div className="font-medium text-foreground">
+                    {program.trainingWorkload.daysTrained} days · {program.trainingWorkload.totalVolumeSets} sets
+                  </div>
+                </div>
+              )}
+              {program.dailyStepTarget && (
+                <div>
+                  <div className="text-xs text-muted-foreground">Daily steps</div>
+                  <div className="font-medium text-foreground capitalize">{program.dailyStepTarget}</div>
+                </div>
+              )}
+              {program.cardioIntensity && (
+                <div>
+                  <div className="text-xs text-muted-foreground">Cardio zone</div>
+                  <div className="font-medium text-foreground capitalize">
+                    {program.cardioIntensity.bpmMin}–{program.cardioIntensity.bpmMax} bpm · {program.cardioIntensity.level}
+                  </div>
+                </div>
+              )}
+              {(program.shortTermGoalWeight != null || program.longTermGoalWeight != null) && (
+                <div>
+                  <div className="text-xs text-muted-foreground">Goal weight</div>
+                  <div className="font-medium text-foreground">
+                    {program.shortTermGoalWeight ?? "—"} → {program.longTermGoalWeight ?? "—"} {profileQuery.data?.weightUnit ?? "kg"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {/* Day tabs */}

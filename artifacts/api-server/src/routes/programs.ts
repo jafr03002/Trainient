@@ -5,6 +5,7 @@ import { requireAuth, getUserId } from "../lib/auth";
 import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
 import { programGenerationKnowledge } from "../lib/knowledge";
+import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -158,6 +159,19 @@ Apply these rules:
 - Always respect injuries — avoid or regress exercises that stress injured areas
 - Add extra sets to priority muscle groups (15–20% more volume)
 - Use progressive overload logic: rep ranges are designed to be beaten week over week
+- Determine the client's short-term phase (calibration, bulk, maintenance, reverse_diet, diet,
+  mini_cut, or deload) and matching energy balance (surplus, maintenance, deficit, or
+  high_deficit), applying the goal-evaluation timeline template and the short-term phase
+  weekly-rate definitions in the reference material above, based on their goal, experience,
+  and current stats
+- Set a short-term goal weight only if the phase implies one (bulk/diet/mini_cut phases target
+  a specific bodyweight bound); for a maintenance/general-fitness client, return
+  short_term_goal_weight as null
+- Recommend a daily step target (low, moderate, or high) per the activity-evaluation guidance
+  above — bump it for clients with low/moderate activity and a weight-loss or general-fitness goal
+- Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
+  your own judgement of what's appropriate for this client's sex, weight, and experience level,
+  per the guidance above
 
 Also produce 3–5 "program highlights" — short explanations of why the program looks the
 way it does. Each highlight MUST tie back to a concrete input from the profile above (the
@@ -171,7 +185,11 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
   "program_highlights": [ { "title": "...", "detail": "..." } ],
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
-    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
+    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
+  "short_term_phase": "bulk", "energy_balance": "surplus",
+  "short_term_goal_weight": 82.5,
+  "daily_step_target": "moderate",
+  "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "moderate" } }`;
 
   const userPrompt = `User profile:
 - Goal: ${profile.goal}
@@ -245,6 +263,14 @@ For each day, provide 5–7 exercises. For each exercise provide:
     .values({
       userId,
       weekNumber: newWeekNumber,
+      longTermPhase: longTermPhaseFor(profile.goal),
+      shortTermPhase: raw.short_term_phase,
+      energyBalance: raw.energy_balance,
+      trainingWorkload: trainingWorkloadFor(days),
+      longTermGoalWeight: profile.goalWeight,
+      shortTermGoalWeight: raw.short_term_goal_weight,
+      dailyStepTarget: raw.daily_step_target,
+      cardioIntensity: cardioIntensityFrom(raw.cardio_intensity),
       programName: raw.program_name,
       splitType: raw.split_type,
       programHighlights,

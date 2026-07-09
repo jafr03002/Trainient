@@ -148,6 +148,76 @@ export interface ProgramHighlight {
   detail: string;
 }
 
+/**
+ * @nullable
+ */
+export type ProgramLongTermPhase = typeof ProgramLongTermPhase[keyof typeof ProgramLongTermPhase] | null;
+
+
+export const ProgramLongTermPhase = {
+  gain_weight: 'gain_weight',
+  lose_weight: 'lose_weight',
+  maintain: 'maintain',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ProgramShortTermPhase = typeof ProgramShortTermPhase[keyof typeof ProgramShortTermPhase] | null;
+
+
+export const ProgramShortTermPhase = {
+  calibration: 'calibration',
+  bulk: 'bulk',
+  maintenance: 'maintenance',
+  reverse_diet: 'reverse_diet',
+  diet: 'diet',
+  mini_cut: 'mini_cut',
+  deload: 'deload',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ProgramEnergyBalance = typeof ProgramEnergyBalance[keyof typeof ProgramEnergyBalance] | null;
+
+
+export const ProgramEnergyBalance = {
+  surplus: 'surplus',
+  maintenance: 'maintenance',
+  deficit: 'deficit',
+  high_deficit: 'high_deficit',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ProgramTrainingWorkload = {
+  daysTrained?: number;
+  totalVolumeSets?: number;
+} | null;
+
+/**
+ * @nullable
+ */
+export type ProgramDailyStepTarget = typeof ProgramDailyStepTarget[keyof typeof ProgramDailyStepTarget] | null;
+
+
+export const ProgramDailyStepTarget = {
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ProgramCardioIntensity = {
+  bpmMin?: number;
+  bpmMax?: number;
+  level?: 'low' | 'moderate' | 'high';
+} | null;
+
 export interface Program {
   id: number;
   userId: string;
@@ -158,6 +228,22 @@ export interface Program {
   aiGenerated: boolean;
   days: ProgramDay[];
   generatedAt: string;
+  /** @nullable */
+  longTermPhase?: ProgramLongTermPhase;
+  /** @nullable */
+  shortTermPhase?: ProgramShortTermPhase;
+  /** @nullable */
+  energyBalance?: ProgramEnergyBalance;
+  /** @nullable */
+  trainingWorkload?: ProgramTrainingWorkload;
+  /** @nullable */
+  longTermGoalWeight?: number | null;
+  /** @nullable */
+  shortTermGoalWeight?: number | null;
+  /** @nullable */
+  dailyStepTarget?: ProgramDailyStepTarget;
+  /** @nullable */
+  cardioIntensity?: ProgramCardioIntensity;
 }
 
 export interface ManualProgramInput {
