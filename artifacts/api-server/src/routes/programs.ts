@@ -149,12 +149,18 @@ User profile:
 - Goal: ${profile.goal}
 - Experience: ${profile.experience}
 - Training days per week: ${profile.trainingDays}
-- Preferred rest days: ${(profile.restDays as string[]).length ? (profile.restDays as string[]).join(", ") : "no preference"}
+- Preferred rest days: ${(profile.preferredRestDays as string[]).length ? (profile.preferredRestDays as string[]).join(", ") : "no preference"}
 - Equipment: ${(profile.equipment as string[]).join(", ")}
 - Age: ${profile.age ?? "not provided"}, Sex: ${profile.sex ?? "not provided"}, Weight: ${profile.weight ?? "not provided"} ${profile.weightUnit ?? "kg"}
 - Long-term goal weight: ${profile.goalWeight != null ? `${profile.goalWeight} ${profile.weightUnit ?? "kg"}` : "not provided"}
 - Daily activity level (outside training): ${profile.activityLevel ?? "not provided"}
-- Injuries/limitations: ${profile.injuries ?? "none"}
+- Injuries/limitations: ${profile.injuries ?? "none"}${profile.injuries && profile.injurySeverity ? ` (severity: ${profile.injurySeverity} — ${
+    profile.injurySeverity === "high"
+      ? "avoid loading the affected area entirely, substitute unaffected-area work"
+      : profile.injurySeverity === "medium"
+        ? "avoid or modify movements that stress the affected area, reduce load/range where needed"
+        : "train around it normally, just avoid aggravating movements"
+  })` : ""}
 - Priority muscle groups: ${(profile.priorityMuscles as string[]).join(", ")}
 
 Generate a weekly training program with exactly ${profile.trainingDays} training days.

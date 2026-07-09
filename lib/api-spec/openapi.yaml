@@ -591,8 +591,9 @@ components:
         weightUnit:             { type: ["string", "null"] }
         goalWeight:             { type: ["number", "null"] }
         activityLevel:          { type: ["string", "null"] }
-        restDays:               { type: array, items: { type: string } }
+        preferredRestDays:      { type: array, items: { type: string } }
         injuries:               { type: ["string", "null"] }
+        injurySeverity:         { type: ["string", "null"], enum: [low, medium, high, null] }
         priorityMuscles:        { type: array, items: { type: string } }
         onboardingComplete:     { type: boolean }
         onboardingCompletedAt:  { type: ["string", "null"] }
@@ -614,8 +615,9 @@ components:
         weightUnit:             { type: ["string", "null"] }
         goalWeight:             { type: ["number", "null"] }
         activityLevel:          { type: ["string", "null"] }
-        restDays:               { type: array, items: { type: string } }
+        preferredRestDays:      { type: array, items: { type: string } }
         injuries:               { type: ["string", "null"] }
+        injurySeverity:         { type: ["string", "null"], enum: [low, medium, high, null] }
         priorityMuscles:        { type: array, items: { type: string } }
 
     UserProfileUpdate:
@@ -627,6 +629,7 @@ components:
         weight:         { type: ["number", "null"] }
         weightUnit:     { type: ["string", "null"] }
         injuries:       { type: ["string", "null"] }
+        injurySeverity: { type: ["string", "null"], enum: [low, medium, high, null] }
 
     # ── Programs ───────────────────────────────────────────────────────────────
     Exercise:

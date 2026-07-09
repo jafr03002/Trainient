@@ -33,8 +33,9 @@ export const GetProfileResponse = zod.object({
   "weightUnit": zod.string().nullish(),
   "goalWeight": zod.number().nullish(),
   "activityLevel": zod.string().nullish(),
-  "restDays": zod.array(zod.string()).optional(),
+  "preferredRestDays": zod.array(zod.string()).optional(),
   "injuries": zod.string().nullish(),
+  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
@@ -58,8 +59,9 @@ export const CreateProfileBody = zod.object({
   "weightUnit": zod.string().nullish(),
   "goalWeight": zod.number().nullish(),
   "activityLevel": zod.string().nullish(),
-  "restDays": zod.array(zod.string()).optional(),
+  "preferredRestDays": zod.array(zod.string()).optional(),
   "injuries": zod.string().nullish(),
+  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()).optional()
 })
 
@@ -73,7 +75,8 @@ export const UpdateProfileBody = zod.object({
   "age": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "weightUnit": zod.string().nullish(),
-  "injuries": zod.string().nullish()
+  "injuries": zod.string().nullish(),
+  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish()
 })
 
 export const UpdateProfileResponse = zod.object({
@@ -90,8 +93,9 @@ export const UpdateProfileResponse = zod.object({
   "weightUnit": zod.string().nullish(),
   "goalWeight": zod.number().nullish(),
   "activityLevel": zod.string().nullish(),
-  "restDays": zod.array(zod.string()).optional(),
+  "preferredRestDays": zod.array(zod.string()).optional(),
   "injuries": zod.string().nullish(),
+  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
