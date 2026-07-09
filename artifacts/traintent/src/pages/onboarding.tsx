@@ -3,11 +3,12 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile, useGenerateProgram, useGetProfile, type Program } from "@workspace/api-client-react";
+import { useCreateProfile, useGenerateProgram, useGetProfile, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
+import { toast } from "@/hooks/use-toast";
 
 const GOALS = [
   { value: "gain_weight", label: "Gain weight", sub: "Build muscle in a surplus" },
@@ -45,6 +46,12 @@ const WEEKDAYS = [
   { value: "sun", label: "Sun" },
 ];
 
+const INJURY_SEVERITY = [
+  { value: "low", label: "Low", sub: "Mild discomfort — doesn't stop you training as normal" },
+  { value: "medium", label: "Medium", sub: "Noticeable pain — some movements need to be avoided or modified" },
+  { value: "high", label: "High", sub: "Significant pain or limitation — needs major changes, possibly medical clearance" },
+];
+
 const EXPERIENCE = [
   { value: "beginner", label: "Beginner", sub: "Under 1 year or returning after a long break" },
   { value: "intermediate", label: "Intermediate", sub: "1–3 years consistent training" },
@@ -72,13 +79,13 @@ const SPLIT_HINTS: Record<number, string> = {
 // Independent mode skips straight to the review step.
 type StepKey =
   | "mode" | "name" | "bodyStats"
-  | "goal" | "experience" | "activity" | "trainingDays" | "restDays" | "equipment" | "details" | "priorityMuscles"
+  | "goal" | "experience" | "activity" | "trainingDays" | "preferredRestDays" | "equipment" | "details" | "priorityMuscles"
   | "review";
 
 function stepsFor(mode: string): StepKey[] {
   const base: StepKey[] = ["mode", "name", "bodyStats"];
   if (mode === "ai") {
-    return [...base, "goal", "experience", "activity", "trainingDays", "restDays", "equipment", "details", "priorityMuscles", "review"];
+    return [...base, "goal", "experience", "activity", "trainingDays", "preferredRestDays", "equipment", "details", "priorityMuscles", "review"];
   }
   return [...base, "review"];
 }
@@ -91,13 +98,14 @@ type FormState = {
   experience: string;
   activityLevel: string;
   trainingDays: number;
-  restDays: string[];
+  preferredRestDays: string[];
   equipment: string[];
   age: string;
   sex: string;
   weight: string;
   weightUnit: string;
   injuries: string;
+  injurySeverity: string;
   priorityMuscles: string[];
 };
 
@@ -109,13 +117,14 @@ const INITIAL: FormState = {
   experience: "",
   activityLevel: "",
   trainingDays: 4,
-  restDays: [],
+  preferredRestDays: [],
   equipment: [],
   age: "",
   sex: "",
   weight: "",
   weightUnit: "kg",
   injuries: "",
+  injurySeverity: "",
   priorityMuscles: [],
 };
 
@@ -126,6 +135,10 @@ export default function Onboarding() {
   const [phase, setPhase] = useState<"form" | "generating" | "presentation">("form");
   const [program, setProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
+  // Tracks which review-step button was clicked so only that one shows a
+  // spinner — both call the same createProfile mutation, so isPending alone
+  // can't tell them apart.
+  const [finishAction, setFinishAction] = useState<"generate" | "later" | null>(null);
   const [, setLocation] = useLocation();
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
@@ -168,15 +181,15 @@ export default function Onboarding() {
   // A user may keep at most (7 - trainingDays + 1) days free: the strict number
   // of off-days plus one day of scheduling slack. More than that can't be
   // programmed around their committed days.
-  const maxRestDays = 7 - form.trainingDays + 1;
-  const tooManyRestDays = form.restDays.length > maxRestDays;
+  const maxPreferredRestDays = 7 - form.trainingDays + 1;
+  const tooManyPreferredRestDays = form.preferredRestDays.length > maxPreferredRestDays;
 
   function canAdvance() {
     switch (currentStep) {
       case "mode": return !!form.mode;
       case "goal": return !!form.goal;
       case "experience": return !!form.experience;
-      case "restDays": return !tooManyRestDays;
+      case "preferredRestDays": return !tooManyPreferredRestDays;
       case "equipment": return form.equipment.length > 0;
       default: return true;
     }
@@ -189,12 +202,12 @@ export default function Onboarding() {
     if (WEIGHT_GOALS.has(value)) setShowGoalWeight(true);
   }
 
-  function toggleRestDay(value: string) {
+  function togglePreferredRestDay(value: string) {
     setForm((f) => ({
       ...f,
-      restDays: f.restDays.includes(value)
-        ? f.restDays.filter((d) => d !== value)
-        : [...f.restDays, value],
+      preferredRestDays: f.preferredRestDays.includes(value)
+        ? f.preferredRestDays.filter((d) => d !== value)
+        : [...f.preferredRestDays, value],
     }));
   }
 
@@ -219,7 +232,10 @@ export default function Onboarding() {
     });
   }
 
-  async function handleFinish() {
+  // `generateNow` only matters in AI mode — Independent mode never generates
+  // here regardless, it always lands on /dashboard and builds a program later
+  // from /program's own empty state.
+  async function handleFinish(generateNow: boolean) {
     try {
       await createProfile.mutateAsync({
         data: {
@@ -230,27 +246,35 @@ export default function Onboarding() {
           experience: form.experience,
           activityLevel: form.activityLevel || undefined,
           trainingDays: form.trainingDays,
-          restDays: form.restDays,
+          preferredRestDays: form.preferredRestDays,
           equipment: form.equipment,
           age: form.age ? parseInt(form.age) : undefined,
           sex: form.sex || undefined,
           weight: form.weight ? parseFloat(form.weight) : undefined,
           weightUnit: form.weightUnit,
           injuries: form.injuries || undefined,
+          injurySeverity: form.injuries ? (form.injurySeverity || undefined) as UserProfileInputInjurySeverity | undefined : undefined,
           priorityMuscles: form.priorityMuscles,
         },
       });
 
-      if (form.mode === "ai") {
+      if (form.mode === "ai" && generateNow) {
         setPhase("generating");
         const result = await generateProgram.mutateAsync({});
         setProgram(result);
         setPhase("presentation");
       } else {
+        if (form.mode === "ai") {
+          toast({
+            title: "Profile saved",
+            description: "You can generate your program any time from My Program.",
+          });
+        }
         setLocation("/dashboard");
       }
     } catch {
       setPhase("form");
+      setFinishAction(null);
     }
   }
 
@@ -634,7 +658,7 @@ export default function Onboarding() {
               )}
 
               {/* Preferred rest days — AI mode only */}
-              {currentStep === "restDays" && (
+              {currentStep === "preferredRestDays" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Any preferred rest days?</h2>
                   <p className="text-muted-foreground mb-8">
@@ -642,15 +666,15 @@ export default function Onboarding() {
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {WEEKDAYS.map((d) => {
-                      const selected = form.restDays.includes(d.value);
+                      const selected = form.preferredRestDays.includes(d.value);
                       return (
                         <button
                           key={d.value}
                           data-testid={`rest-${d.value}`}
-                          onClick={() => toggleRestDay(d.value)}
+                          onClick={() => togglePreferredRestDay(d.value)}
                           className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                             selected
-                              ? tooManyRestDays
+                              ? tooManyPreferredRestDays
                                 ? "border-destructive bg-destructive/10 text-destructive"
                                 : "border-primary bg-primary/10 text-primary"
                               : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
@@ -661,15 +685,15 @@ export default function Onboarding() {
                       );
                     })}
                   </div>
-                  {tooManyRestDays ? (
+                  {tooManyPreferredRestDays ? (
                     <p className="text-xs font-medium text-destructive" data-testid="text-rest-warning">
                       Too many rest days to program around your {form.trainingDays} training days — remove one to continue.
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      {form.restDays.length === 0
+                      {form.preferredRestDays.length === 0
                         ? "No preference — your coach schedules your days."
-                        : `${form.restDays.length} of ${7 - form.trainingDays} rest days selected.`}
+                        : `${form.preferredRestDays.length} of ${7 - form.trainingDays} rest days selected.`}
                     </p>
                   )}
                 </div>
@@ -731,13 +755,44 @@ export default function Onboarding() {
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Injuries or limitations</label>
                       <textarea
                         value={form.injuries}
-                        onChange={(e) => setForm((f) => ({ ...f, injuries: e.target.value }))}
+                        onChange={(e) => setForm((f) => ({
+                          ...f,
+                          injuries: e.target.value,
+                          injurySeverity: e.target.value ? f.injurySeverity : "",
+                        }))}
                         placeholder="e.g. bad lower back, knee pain"
                         rows={3}
                         className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
                         data-testid="input-injuries"
                       />
                     </div>
+                    {form.injuries && (
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">
+                          How bad is it? <span className="text-muted-foreground font-normal">(optional)</span>
+                        </label>
+                        <div className="grid grid-cols-1 gap-3">
+                          {INJURY_SEVERITY.map((s) => (
+                            <button
+                              key={s.value}
+                              data-testid={`injury-severity-${s.value}`}
+                              onClick={() => setForm((f) => ({
+                                ...f,
+                                injurySeverity: f.injurySeverity === s.value ? "" : s.value,
+                              }))}
+                              className={`p-4 rounded-xl border text-left transition-all ${
+                                form.injurySeverity === s.value
+                                  ? "border-primary bg-primary/10"
+                                  : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
+                              }`}
+                            >
+                              <div className="font-semibold text-foreground">{s.label}</div>
+                              <div className="text-sm text-muted-foreground mt-0.5">{s.sub}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -791,12 +846,13 @@ export default function Onboarding() {
                       form.experience && { label: "Experience", value: EXPERIENCE.find((e) => e.value === form.experience)?.label },
                       form.activityLevel && { label: "Activity level", value: ACTIVITY.find((a) => a.value === form.activityLevel)?.label },
                       form.mode === "ai" && { label: "Training days", value: `${form.trainingDays} days/week` },
-                      form.restDays.length > 0 && { label: "Rest days", value: form.restDays.map((d) => WEEKDAYS.find((w) => w.value === d)?.label).join(", ") },
+                      form.preferredRestDays.length > 0 && { label: "Rest days", value: form.preferredRestDays.map((d) => WEEKDAYS.find((w) => w.value === d)?.label).join(", ") },
                       form.equipment.length > 0 && { label: "Equipment", value: form.equipment.join(", ") },
                       form.age && { label: "Age", value: form.age },
                       form.sex && { label: "Sex", value: form.sex },
                       form.weight && { label: "Weight", value: `${form.weight} ${form.weightUnit}` },
                       form.injuries && { label: "Injuries", value: form.injuries },
+                      form.injuries && form.injurySeverity && { label: "Severity", value: INJURY_SEVERITY.find((s) => s.value === form.injurySeverity)?.label },
                       form.priorityMuscles.length > 0 && { label: "Priority muscles", value: form.priorityMuscles.join(", ") },
                     ]
                       .filter(Boolean)
@@ -814,25 +870,60 @@ export default function Onboarding() {
                     </div>
                   )}
 
-                  <Button
-                    className="w-full h-12 text-base font-semibold"
-                    onClick={handleFinish}
-                    disabled={isPending}
-                    data-testid="button-generate-program"
-                  >
-                    {isPending ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        {createProfile.isPending
-                          ? "Saving profile..."
-                          : "Building your program..."}
-                      </>
-                    ) : form.mode === "ai" ? (
-                      "Generate my program"
-                    ) : (
-                      "Get started"
-                    )}
-                  </Button>
+                  {form.mode === "ai" ? (
+                    <div className="space-y-3">
+                      <Button
+                        className="w-full h-12 text-base font-semibold"
+                        onClick={() => { setFinishAction("generate"); handleFinish(true); }}
+                        disabled={isPending}
+                        data-testid="button-generate-program"
+                      >
+                        {isPending && finishAction === "generate" ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            {createProfile.isPending ? "Saving profile..." : "Building your program..."}
+                          </>
+                        ) : (
+                          "Generate program"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full h-11 text-sm font-semibold"
+                        onClick={() => { setFinishAction("later"); handleFinish(false); }}
+                        disabled={isPending}
+                        data-testid="button-generate-later"
+                      >
+                        {isPending && finishAction === "later" ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving profile...
+                          </>
+                        ) : (
+                          "Generate program later"
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center">
+                        You can generate your program any time from My Program.
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full h-12 text-base font-semibold"
+                      onClick={() => { setFinishAction("later"); handleFinish(false); }}
+                      disabled={isPending}
+                      data-testid="button-generate-program"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Saving profile...
+                        </>
+                      ) : (
+                        "Get started"
+                      )}
+                    </Button>
+                  )}
                 </div>
               )}
             </motion.div>

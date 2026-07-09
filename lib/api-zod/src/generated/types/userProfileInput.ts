@@ -5,6 +5,7 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserProfileInputInjurySeverity } from './userProfileInputInjurySeverity';
 
 export interface UserProfileInput {
   name?: string;
@@ -25,8 +26,10 @@ export interface UserProfileInput {
   goalWeight?: number | null;
   /** @nullable */
   activityLevel?: string | null;
-  restDays?: string[];
+  preferredRestDays?: string[];
   /** @nullable */
   injuries?: string | null;
+  /** @nullable */
+  injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
 }

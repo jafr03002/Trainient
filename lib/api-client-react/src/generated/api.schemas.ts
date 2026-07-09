@@ -9,6 +9,18 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * @nullable
+ */
+export type UserProfileInjurySeverity = typeof UserProfileInjurySeverity[keyof typeof UserProfileInjurySeverity] | null;
+
+
+export const UserProfileInjurySeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
+
 export interface UserProfile {
   userId: string;
   /** @nullable */
@@ -30,15 +42,29 @@ export interface UserProfile {
   goalWeight?: number | null;
   /** @nullable */
   activityLevel?: string | null;
-  restDays?: string[];
+  preferredRestDays?: string[];
   /** @nullable */
   injuries?: string | null;
+  /** @nullable */
+  injurySeverity?: UserProfileInjurySeverity;
   priorityMuscles: string[];
   onboardingComplete: boolean;
   /** @nullable */
   onboardingCompletedAt?: string | null;
   createdAt: string;
 }
+
+/**
+ * @nullable
+ */
+export type UserProfileInputInjurySeverity = typeof UserProfileInputInjurySeverity[keyof typeof UserProfileInputInjurySeverity] | null;
+
+
+export const UserProfileInputInjurySeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
 
 export interface UserProfileInput {
   name?: string;
@@ -59,11 +85,25 @@ export interface UserProfileInput {
   goalWeight?: number | null;
   /** @nullable */
   activityLevel?: string | null;
-  restDays?: string[];
+  preferredRestDays?: string[];
   /** @nullable */
   injuries?: string | null;
+  /** @nullable */
+  injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
 }
+
+/**
+ * @nullable
+ */
+export type UserProfileUpdateInjurySeverity = typeof UserProfileUpdateInjurySeverity[keyof typeof UserProfileUpdateInjurySeverity] | null;
+
+
+export const UserProfileUpdateInjurySeverity = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const;
 
 export interface UserProfileUpdate {
   name?: string;
@@ -76,6 +116,8 @@ export interface UserProfileUpdate {
   weightUnit?: string | null;
   /** @nullable */
   injuries?: string | null;
+  /** @nullable */
+  injurySeverity?: UserProfileUpdateInjurySeverity;
 }
 
 export interface Exercise {

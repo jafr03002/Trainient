@@ -3,7 +3,8 @@ import { eq, desc } from "drizzle-orm";
 import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
-import { openai } from "../lib/openai";
+import { anthropic } from "../lib/anthropic";
+import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -129,14 +130,22 @@ Return ONLY valid JSON (no markdown):
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
   "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...] } }`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: adjustmentPrompt }],
-    response_format: { type: "json_object" },
+  const completion = await anthropic.messages.create({
+    model: "claude-opus-4-8",
     max_tokens: 4000,
+    thinking: { type: "adaptive" },
+    output_config: {
+      effort: "medium",
+      format: { type: "json_schema", schema: checkinAdjustmentOutputSchema },
+    },
+    messages: [{ role: "user", content: adjustmentPrompt }],
   });
 
-  const raw = JSON.parse(completion.choices[0].message.content!);
+  const textBlock = completion.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Expected a text block in Claude's check-in adjustment response");
+  }
+  const raw = JSON.parse(textBlock.text);
   const updatedDays = raw.updated_program.days.map((d: any) => ({
     dayNumber: d.day_number ?? d.dayNumber,
     label: d.label,
