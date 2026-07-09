@@ -5,8 +5,14 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProgramCardioIntensity } from './programCardioIntensity';
+import type { ProgramDailyStepTarget } from './programDailyStepTarget';
 import type { ProgramDay } from './programDay';
+import type { ProgramEnergyBalance } from './programEnergyBalance';
 import type { ProgramHighlight } from './programHighlight';
+import type { ProgramLongTermPhase } from './programLongTermPhase';
+import type { ProgramShortTermPhase } from './programShortTermPhase';
+import type { ProgramTrainingWorkload } from './programTrainingWorkload';
 
 export interface Program {
   id: number;
@@ -18,4 +24,20 @@ export interface Program {
   aiGenerated: boolean;
   days: ProgramDay[];
   generatedAt: string;
+  /** @nullable */
+  longTermPhase?: ProgramLongTermPhase;
+  /** @nullable */
+  shortTermPhase?: ProgramShortTermPhase;
+  /** @nullable */
+  energyBalance?: ProgramEnergyBalance;
+  /** @nullable */
+  trainingWorkload?: ProgramTrainingWorkload;
+  /** @nullable */
+  longTermGoalWeight?: number | null;
+  /** @nullable */
+  shortTermGoalWeight?: number | null;
+  /** @nullable */
+  dailyStepTarget?: ProgramDailyStepTarget;
+  /** @nullable */
+  cardioIntensity?: ProgramCardioIntensity;
 }

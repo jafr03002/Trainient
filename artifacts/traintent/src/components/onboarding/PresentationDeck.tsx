@@ -225,6 +225,39 @@ export function PresentationDeck({
                     </div>
                   ))}
                 </div>
+                {(program.shortTermPhase || program.energyBalance || program.cardioIntensity || program.dailyStepTarget) && (
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/15" data-testid="deck-monitoring">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-primary mb-2">Right now</div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      {program.shortTermPhase && (
+                        <div>
+                          <span className="text-muted-foreground">Phase</span>
+                          <div className="font-semibold text-foreground capitalize">{program.shortTermPhase.replace(/_/g, " ")}</div>
+                        </div>
+                      )}
+                      {program.energyBalance && (
+                        <div>
+                          <span className="text-muted-foreground">Energy balance</span>
+                          <div className="font-semibold text-foreground capitalize">{program.energyBalance.replace(/_/g, " ")}</div>
+                        </div>
+                      )}
+                      {program.dailyStepTarget && (
+                        <div>
+                          <span className="text-muted-foreground">Daily steps</span>
+                          <div className="font-semibold text-foreground capitalize">{program.dailyStepTarget}</div>
+                        </div>
+                      )}
+                      {program.cardioIntensity && (
+                        <div>
+                          <span className="text-muted-foreground">Cardio</span>
+                          <div className="font-semibold text-foreground capitalize">
+                            {program.cardioIntensity.bpmMin}–{program.cardioIntensity.bpmMax}bpm · {program.cardioIntensity.level}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 

@@ -39,6 +39,17 @@ const programHighlightSchema = {
   additionalProperties: false,
 };
 
+const cardioIntensitySchema = {
+  type: "object",
+  properties: {
+    bpm_min: { type: "integer" },
+    bpm_max: { type: "integer" },
+    level: { type: "string", enum: ["low", "moderate", "high"] },
+  },
+  required: ["bpm_min", "bpm_max", "level"],
+  additionalProperties: false,
+};
+
 const programSchema = {
   type: "object",
   properties: {
@@ -46,8 +57,23 @@ const programSchema = {
     split_type: { type: "string" },
     program_highlights: { type: "array", items: programHighlightSchema },
     days: { type: "array", items: programDaySchema },
+    short_term_phase: {
+      type: "string",
+      enum: ["calibration", "bulk", "maintenance", "reverse_diet", "diet", "mini_cut", "deload"],
+    },
+    energy_balance: {
+      type: "string",
+      enum: ["surplus", "maintenance", "deficit", "high_deficit"],
+    },
+    short_term_goal_weight: { type: ["number", "null"] },
+    daily_step_target: { type: "string", enum: ["low", "moderate", "high"] },
+    cardio_intensity: cardioIntensitySchema,
   },
-  required: ["program_name", "split_type", "program_highlights", "days"],
+  required: [
+    "program_name", "split_type", "program_highlights", "days",
+    "short_term_phase", "energy_balance", "short_term_goal_weight",
+    "daily_step_target", "cardio_intensity",
+  ],
   additionalProperties: false,
 };
 

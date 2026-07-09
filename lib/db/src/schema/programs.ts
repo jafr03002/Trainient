@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, jsonb, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, boolean, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,16 @@ export const programsTable = pgTable("programs", {
   splitType: text("split_type").notNull(),
   programHighlights: jsonb("program_highlights").notNull().default([]),
   days: jsonb("days").notNull().default([]),
+  // AI-generated program monitoring — nullable since manual/Independent-mode
+  // programs (no AI involved) and pre-existing rows never populate these.
+  longTermPhase: text("long_term_phase"),
+  shortTermPhase: text("short_term_phase"),
+  energyBalance: text("energy_balance"),
+  trainingWorkload: jsonb("training_workload"),
+  longTermGoalWeight: real("long_term_goal_weight"),
+  shortTermGoalWeight: real("short_term_goal_weight"),
+  dailyStepTarget: text("daily_step_target"),
+  cardioIntensity: jsonb("cardio_intensity"),
   aiGenerated: boolean("ai_generated").notNull().default(true),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
 });

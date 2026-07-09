@@ -183,6 +183,30 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
+      {/* Current phase */}
+      {program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.energyBalance) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.09 }}
+          className="p-4 rounded-xl bg-card border border-border flex items-center justify-between"
+          data-testid="card-program-phase"
+        >
+          <div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Current phase</div>
+            <div className="text-lg font-bold text-foreground capitalize">
+              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "—"}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Energy balance</div>
+            <div className="text-sm font-semibold text-foreground capitalize">
+              {program.data.energyBalance?.replace(/_/g, " ") ?? "—"}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Bodyweight */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}

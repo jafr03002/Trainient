@@ -133,7 +133,22 @@ export const GetCurrentProgramResponse = zod.object({
   "isUnilateral": zod.boolean().optional()
 }))
 })),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish()
 })
 
 
@@ -167,7 +182,22 @@ export const ListProgramsResponseItem = zod.object({
   "isUnilateral": zod.boolean().optional()
 }))
 })),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish()
 })
 export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
 
@@ -259,7 +289,22 @@ export const UpdateProgramResponse = zod.object({
   "isUnilateral": zod.boolean().optional()
 }))
 })),
-  "generatedAt": zod.string()
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish()
 })
 
 

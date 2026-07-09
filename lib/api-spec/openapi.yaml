@@ -684,6 +684,23 @@ components:
           items:
             $ref: "#/components/schemas/ProgramDay"
         generatedAt:  { type: string }
+        longTermPhase:       { type: ["string", "null"], enum: [gain_weight, lose_weight, maintain, null] }
+        shortTermPhase:      { type: ["string", "null"], enum: [calibration, bulk, maintenance, reverse_diet, diet, mini_cut, deload, null] }
+        energyBalance:       { type: ["string", "null"], enum: [surplus, maintenance, deficit, high_deficit, null] }
+        trainingWorkload:
+          type: ["object", "null"]
+          properties:
+            daysTrained:     { type: integer }
+            totalVolumeSets: { type: integer }
+        longTermGoalWeight:  { type: ["number", "null"] }
+        shortTermGoalWeight: { type: ["number", "null"] }
+        dailyStepTarget:     { type: ["string", "null"], enum: [low, moderate, high, null] }
+        cardioIntensity:
+          type: ["object", "null"]
+          properties:
+            bpmMin: { type: integer }
+            bpmMax: { type: integer }
+            level:  { type: string, enum: [low, moderate, high] }
 
     ManualProgramInput:
       type: object
