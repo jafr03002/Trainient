@@ -4,6 +4,7 @@ import { db, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
+import { programGenerationKnowledge } from "../lib/knowledge";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -143,9 +144,36 @@ ${JSON.stringify(latestProgram?.days ?? [])}
 Generate a new version of the program that directly addresses this feedback, while still following all the rules above.`
     : "";
 
-  const systemPrompt = `You are an expert strength and conditioning coach with deep knowledge of hypertrophy, powerlifting, and evidence-based training. You write structured, intelligent training programs tailored to the individual.
+  // Static across every call for every user — persona, house training philosophy, and
+  // output format never change per-request, so this is the part worth prompt-caching.
+  const staticInstructions = `You are an expert strength and conditioning coach with deep knowledge of hypertrophy, powerlifting, and evidence-based training. You write structured, intelligent training programs tailored to the individual.
 
-User profile:
+Reference material — house training philosophy and program-generation rules to apply:
+${programGenerationKnowledge}
+
+Apply these rules:
+- Beginners: full body or upper/lower, compound-focused, lower volume
+- Intermediate: upper/lower or PPL, mix of compounds and isolation
+- Advanced: PPL or specialisation splits, higher volume, more intensity techniques
+- Always respect injuries — avoid or regress exercises that stress injured areas
+- Add extra sets to priority muscle groups (15–20% more volume)
+- Use progressive overload logic: rep ranges are designed to be beaten week over week
+
+Also produce 3–5 "program highlights" — short explanations of why the program looks the
+way it does. Each highlight MUST tie back to a concrete input from the profile above (the
+chosen split and why it fits the training-days/experience combo, an extra-volume bump for a
+priority muscle group, an exercise substitution or omission made for an injury, the
+progression logic used for this experience level, etc). Do not write generic filler —
+every highlight should reference a specific choice this program actually makes.
+
+Return ONLY valid JSON (no markdown, no explanation) structured as:
+{ "program_name": "...", "split_type": "...",
+  "program_highlights": [ { "title": "...", "detail": "..." } ],
+  "days": [ { "day_number": 1, "label": "...", "focus": "...",
+    "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
+    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }`;
+
+  const userPrompt = `User profile:
 - Goal: ${profile.goal}
 - Experience: ${profile.experience}
 - Training days per week: ${profile.trainingDays}
@@ -170,39 +198,20 @@ For each day, provide 5–7 exercises. For each exercise provide:
 - Rep range (e.g. 8–10)
 - Rest time in seconds
 - One coaching cue (one sentence)
-- Primary muscle group
-
-Apply these rules:
-- Beginners: full body or upper/lower, compound-focused, lower volume
-- Intermediate: upper/lower or PPL, mix of compounds and isolation
-- Advanced: PPL or specialisation splits, higher volume, more intensity techniques
-- Always respect injuries — avoid or regress exercises that stress injured areas
-- Add extra sets to priority muscle groups (15–20% more volume)
-- Use progressive overload logic: rep ranges are designed to be beaten week over week
-
-Also produce 3–5 "program highlights" — short explanations of why the program looks the
-way it does. Each highlight MUST tie back to a concrete input from the profile above (the
-chosen split and why it fits the training-days/experience combo, an extra-volume bump for a
-priority muscle group, an exercise substitution or omission made for an injury, the
-progression logic used for this experience level, etc). Do not write generic filler —
-every highlight should reference a specific choice this program actually makes.
-
-Return ONLY valid JSON (no markdown, no explanation) structured as:
-{ "program_name": "...", "split_type": "...",
-  "program_highlights": [ { "title": "...", "detail": "..." } ],
-  "days": [ { "day_number": 1, "label": "...", "focus": "...",
-    "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
-    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ] }${feedbackBlock}`;
+- Primary muscle group${feedbackBlock}`;
 
   const completion = await anthropic.messages.create({
     model: "claude-opus-4-8",
     max_tokens: 4000,
     thinking: { type: "adaptive" },
+    system: [
+      { type: "text", text: staticInstructions, cache_control: { type: "ephemeral" } },
+    ],
     output_config: {
       effort: "medium",
       format: { type: "json_schema", schema: generateProgramOutputSchema },
     },
-    messages: [{ role: "user", content: systemPrompt }],
+    messages: [{ role: "user", content: userPrompt }],
   });
 
   const textBlock = completion.content.find((block) => block.type === "text");
