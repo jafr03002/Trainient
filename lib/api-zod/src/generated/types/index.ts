@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './bodyweightLog';
+export * from './bodyweightLogInput';
+export * from './bodyweightPoint';
 export * from './calendarColor';
 export * from './calendarColorInput';
 export * from './checkin';
@@ -16,6 +19,7 @@ export * from './checkoutSession';
 export * from './exercise';
 export * from './generateProgramInput';
 export * from './getStrengthProgressParams';
+export * from './getTodaysBodyweightParams';
 export * from './getWorkoutsByDayLabelParams';
 export * from './healthStatus';
 export * from './listWorkoutsParams';

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, workoutLogsTable } from "@workspace/db";
+import { db, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { GetStrengthProgressQueryParams } from "@workspace/api-zod";
 
@@ -186,6 +186,16 @@ router.get("/progress/muscle-volume", requireAuth, async (req, res) => {
     .map(([week, data]) => ({ week: Number(week), ...data }));
 
   res.json(result);
+});
+
+router.get("/progress/bodyweight", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const logs = await db.query.bodyweightLogsTable.findMany({
+    where: eq(bodyweightLogsTable.userId, userId),
+  });
+
+  const points = logs.map((log) => ({ date: log.date, weight: log.weight }));
+  res.json(points.sort((a, b) => a.date.localeCompare(b.date)));
 });
 
 router.get("/progress/exercises", requireAuth, async (req, res) => {

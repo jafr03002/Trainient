@@ -510,6 +510,53 @@ export const ListTrackedExercisesResponse = zod.array(ListTrackedExercisesRespon
 
 
 /**
+ * @summary Log (upsert) the bodyweight entry for a given date
+ */
+export const LogBodyweightBody = zod.object({
+  "date": zod.string(),
+  "weight": zod.number()
+})
+
+export const LogBodyweightResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "date": zod.string(),
+  "weight": zod.number(),
+  "weightUnit": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Get the bodyweight entry for a given date, if logged (drives the dashboard card's state)
+ */
+export const GetTodaysBodyweightQueryParams = zod.object({
+  "date": zod.coerce.string()
+})
+
+export const GetTodaysBodyweightResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "date": zod.string(),
+  "weight": zod.number(),
+  "weightUnit": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Bodyweight over time (for line chart)
+ */
+export const GetBodyweightProgressResponseItem = zod.object({
+  "date": zod.string(),
+  "weight": zod.number()
+})
+export const GetBodyweightProgressResponse = zod.array(GetBodyweightProgressResponseItem)
+
+
+/**
  * @summary Get all calendar day-label colour mappings for the user
  */
 export const GetCalendarColorsResponseItem = zod.object({

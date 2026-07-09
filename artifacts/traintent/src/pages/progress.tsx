@@ -10,6 +10,8 @@ import {
   useGetPersonalRecords,
   useGetMuscleVolumeBreakdown,
   useListTrackedExercises,
+  useGetBodyweightProgress,
+  useGetProfile,
   getGetStrengthProgressQueryKey,
 } from "@workspace/api-client-react";
 import { Trophy } from "lucide-react";
@@ -57,6 +59,9 @@ export default function Progress() {
   );
   const personalRecords = useGetPersonalRecords();
   const muscleVolume = useGetMuscleVolumeBreakdown();
+  const bodyweightProgress = useGetBodyweightProgress();
+  const profileQuery = useGetProfile();
+  const weightUnit = profileQuery.data?.weightUnit ?? "kg";
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => isRecent(pr.date, 7)).length;
 
@@ -73,13 +78,26 @@ export default function Progress() {
     return { lower, upper, ticks };
   })();
 
+  // Same lower/upper snapping as the strength chart, just on the bodyweight
+  // data's own scale — bodyweight moves in much smaller increments.
+  const bodyweightBounds = (() => {
+    const data = bodyweightProgress.data ?? [];
+    if (!data.length) return null;
+    const weights = data.map((p) => p.weight);
+    const lower = Math.max(0, Math.round((Math.min(...weights) * 0.95) / 5) * 5);
+    const upper = Math.ceil((Math.max(...weights) * 1.05) / 5) * 5;
+    const ticks: number[] = [];
+    for (let t = lower; t <= upper; t += 5) ticks.push(t);
+    return { lower, upper, ticks };
+  })();
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Progress</h1>
-            <p className="text-muted-foreground mt-1">Track your strength, volume, and personal records.</p>
+            <p className="text-muted-foreground mt-1">Track your strength, volume, bodyweight, and personal records.</p>
           </div>
           {recentPrCount > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold">
@@ -135,6 +153,40 @@ export default function Progress() {
               />
               <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} kg`, "Max weight"]} />
               <Line type="monotone" dataKey="maxWeight" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </motion.div>
+
+      {/* Bodyweight over time */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.11 }}
+        className="p-5 rounded-xl bg-card border border-border"
+        data-testid="chart-bodyweight"
+      >
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-5">Bodyweight over time</h2>
+        {bodyweightProgress.isLoading ? (
+          <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+        ) : !bodyweightProgress.data?.length ? (
+          <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">
+            Log today's bodyweight from the dashboard to start tracking
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={bodyweightProgress.data}>
+              <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" opacity={0.4} />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                stroke="hsl(var(--muted-foreground))"
+                domain={[bodyweightBounds?.lower ?? 0, bodyweightBounds?.upper ?? "auto"]}
+                ticks={bodyweightBounds?.ticks}
+                allowDecimals={false}
+              />
+              <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} ${weightUnit}`, "Bodyweight"]} />
+              <Line type="monotone" dataKey="weight" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         )}

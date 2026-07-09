@@ -20,6 +20,8 @@ tags:
     description: Weekly check-ins
   - name: progress
     description: Progress analytics
+  - name: bodyweight
+    description: Daily bodyweight logging
   - name: subscriptions
     description: Stripe subscription management
   - name: calendar
@@ -396,6 +398,62 @@ paths:
                 type: array
                 items:
                   type: string
+
+  # ── Bodyweight ────────────────────────────────────────────────────────────────
+  /bodyweight:
+    post:
+      operationId: logBodyweight
+      tags: [bodyweight]
+      summary: Log (upsert) the bodyweight entry for a given date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BodyweightLogInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BodyweightLog"
+
+  /bodyweight/today:
+    get:
+      operationId: getTodaysBodyweight
+      tags: [bodyweight]
+      summary: Get the bodyweight entry for a given date, if logged (drives the dashboard card's state)
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entry for that date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BodyweightLog"
+        "404":
+          description: Not logged yet
+
+  /progress/bodyweight:
+    get:
+      operationId: getBodyweightProgress
+      tags: [progress]
+      summary: Bodyweight over time (for line chart)
+      responses:
+        "200":
+          description: Bodyweight data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BodyweightPoint"
 
   # ── Calendar colours ──────────────────────────────────────────────────────────
   /calendar/colors:
@@ -787,6 +845,33 @@ components:
         glutes:      { type: integer }
         calves:      { type: integer }
         core:        { type: integer }
+
+    BodyweightPoint:
+      type: object
+      required: [date, weight]
+      properties:
+        date:       { type: string }
+        weight:     { type: number }
+
+    # ── Bodyweight ────────────────────────────────────────────────────────────
+    BodyweightLog:
+      type: object
+      required: [id, userId, date, weight, weightUnit, createdAt]
+      properties:
+        id:         { type: integer }
+        userId:     { type: string }
+        date:       { type: string }
+        weight:     { type: number }
+        weightUnit: { type: string }
+        createdAt:  { type: string }
+        updatedAt:  { type: string }
+
+    BodyweightLogInput:
+      type: object
+      required: [date, weight]
+      properties:
+        date:       { type: string }
+        weight:     { type: number }
 
     # ── Calendar colours ──────────────────────────────────────────────────────
     CalendarColor:

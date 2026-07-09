@@ -1,12 +1,28 @@
 import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable } from "@workspace/db";
+import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
 import { openai } from "../lib/openai";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
+
+// Reduced to a single line rather than raw entries — cheap to interpolate
+// into the prompt and reads the same "is this trending the right way"
+// signal a coach would glance at, without dumping a whole log array.
+function bodyweightTrendSummary(logs: { date: string; weight: number; weightUnit: string }[]): string {
+  if (logs.length === 0) return "No bodyweight logged recently.";
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  if (sorted.length === 1) {
+    return `${last.weight} ${last.weightUnit} (logged ${last.date}, only one entry so far)`;
+  }
+  const delta = last.weight - first.weight;
+  const sign = delta > 0 ? "+" : "";
+  return `${first.weight} ${first.weightUnit} on ${first.date} → ${last.weight} ${last.weightUnit} on ${last.date} (${sign}${delta.toFixed(1)} ${last.weightUnit})`;
+}
 
 function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
   return {
@@ -61,7 +77,7 @@ router.post("/checkins", requireAuth, async (req, res) => {
     .values({ userId, ...parsed.data })
     .returning();
 
-  const [profile, currentProgram, recentLogs] = await Promise.all([
+  const [profile, currentProgram, recentLogs, recentBodyweightLogs] = await Promise.all([
     db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
     db.query.programsTable.findFirst({
       where: eq(programsTable.userId, userId),
@@ -71,6 +87,11 @@ router.post("/checkins", requireAuth, async (req, res) => {
       where: eq(workoutLogsTable.userId, userId),
       orderBy: [desc(workoutLogsTable.createdAt)],
       limit: 10,
+    }),
+    db.query.bodyweightLogsTable.findMany({
+      where: eq(bodyweightLogsTable.userId, userId),
+      orderBy: [desc(bodyweightLogsTable.date)],
+      limit: 30,
     }),
   ]);
 
@@ -83,6 +104,7 @@ router.post("/checkins", requireAuth, async (req, res) => {
 
 Client profile: ${JSON.stringify(profile)}
 Current program: ${JSON.stringify(currentProgram.days)}
+Bodyweight trend (last 30 logged days): ${bodyweightTrendSummary(recentBodyweightLogs)}
 This week's check-in:
 - Energy: ${parsed.data.energy}/10
 - Sleep: ${parsed.data.sleep}/10
@@ -100,6 +122,7 @@ Adjustment rules:
 - All sessions completed + good energy: increase weight targets or add 1 rep to ranges (progressive overload)
 - Missed sessions: do not increase volume, note which days to prioritise
 - High soreness: swap high-impact exercises for lower-impact alternatives
+- Bodyweight trend vs the client's goal weight: if it's moving the wrong direction relative to their goal, factor that into volume/intensity guidance; if there's not enough data, ignore this signal
 - Apply any specific notes the user left
 
 Return ONLY valid JSON (no markdown):

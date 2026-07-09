@@ -267,6 +267,26 @@ export interface MuscleVolumeWeek {
   core?: number;
 }
 
+export interface BodyweightPoint {
+  date: string;
+  weight: number;
+}
+
+export interface BodyweightLog {
+  id: number;
+  userId: string;
+  date: string;
+  weight: number;
+  weightUnit: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface BodyweightLogInput {
+  date: string;
+  weight: number;
+}
+
 export interface CalendarColor {
   id: number;
   userId: string;
@@ -316,5 +336,9 @@ label: string;
 
 export type GetStrengthProgressParams = {
 exercise: string;
+};
+
+export type GetTodaysBodyweightParams = {
+date: string;
 };
 
