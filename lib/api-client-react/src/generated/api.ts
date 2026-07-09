@@ -1116,6 +1116,76 @@ export function useGetWorkoutsByDayLabel<TData = Awaited<ReturnType<typeof getWo
 
 
 
+export const getDeleteWorkoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/workouts/${id}`
+}
+
+/**
+ * @summary Delete a logged workout session
+ */
+export const deleteWorkout = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteWorkoutUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteWorkoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkout>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWorkout>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteWorkout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWorkout>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteWorkout(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWorkoutMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWorkout>>>
+
+    export type DeleteWorkoutMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a logged workout session
+ */
+export const useDeleteWorkout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWorkout>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWorkout>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteWorkoutMutationOptions(options));
+    }
+
 export const getListCheckinsUrl = () => {
 
 

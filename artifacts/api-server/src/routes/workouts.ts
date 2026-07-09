@@ -104,4 +104,25 @@ router.get("/workouts/by-day-label", requireAuth, async (req, res) => {
   res.json(logs.map(serializeLog));
 });
 
+router.delete("/workouts/:id", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  if (Number.isNaN(id)) {
+    res.status(404).json({ error: "Workout not found" });
+    return;
+  }
+  // Scoped to id + userId in the WHERE itself so this can never delete
+  // another user's row. PRs/stats are all computed from workout_logs at
+  // read time, so no manual cascade cleanup is needed here.
+  const [deleted] = await db
+    .delete(workoutLogsTable)
+    .where(and(eq(workoutLogsTable.id, id), eq(workoutLogsTable.userId, userId)))
+    .returning();
+  if (!deleted) {
+    res.status(404).json({ error: "Workout not found" });
+    return;
+  }
+  res.status(204).end();
+});
+
 export default router;

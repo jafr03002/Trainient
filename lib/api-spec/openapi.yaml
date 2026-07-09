@@ -267,6 +267,23 @@ paths:
                 items:
                   $ref: "#/components/schemas/WorkoutLog"
 
+  /workouts/{id}:
+    delete:
+      operationId: deleteWorkout
+      tags: [workouts]
+      summary: Delete a logged workout session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
   # ── Check-ins ─────────────────────────────────────────────────────────────────
   /checkins:
     get:

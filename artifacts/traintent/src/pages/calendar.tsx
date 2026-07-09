@@ -1,7 +1,20 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, MessageSquare } from "lucide-react";
-import { useListWorkouts, useGetCalendarColors } from "@workspace/api-client-react";
+import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useListWorkouts,
+  useGetCalendarColors,
+  useDeleteWorkout,
+  getListWorkoutsQueryKey,
+  getGetRecentWorkoutsQueryKey,
+  getGetWorkoutStatsQueryKey,
+  getGetPersonalRecordsQueryKey,
+  getGetStrengthProgressQueryKey,
+  getGetVolumeProgressQueryKey,
+  getGetMuscleVolumeBreakdownQueryKey,
+  getGetWorkoutsByDayLabelQueryKey,
+} from "@workspace/api-client-react";
 
 const DEFAULT_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -67,6 +80,29 @@ function setRepsLabel(s: any): string {
 
 function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
+  const queryClient = useQueryClient();
+  const deleteWorkout = useDeleteWorkout();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  async function handleDelete() {
+    try {
+      await deleteWorkout.mutateAsync({ id: session.id });
+    } catch {
+      return; // deleteWorkout.isError drives the inline error message below.
+    }
+    queryClient.invalidateQueries({ queryKey: getListWorkoutsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetRecentWorkoutsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetWorkoutStatsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetPersonalRecordsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetStrengthProgressQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetVolumeProgressQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetMuscleVolumeBreakdownQueryKey() });
+    if (session.dayLabel) {
+      queryClient.invalidateQueries({ queryKey: getGetWorkoutsByDayLabelQueryKey() });
+    }
+    setShowDeleteConfirm(false);
+    onClose();
+  }
 
   // Most recent session strictly before this one (by date, then id) that has
   // real data for the given exercise — skips empty/abandoned sessions.
@@ -174,9 +210,70 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
                 </div>
               );
             })}
+
+            {/* Delete session */}
+            <div className="pt-4 mt-2 border-t border-border/50">
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg px-2 py-2 -mx-2 transition-colors"
+                data-testid="delete-session-button"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete session
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Delete confirmation */}
+      <AnimatePresence>
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !deleteWorkout.isPending && setShowDeleteConfirm(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            transition={{ duration: 0.22 }}
+            className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+          >
+            <div>
+              <h3 className="font-semibold text-foreground">Delete this session?</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                All PRs and data from this session will be deleted. This can't be undone.
+              </p>
+            </div>
+            {deleteWorkout.isError && (
+              <p className="text-sm text-destructive">Something went wrong. Please try again.</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteWorkout.isPending}
+                className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium disabled:opacity-50 hover:bg-secondary/30 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteWorkout.isPending}
+                className="flex-1 h-11 rounded-xl bg-red-500/90 text-white font-semibold disabled:opacity-50 hover:bg-red-500 transition-colors"
+                data-testid="confirm-delete-session"
+              >
+                {deleteWorkout.isPending ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }
