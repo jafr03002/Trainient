@@ -5,6 +5,7 @@ import programsRouter from "./programs";
 import workoutsRouter from "./workouts";
 import checkinsRouter from "./checkins";
 import progressRouter from "./progress";
+import bodyweightRouter from "./bodyweight";
 import subscriptionsRouter from "./subscriptions";
 import calendarRouter from "./calendar";
 
@@ -16,6 +17,7 @@ router.use(programsRouter);
 router.use(workoutsRouter);
 router.use(checkinsRouter);
 router.use(progressRouter);
+router.use(bodyweightRouter);
 router.use(subscriptionsRouter);
 router.use(calendarRouter);
 

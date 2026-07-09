@@ -20,6 +20,9 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BodyweightLog,
+  BodyweightLogInput,
+  BodyweightPoint,
   CalendarColor,
   CalendarColorInput,
   Checkin,
@@ -29,6 +32,7 @@ import type {
   CheckoutSession,
   GenerateProgramInput,
   GetStrengthProgressParams,
+  GetTodaysBodyweightParams,
   GetWorkoutsByDayLabelParams,
   HealthStatus,
   ListWorkoutsParams,
@@ -1791,6 +1795,238 @@ export function useListTrackedExercises<TData = Awaited<ReturnType<typeof listTr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListTrackedExercisesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLogBodyweightUrl = () => {
+
+
+
+
+  return `/api/bodyweight`
+}
+
+/**
+ * @summary Log (upsert) the bodyweight entry for a given date
+ */
+export const logBodyweight = async (bodyweightLogInput: BodyweightLogInput, options?: RequestInit): Promise<BodyweightLog> => {
+
+  return customFetch<BodyweightLog>(getLogBodyweightUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bodyweightLogInput,)
+  }
+);}
+
+
+
+
+export const getLogBodyweightMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logBodyweight>>, TError,{data: BodyType<BodyweightLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logBodyweight>>, TError,{data: BodyType<BodyweightLogInput>}, TContext> => {
+
+const mutationKey = ['logBodyweight'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logBodyweight>>, {data: BodyType<BodyweightLogInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  logBodyweight(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogBodyweightMutationResult = NonNullable<Awaited<ReturnType<typeof logBodyweight>>>
+    export type LogBodyweightMutationBody = BodyType<BodyweightLogInput>
+    export type LogBodyweightMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log (upsert) the bodyweight entry for a given date
+ */
+export const useLogBodyweight = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logBodyweight>>, TError,{data: BodyType<BodyweightLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logBodyweight>>,
+        TError,
+        {data: BodyType<BodyweightLogInput>},
+        TContext
+      > => {
+      return useMutation(getLogBodyweightMutationOptions(options));
+    }
+
+export const getGetTodaysBodyweightUrl = (params: GetTodaysBodyweightParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/bodyweight/today?${stringifiedParams}` : `/api/bodyweight/today`
+}
+
+/**
+ * @summary Get the bodyweight entry for a given date, if logged (drives the dashboard card's state)
+ */
+export const getTodaysBodyweight = async (params: GetTodaysBodyweightParams, options?: RequestInit): Promise<BodyweightLog> => {
+
+  return customFetch<BodyweightLog>(getGetTodaysBodyweightUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodaysBodyweightQueryKey = (params?: GetTodaysBodyweightParams,) => {
+    return [
+    `/api/bodyweight/today`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTodaysBodyweightQueryOptions = <TData = Awaited<ReturnType<typeof getTodaysBodyweight>>, TError = ErrorType<void>>(params: GetTodaysBodyweightParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodaysBodyweight>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodaysBodyweightQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodaysBodyweight>>> = ({ signal }) => getTodaysBodyweight(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodaysBodyweight>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodaysBodyweightQueryResult = NonNullable<Awaited<ReturnType<typeof getTodaysBodyweight>>>
+export type GetTodaysBodyweightQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the bodyweight entry for a given date, if logged (drives the dashboard card's state)
+ */
+
+export function useGetTodaysBodyweight<TData = Awaited<ReturnType<typeof getTodaysBodyweight>>, TError = ErrorType<void>>(
+ params: GetTodaysBodyweightParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodaysBodyweight>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodaysBodyweightQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBodyweightProgressUrl = () => {
+
+
+
+
+  return `/api/progress/bodyweight`
+}
+
+/**
+ * @summary Bodyweight over time (for line chart)
+ */
+export const getBodyweightProgress = async ( options?: RequestInit): Promise<BodyweightPoint[]> => {
+
+  return customFetch<BodyweightPoint[]>(getGetBodyweightProgressUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBodyweightProgressQueryKey = () => {
+    return [
+    `/api/progress/bodyweight`
+    ] as const;
+    }
+
+
+export const getGetBodyweightProgressQueryOptions = <TData = Awaited<ReturnType<typeof getBodyweightProgress>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBodyweightProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBodyweightProgressQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBodyweightProgress>>> = ({ signal }) => getBodyweightProgress({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBodyweightProgress>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBodyweightProgressQueryResult = NonNullable<Awaited<ReturnType<typeof getBodyweightProgress>>>
+export type GetBodyweightProgressQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Bodyweight over time (for line chart)
+ */
+
+export function useGetBodyweightProgress<TData = Awaited<ReturnType<typeof getBodyweightProgress>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBodyweightProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBodyweightProgressQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
