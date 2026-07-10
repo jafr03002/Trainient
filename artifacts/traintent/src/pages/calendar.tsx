@@ -33,6 +33,7 @@ type WorkoutLog = {
   dayLabel: string | null;
   dayNumber: number;
   weekNumber: number;
+  mode: string;
   exercisesLogged: any[];
 };
 
@@ -149,6 +150,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {new Date(session.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
               </p>
             </div>
             <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">

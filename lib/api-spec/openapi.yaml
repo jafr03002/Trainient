@@ -766,7 +766,7 @@ components:
 
     WorkoutLog:
       type: object
-      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, createdAt]
+      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, createdAt, mode]
       properties:
         id:               { type: integer }
         userId:           { type: string }
@@ -774,6 +774,7 @@ components:
         dayNumber:        { type: integer }
         weekNumber:       { type: integer }
         dayLabel:         { type: ["string", "null"] }
+        mode:             { type: string, enum: [ai, independent], description: "Training mode the user was in when this session was logged" }
         exercisesLogged:
           type: array
           items:

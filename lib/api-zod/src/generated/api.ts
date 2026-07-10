@@ -326,6 +326,7 @@ export const ListWorkoutsResponseItem = zod.object({
   "dayNumber": zod.number(),
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
+  "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string(),
   "muscle": zod.string(),
@@ -382,6 +383,7 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "dayNumber": zod.number(),
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
+  "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string(),
   "muscle": zod.string(),
@@ -427,6 +429,7 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "dayNumber": zod.number(),
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
+  "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string(),
   "muscle": zod.string(),
