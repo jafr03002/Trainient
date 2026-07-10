@@ -53,7 +53,13 @@ const cardioIntensitySchema = {
 const programSchema = {
   type: "object",
   properties: {
-    program_name: { type: "string" },
+    program_name: {
+      type: "string",
+      description:
+        "Short, plain-language name for the program (e.g. \"Push Pull Legs\", \"Upper/Lower Split\"). " +
+        "Do not tack on training-method jargon like \"Hypertrophy\" or \"Strength\" — the split and " +
+        "days already communicate that.",
+    },
     split_type: { type: "string" },
     program_highlights: { type: "array", items: programHighlightSchema },
     days: { type: "array", items: programDaySchema },
