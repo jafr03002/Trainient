@@ -37,7 +37,7 @@ router.post("/workouts", requireAuth, async (req, res) => {
     return;
   }
   // Compute the week ourselves rather than trusting the client-submitted
-  // value — it may be stale (e.g. a page left open across a week boundary).
+  // value - it may be stale (e.g. a page left open across a week boundary).
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
   const weekNumber = trainingWeekNumber(profile?.onboardingCompletedAt);
   const [log] = await db
@@ -70,7 +70,7 @@ router.get("/workouts/stats", requireAuth, async (req, res) => {
   const totalLogged = logs.length;
   const lastSessionDate = logs[0]?.date ?? null;
 
-  // Live calendar week since onboarding — not "the highest week number we've
+  // Live calendar week since onboarding - not "the highest week number we've
   // ever logged", which stalls forever once a program stops being regenerated.
   const currentWeek = trainingWeekNumber(profile?.onboardingCompletedAt);
 

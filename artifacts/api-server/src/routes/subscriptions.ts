@@ -97,7 +97,7 @@ router.post("/subscriptions/portal", requireAuth, async (req, res) => {
   res.json({ url: session.url });
 });
 
-// Stripe webhook — raw body needed, wired separately
+// Stripe webhook - raw body needed, wired separately
 router.post("/subscriptions/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

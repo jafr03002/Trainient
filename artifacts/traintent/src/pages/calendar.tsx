@@ -105,7 +105,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
   }
 
   // Most recent session strictly before this one (by date, then id) that has
-  // real data for the given exercise — skips empty/abandoned sessions.
+  // real data for the given exercise - skips empty/abandoned sessions.
   function findPrevExerciseSets(name: string): any[] | null {
     const priors = allWorkouts
       .filter((w) => w.id !== session.id)
@@ -174,7 +174,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
                   </div>
                   <h3 className="font-semibold text-foreground">{ex.name}</h3>
 
-                  {/* Sets — with per-set progression vs the previous session */}
+                  {/* Sets - with per-set progression vs the previous session */}
                   <div className="space-y-1">
                     {(ex.sets as any[])
                       .filter((s: any) => !isEmptySet(s))

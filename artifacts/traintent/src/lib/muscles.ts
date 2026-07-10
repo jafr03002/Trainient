@@ -1,12 +1,12 @@
 // The 11 canonical muscle-group options used across program building,
-// progress tracking, and onboarding — single source so they can't drift out
+// progress tracking, and onboarding - single source so they can't drift out
 // of alignment with each other again.
 export const MUSCLE_OPTIONS = [
   "Chest", "Shoulders", "Biceps", "Triceps", "Upper Back",
   "Lats", "Quads", "Hamstrings", "Glutes", "Calves", "Core",
 ] as const;
 
-// Single source for muscle-group colors, keyed by the MUSCLE_OPTIONS labels —
+// Single source for muscle-group colors, keyed by the MUSCLE_OPTIONS labels -
 // used by the onboarding/progress volume charts and the program page's muscle
 // badges, so they can't drift out of sync with each other.
 export const MUSCLE_COLORS: Record<string, string> = {

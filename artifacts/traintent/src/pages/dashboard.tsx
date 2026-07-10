@@ -25,7 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-// Local calendar date, not UTC — so logging just after midnight lands on the
+// Local calendar date, not UTC - so logging just after midnight lands on the
 // day the user actually sees, not a day that already rolled over server-side.
 function todayDateString(): string {
   const d = new Date();
@@ -77,7 +77,7 @@ export default function Dashboard() {
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
 
-  // Works identically in both modes — bodyweight is a body metric, not a
+  // Works identically in both modes - bodyweight is a body metric, not a
   // program concern, so it isn't gated by Independent/AI mode like the rest
   // of this page.
   const todayStr = todayDateString();
@@ -117,7 +117,7 @@ export default function Dashboard() {
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => daysSince(pr.date) <= 7).length;
   const progressionMessage = recentPrCount > 0
-    ? `New PR${recentPrCount > 1 ? "s" : ""} this week — keep it up!`
+    ? `New PR${recentPrCount > 1 ? "s" : ""} this week - keep it up!`
     : "No new PRs yet this week";
 
   const nextDay = program.data?.days?.[0] as any;
@@ -135,7 +135,7 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* Check-in banner — AI mode only, after day 6 */}
+      {/* Check-in banner - AI mode only, after day 6 */}
       {showCheckinBanner && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -166,7 +166,7 @@ export default function Dashboard() {
           data-testid="stat-current-week"
         >
           <CalendarCheck className="w-5 h-5 mb-3 text-primary" />
-          <div className="text-2xl font-bold text-foreground">{stats.isLoading ? "—" : stats.data?.currentWeek ?? "—"}</div>
+          <div className="text-2xl font-bold text-foreground">{stats.isLoading ? "-" : stats.data?.currentWeek ?? "-"}</div>
           <div className="text-xs text-muted-foreground mt-1">Current week</div>
         </motion.div>
 
@@ -178,7 +178,7 @@ export default function Dashboard() {
           data-testid="card-progression"
         >
           <Trophy className="w-5 h-5 mb-3 text-amber-400" />
-          <div className="text-2xl font-bold text-foreground">{personalRecords.isLoading ? "—" : recentPrCount}</div>
+          <div className="text-2xl font-bold text-foreground">{personalRecords.isLoading ? "-" : recentPrCount}</div>
           <div className="text-xs text-muted-foreground mt-1">{progressionMessage}</div>
         </motion.div>
       </div>
@@ -195,13 +195,13 @@ export default function Dashboard() {
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Current phase</div>
             <div className="text-lg font-bold text-foreground capitalize">
-              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "—"}
+              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "-"}
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Energy balance</div>
             <div className="text-sm font-semibold text-foreground capitalize">
-              {program.data.energyBalance?.replace(/_/g, " ") ?? "—"}
+              {program.data.energyBalance?.replace(/_/g, " ") ?? "-"}
             </div>
           </div>
         </motion.div>
@@ -280,7 +280,7 @@ export default function Dashboard() {
               />
               <span className="text-sm text-muted-foreground">{profile?.weightUnit ?? "kg"}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">Unit follows your profile setting — change it in Settings.</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Unit follows your profile setting - change it in Settings.</p>
           </div>
           <DialogFooter>
             <button

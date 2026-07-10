@@ -17,7 +17,7 @@ function dayColor(index: number): string {
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Which weekdays a program with N training days lands on — rest days spread out
+// Which weekdays a program with N training days lands on - rest days spread out
 // rather than all bunched at the end. Falls back to the first N weekdays.
 const SCHEDULE_SLOTS: Record<number, number[]> = {
   1: [0],
@@ -40,7 +40,7 @@ function scheduleFor(days: ProgramDay[]): (ProgramDay | null)[] {
 
 type Phase = { weeks: string; title: string; motive: string; color: string };
 
-// A light, template-driven arc keyed to the user's goal. Not model-generated —
+// A light, template-driven arc keyed to the user's goal. Not model-generated -
 // it frames the long game so week one doesn't feel like the whole plan. Every
 // arc opens with a short calibration window (the AI's own shortTermPhase enum
 // includes "calibration" for the same reason: the first couple of weeks are
@@ -52,28 +52,28 @@ function timelineFor(goal: string, goalWeight?: number | null, weightUnit?: stri
   const goalMotive = goalWeight != null ? ` and check in against your goal weight of ${goalWeight}${unit}` : "";
   const byGoal: Record<string, Phase[]> = {
     hypertrophy: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity — this sets the true starting point for everything after.", color: c[0] },
+      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
       { weeks: "Weeks 4–7", title: "Foundation", motive: "Groove the main lifts and build the work capacity heavier training will demand.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Growth block", motive: "Progressive overload where it counts — your widest muscle-building window.", color: c[2] },
+      { weeks: "Weeks 8–15", title: "Growth block", motive: "Progressive overload where it counts - your widest muscle-building window.", color: c[2] },
       { weeks: "Weeks 16–21", title: "Intensify", motive: "Heavier loads and tighter rest turn new size into strength.", color: c[3] },
       { weeks: `Week 22 →${goalWeeks}`, title: "Deload & reassess", motive: `Recover, retest your lifts${goalMotive}, then build the next block on fresh numbers.`, color: c[4] },
     ],
     strength: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity — this sets the true starting point for everything after.", color: c[0] },
+      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
       { weeks: "Weeks 4–7", title: "Foundation", motive: "Dial in technique and build a base you can load heavily later.", color: c[1] },
       { weeks: "Weeks 8–15", title: "Build", motive: "Add weight to the bar week over week on your main lifts.", color: c[2] },
-      { weeks: "Weeks 16–21", title: "Peak", motive: "Fewer reps, heavier loads — express the strength you've built.", color: c[3] },
+      { weeks: "Weeks 16–21", title: "Peak", motive: "Fewer reps, heavier loads - express the strength you've built.", color: c[3] },
       { weeks: `Week 22 →${goalWeeks}`, title: "Deload & reassess", motive: `Back off, retest your maxes${goalMotive}, then start the next cycle.`, color: c[4] },
     ],
     fat_loss: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to the deficit before pushing intensity — this sets the true starting point for everything after.", color: c[0] },
+      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to the deficit before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
       { weeks: "Weeks 4–7", title: "Foundation", motive: "Build the habit and work capacity while your calories settle in.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Lean out", motive: "Hold strength while the deficit does its job — protect your muscle.", color: c[2] },
+      { weeks: "Weeks 8–15", title: "Lean out", motive: "Hold strength while the deficit does its job - protect your muscle.", color: c[2] },
       { weeks: "Weeks 16–21", title: "Refine", motive: "Keep intensity high and tighten up as you near your target.", color: c[3] },
       { weeks: `Week 22 →${goalWeeks}`, title: "Reassess", motive: `Reset, review the numbers${goalMotive}, and plan the next phase.`, color: c[4] },
     ],
     general: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity — this sets the true starting point for everything after.", color: c[0] },
+      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
       { weeks: "Weeks 4–7", title: "Foundation", motive: "Build the routine and groove the movements.", color: c[1] },
       { weeks: "Weeks 8–15", title: "Build", motive: "Progress steadily across strength and conditioning.", color: c[2] },
       { weeks: "Weeks 16–21", title: "Challenge", motive: "Push a little harder as the basics become second nature.", color: c[3] },
@@ -84,7 +84,7 @@ function timelineFor(goal: string, goalWeight?: number | null, weightUnit?: stri
 }
 
 // A short narrative sentence weaving the current monitoring parameters
-// together, instead of a terse label grid — reads like a coach's note rather
+// together, instead of a terse label grid - reads like a coach's note rather
 // than a stats readout.
 function rightNowSentence(program: Program): string {
   const parts: string[] = [];
@@ -202,7 +202,7 @@ export function PresentationDeck({
             transition={{ duration: 0.22 }}
             className="space-y-5"
           >
-            {/* CARD 1 — Program & split */}
+            {/* CARD 1 - Program & split */}
             {cards[card] === "program" && (
               <>
                 <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your program</div>
@@ -224,7 +224,7 @@ export function PresentationDeck({
               </>
             )}
 
-            {/* CARD 2 — Timeline */}
+            {/* CARD 2 - Timeline */}
             {cards[card] === "timeline" && (
               <>
                 <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your journey</div>
@@ -232,8 +232,8 @@ export function PresentationDeck({
                   <h2 className="text-2xl font-bold text-foreground mb-1">The road to your goal</h2>
                   <p className="text-sm text-muted-foreground">
                     {program.longTermGoalWeight != null
-                      ? `You're building toward ${program.longTermGoalWeight}${weightUnit ?? "kg"} — this is a long game, and week one is just the start. Here's how your training gets you there.`
-                      : "This is a long game — week one is just the start. Here's how your training evolves."}
+                      ? `You're building toward ${program.longTermGoalWeight}${weightUnit ?? "kg"} - this is a long game, and week one is just the start. Here's how your training gets you there.`
+                      : "This is a long game - week one is just the start. Here's how your training evolves."}
                   </p>
                 </div>
                 <div className="relative pl-7">
@@ -269,7 +269,7 @@ export function PresentationDeck({
               </>
             )}
 
-            {/* CARD 3 — Balance & schedule */}
+            {/* CARD 3 - Balance & schedule */}
             {cards[card] === "balance" && (
               <>
                 <div className="text-xs font-semibold tracking-wider uppercase text-primary">Balance &amp; schedule</div>
@@ -306,7 +306,7 @@ export function PresentationDeck({
               </>
             )}
 
-            {/* CARD 4 — Sessions */}
+            {/* CARD 4 - Sessions */}
             {cards[card] === "sessions" && (
               <>
                 <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your week's sessions</div>
@@ -319,7 +319,7 @@ export function PresentationDeck({
               </>
             )}
 
-            {/* CARD 5 — Gate */}
+            {/* CARD 5 - Gate */}
             {cards[card] === "gate" && (
               <>
                 <div className="text-xs font-semibold tracking-wider uppercase text-primary">Ready?</div>

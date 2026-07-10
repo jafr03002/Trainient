@@ -4,12 +4,12 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
-- `pnpm --filter @workspace/traintent run dev` — run the frontend (port 24301)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/api-server run dev` - run the API server (port 8080)
+- `pnpm --filter @workspace/traintent run dev` - run the frontend (port 24301)
+- `pnpm run typecheck` - full typecheck across all packages
+- `pnpm run build` - typecheck + build all packages
+- `pnpm --filter @workspace/api-spec run codegen` - regenerate API hooks and Zod schemas from the OpenAPI spec
+- `pnpm --filter @workspace/db run push` - push DB schema changes (dev only)
 - Required env: `DATABASE_URL`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `SESSION_SECRET`
 
 ## Stack
@@ -27,13 +27,13 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 
 ## Where things live
 
-- `lib/db/src/schema/` — DB schema tables (userProfiles, programs, workoutLogs, checkins, subscriptions)
-- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for API contract)
-- `lib/api-client-react/src/generated/` — generated React Query hooks
-- `lib/api-zod/src/generated/` — generated Zod schemas
-- `artifacts/api-server/src/routes/` — Express route handlers
-- `artifacts/traintent/src/pages/` — 9 frontend pages
-- `artifacts/traintent/src/index.css` — dark-mode theme (HSL CSS variables)
+- `lib/db/src/schema/` - DB schema tables (userProfiles, programs, workoutLogs, checkins, subscriptions)
+- `lib/api-spec/openapi.yaml` - OpenAPI spec (source of truth for API contract)
+- `lib/api-client-react/src/generated/` - generated React Query hooks
+- `lib/api-zod/src/generated/` - generated Zod schemas
+- `artifacts/api-server/src/routes/` - Express route handlers
+- `artifacts/traintent/src/pages/` - 9 frontend pages
+- `artifacts/traintent/src/index.css` - dark-mode theme (HSL CSS variables)
 
 ## Architecture decisions
 
@@ -43,30 +43,30 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - Stripe API version: `2026-05-27.dahlia` (Stripe v22.x)
 - Clerk ClerkProvider redirect props: `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` (not `afterSignInUrl`)
 - Raw body middleware for Stripe webhook must be registered before `express.json()` for the `/api/subscriptions/webhook` path
-- Deleting a workout (`DELETE /workouts/:id`) needs no cascade cleanup — sets/exercises/notes live as embedded JSON on the row, and PRs/stats/progress charts are all computed from `workout_logs` at read time, so callers just invalidate the relevant queries after the mutation
+- Deleting a workout (`DELETE /workouts/:id`) needs no cascade cleanup - sets/exercises/notes live as embedded JSON on the row, and PRs/stats/progress charts are all computed from `workout_logs` at read time, so callers just invalidate the relevant queries after the mutation
 
 ## Product
 
-- **Landing** — marketing page with feature highlights
-- **Auth** — Clerk-hosted sign-in/sign-up with dark theme
-- **Onboarding (7 steps)** — goal, experience, training days, equipment, body stats, priority muscles, review + generate
-- **Dashboard** — stats (streak, week, sessions), next workout card, recent sessions, volume chart
-- **My Program** — tabbed view per training day, exercise cards with RPE/sets/cue/coaching tip
-- **Workout Logger** — live set tracking with weight/reps/RPE inputs, rest timer, finish + save
-- **Weekly Check-in** — 5 questions (energy, sleep, soreness, completion, notes) → GPT-4o adjusts next week's program
-- **Progress** — strength chart, muscle volume breakdown bar chart, personal records table
-- **Calendar** — logged-session history grid; tapping a day opens a session detail modal (exercises, "Last time" hints) with a delete-session action
-- **Settings** — profile edit, subscription status, Stripe checkout/portal, sign out
+- **Landing** - marketing page with feature highlights
+- **Auth** - Clerk-hosted sign-in/sign-up with dark theme
+- **Onboarding (7 steps)** - goal, experience, training days, equipment, body stats, priority muscles, review + generate
+- **Dashboard** - stats (streak, week, sessions), next workout card, recent sessions, volume chart
+- **My Program** - tabbed view per training day, exercise cards with RPE/sets/cue/coaching tip
+- **Workout Logger** - live set tracking with weight/reps/RPE inputs, rest timer, finish + save
+- **Weekly Check-in** - 5 questions (energy, sleep, soreness, completion, notes) → GPT-4o adjusts next week's program
+- **Progress** - strength chart, muscle volume breakdown bar chart, personal records table
+- **Calendar** - logged-session history grid; tapping a day opens a session detail modal (exercises, "Last time" hints) with a delete-session action
+- **Settings** - profile edit, subscription status, Stripe checkout/portal, sign out
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+_Populate as you build - explicit user instructions worth remembering across sessions._
 
 ## Gotchas
 
 - After adding new schema tables, run `pnpm run typecheck:libs` before leaf package typechecks (stale lib declarations)
 - Stripe v22.x uses API version `2026-05-27.dahlia`, not older `basil` string
-- Clerk ClerkProvider no longer has `afterSignInUrl` — use `signInFallbackRedirectUrl`
+- Clerk ClerkProvider no longer has `afterSignInUrl` - use `signInFallbackRedirectUrl`
 - `useCreatePortalSession` mutation takes `void` (no body), call with `mutateAsync()` not `mutateAsync({})`
 - DB push (`pnpm --filter @workspace/db run push`) must be run after schema changes
 

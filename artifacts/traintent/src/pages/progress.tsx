@@ -79,7 +79,7 @@ export default function Progress() {
   })();
 
   // Same lower/upper snapping as the strength chart, just on the bodyweight
-  // data's own scale — bodyweight moves in much smaller increments.
+  // data's own scale - bodyweight moves in much smaller increments.
   const bodyweightBounds = (() => {
     const data = bodyweightProgress.data ?? [];
     if (!data.length) return null;
