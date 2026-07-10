@@ -65,14 +65,6 @@ const EQUIPMENT = [
 
 const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 
-const SPLIT_HINTS: Record<number, string> = {
-  2: "Upper / Lower split",
-  3: "Push / Pull / Legs",
-  4: "Upper / Lower × 2 - optimal for most goals",
-  5: "Upper / Lower + accessory day",
-  6: "Push / Pull / Legs × 2 - high frequency",
-};
-
 // Everyone gets mode + the profile basics also editable later in Settings
 // (name, age, weight). Everything else is AI-coaching input - it's only
 // meaningful when the AI is the one building/adjusting your program, so
@@ -652,9 +644,6 @@ export default function Onboarding() {
                   <div className="flex justify-between text-xs text-muted-foreground mb-6">
                     {[2, 3, 4, 5, 6].map((n) => <span key={n}>{n}</span>)}
                   </div>
-                  <div className="p-4 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground">
-                    {SPLIT_HINTS[form.trainingDays]}
-                  </div>
                 </div>
               )}
 
@@ -690,13 +679,15 @@ export default function Onboarding() {
                     <p className="text-xs font-medium text-destructive" data-testid="text-rest-warning">
                       Too many rest days to program around your {form.trainingDays} training days - remove one to continue.
                     </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {form.preferredRestDays.length === 0
-                        ? "No preference - your coach schedules your days."
-                        : `${form.preferredRestDays.length} of ${7 - form.trainingDays} rest days selected.`}
+                  ) : form.preferredRestDays.length === maxPreferredRestDays ? (
+                    <p className="text-xs font-medium text-amber-500" data-testid="text-rest-warning">
+                      That's the most rest days you can keep free with {form.trainingDays} training days.
                     </p>
-                  )}
+                  ) : form.preferredRestDays.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No preference - your coach schedules your days.
+                    </p>
+                  ) : null}
                 </div>
               )}
 
