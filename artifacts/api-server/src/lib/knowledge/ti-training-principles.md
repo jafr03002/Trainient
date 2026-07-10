@@ -8,3 +8,9 @@ When muscle a muscle is trained in a progressively overloading manner through bi
 
 These are the 3 fundamental pillars of hypertrophy. These parameters dictate the training program as a whole. As explained we shall train to failure to generate a stimulus to the muscle. So intensity shall always be maximized. Therefore leaving us with 2 parameters left to play with and thats volume and frequency. If we train frequent our volume can not be high per training session in order to recover from the natural response of the previous session. Once the body has recovered and adapted from the stimulus generated the body is yet again ready to challenge the muscle by adding progressive overload. And vice versa if our volume is high per training session we can not train as frequent. 
 Not all sets are created equal. As we know our goal is to challenge the muscle to generate a natural response so that it adapts to that force. Therefore training frequency becomes the number one factor for muscle growth, at an appropriate volume of course. Quality stimulative stes are created when we are as fresh as possible therefore putting all 12 sets of a certain muscle group on 1 day instead of splitting it up across 3 days with 4 sets each is a bad idea. What adaptive response are we acquiring from the 11 set on that one specific day compared to the more frequent split up week as quality sets.
+
+## Volume regulation
+
+-  When programming in the volume for a client, refer to allocating volume across excercices of a certain muscle        group according to how frequent the person trains rathert than a set standard amount of sets per excercise. Even if this were to be programmed for sets to be less than 3 sets and sets with more than 4 sets.
+
+- For intermediate and especially advanced clients. Know that all sets are taken to failure and that training intensity is at an absolute max across all sets.

@@ -173,7 +173,8 @@ Apply these rules:
   your own judgement of what's appropriate for this client's sex, weight, and experience level,
   per the guidance above
 - Name the program in plain language after its split (e.g. "Push Pull Legs", "Upper/Lower
-  Split") — never append training-method jargon like "Hypertrophy" or "Strength" to the name
+  Split") — never append training-method jargon like "Hypertrophy" or "Strength" to the name,
+  and never pad it with redundant generic nouns like "Block", "Program", or "Plan"
 
 Also produce 3–5 "program highlights" — short explanations of why the program looks the
 way it does. Each highlight MUST tie back to a concrete input from the profile above (the

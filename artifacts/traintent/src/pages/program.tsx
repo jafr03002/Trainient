@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Dumbbell, Info, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
@@ -37,7 +37,6 @@ function muscleAccent(muscle: string): { solid: string; soft: string } | null {
 }
 
 function ExerciseCard({ ex }: { ex: Exercise }) {
-  const [expanded, setExpanded] = useState(false);
   const primaryAccent = muscleAccent(ex.muscle);
   const secondaryAccent = ex.secondaryMuscle ? muscleAccent(ex.secondaryMuscle) : null;
 
@@ -47,44 +46,33 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
       className="bg-secondary/20 border border-border rounded-xl overflow-hidden"
     >
       <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span
+              style={primaryAccent ? { backgroundColor: primaryAccent.soft, color: primaryAccent.solid, borderColor: primaryAccent.soft } : undefined}
+              className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                primaryAccent ? "" : "bg-primary/10 text-primary border-primary/20"
+              }`}
+            >
+              {ex.muscle}
+            </span>
+            {ex.secondaryMuscle && (
               <span
-                style={primaryAccent ? { backgroundColor: primaryAccent.soft, color: primaryAccent.solid, borderColor: primaryAccent.soft } : undefined}
-                className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                  primaryAccent ? "" : "bg-primary/10 text-primary border-primary/20"
+                style={secondaryAccent ? { backgroundColor: secondaryAccent.soft, color: secondaryAccent.solid, borderColor: secondaryAccent.soft } : undefined}
+                className={`text-xs px-2 py-0.5 rounded-full border ${
+                  secondaryAccent ? "" : "bg-secondary/40 text-muted-foreground border-border"
                 }`}
               >
-                {ex.muscle}
+                {ex.secondaryMuscle}
               </span>
-              {ex.secondaryMuscle && (
-                <span
-                  style={secondaryAccent ? { backgroundColor: secondaryAccent.soft, color: secondaryAccent.solid, borderColor: secondaryAccent.soft } : undefined}
-                  className={`text-xs px-2 py-0.5 rounded-full border ${
-                    secondaryAccent ? "" : "bg-secondary/40 text-muted-foreground border-border"
-                  }`}
-                >
-                  {ex.secondaryMuscle}
-                </span>
-              )}
-              {ex.isUnilateral && (
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                  Unilateral
-                </span>
-              )}
-            </div>
-            <h3 className="font-semibold text-foreground">{ex.name}</h3>
+            )}
+            {ex.isUnilateral && (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                Unilateral
+              </span>
+            )}
           </div>
-          {ex.cue && (
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-            >
-              <Info className="w-4 h-4" />
-              {expanded ? <ChevronUp className="w-3 h-3 mt-0.5" /> : <ChevronDown className="w-3 h-3 mt-0.5" />}
-            </button>
-          )}
+          <h3 className="font-semibold text-foreground">{ex.name}</h3>
         </div>
 
         <div className="flex items-center gap-4 mt-3">
@@ -93,24 +81,7 @@ function ExerciseCard({ ex }: { ex: Exercise }) {
             <span className="font-semibold text-foreground">{ex.sets} × {ex.reps}</span>
           </div>
         </div>
-
-        {ex.cue && <p className="text-sm text-muted-foreground mt-3 italic">"{ex.cue}"</p>}
       </div>
-
-      {expanded && ex.cue && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="px-4 pb-4 border-t border-border/50 pt-3"
-        >
-          <div className="text-sm text-muted-foreground">
-            <p><span className="font-medium text-foreground">Primary muscle:</span> {ex.muscle}</p>
-            {ex.secondaryMuscle && (
-              <p className="mt-1"><span className="font-medium text-foreground">Secondary muscle:</span> {ex.secondaryMuscle}</p>
-            )}
-          </div>
-        </motion.div>
-      )}
     </motion.div>
   );
 }
@@ -817,20 +788,7 @@ export default function Program() {
             </button>
           )}
         </div>
-        {program.programHighlights.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {program.programHighlights.map((h, i) => (
-              <div
-                key={i}
-                className="p-3 rounded-lg bg-primary/5 border border-primary/15 text-sm"
-              >
-                <span className="font-semibold text-foreground">{h.title}</span>
-                <span className="text-muted-foreground"> — {h.detail}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {program.aiGenerated && (program.shortTermPhase || program.energyBalance || program.cardioIntensity || program.dailyStepTarget || program.trainingWorkload) && (
+        {program.aiGenerated && (program.shortTermPhase || program.energyBalance || program.dailyStepTarget || program.trainingWorkload) && (
           <div className="mt-3 p-4 rounded-xl bg-card border border-border space-y-3" data-testid="program-monitoring">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program monitoring</h2>
             <div className="flex flex-wrap gap-2">
@@ -858,14 +816,6 @@ export default function Program() {
                 <div>
                   <div className="text-xs text-muted-foreground">Daily steps</div>
                   <div className="font-medium text-foreground capitalize">{program.dailyStepTarget}</div>
-                </div>
-              )}
-              {program.cardioIntensity && (
-                <div>
-                  <div className="text-xs text-muted-foreground">Cardio zone</div>
-                  <div className="font-medium text-foreground capitalize">
-                    {program.cardioIntensity.bpmMin}–{program.cardioIntensity.bpmMax} bpm · {program.cardioIntensity.level}
-                  </div>
                 </div>
               )}
               {(program.shortTermGoalWeight != null || program.longTermGoalWeight != null) && (
