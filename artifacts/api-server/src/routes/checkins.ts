@@ -210,6 +210,8 @@ Return ONLY valid JSON (no markdown):
     raw.updated_program.phase_progress.recommendation,
   );
   const { shortTermPhase, energyBalance } = effectivePhase(template, resolved.segmentIndex, resolved.weeksInSegment);
+  const phaseHasWeightTarget = shortTermPhase === "bulk" || shortTermPhase === "diet" || shortTermPhase === "mini_cut";
+  const shortTermGoalWeight = phaseHasWeightTarget ? raw.updated_program.short_term_goal_weight : null;
 
   const [updatedProgram] = await db
     .insert(programsTable)
@@ -221,7 +223,7 @@ Return ONLY valid JSON (no markdown):
       energyBalance,
       trainingWorkload: trainingWorkloadFor(updatedDays),
       longTermGoalWeight: profile?.goalWeight,
-      shortTermGoalWeight: raw.updated_program.short_term_goal_weight,
+      shortTermGoalWeight,
       dailyStepTarget: raw.updated_program.daily_step_target,
       cardioIntensity: cardioIntensityFrom(raw.updated_program.cardio_intensity),
       phaseSegmentIndex: resolved.segmentIndex,
