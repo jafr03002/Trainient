@@ -20,6 +20,11 @@ export const programsTable = pgTable("programs", {
   shortTermGoalWeight: real("short_term_goal_weight"),
   dailyStepTarget: text("daily_step_target"),
   cardioIntensity: jsonb("cardio_intensity"),
+  // Server-internal phase-template bookkeeping (see lib/phaseTemplate.ts) -
+  // which hard-template segment the client is in and how many weeks they've
+  // been there. Never returned to clients (stripped in serializeProgram).
+  phaseSegmentIndex: integer("phase_segment_index"),
+  weeksInPhaseSegment: integer("weeks_in_phase_segment"),
   aiGenerated: boolean("ai_generated").notNull().default(true),
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
 });
