@@ -1,4 +1,4 @@
-<title>Weekly Progress Card Deck — /progress</title>
+<title>Weekly Progress Card Deck - /progress</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -66,12 +66,12 @@
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <p class="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Design discussion · progress.tsx (not dashboard.tsx)</p>
-        <h1 class="text-3xl font-bold">Weekly progress — a card deck</h1>
+        <h1 class="text-3xl font-bold">Weekly progress - a card deck</h1>
         <p class="text-muted-foreground mt-2 max-w-2xl text-sm leading-relaxed">
           A vertical card per week, fanned like a hand of cards. Click any card and it expands to the center
           with the background blurred, showing that week's full detail. Lives on
           <code class="px-1 rounded bg-muted text-foreground text-xs">/progress</code>, not the dashboard.
-          <span class="font-semibold text-foreground">Try it — click a card below.</span>
+          <span class="font-semibold text-foreground">Try it - click a card below.</span>
         </p>
       </div>
       <button onclick="document.documentElement.classList.toggle('dark')"
@@ -251,7 +251,7 @@
       </div>
 
       <div class="mb-5">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">% progressed — last 5 weeks</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">% progressed - last 5 weeks</div>
         <svg id="m-spark" viewBox="0 0 200 48" class="w-full h-12" preserveAspectRatio="none"></svg>
       </div>
 
@@ -262,20 +262,20 @@
     </div>
   </div>
 
-  <!-- Progression definition — now confirmed -->
+  <!-- Progression definition - now confirmed -->
   <section class="space-y-3">
-    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Progression — confirmed</h2>
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Progression - confirmed</h2>
     <div class="p-4 rounded-xl border border-primary/30 bg-primary/5 max-w-2xl text-sm leading-relaxed">
       <p>
         Same rule as PR tracking: estimated 1RM via the Epley formula, per exercise, per set. For each exercise
         logged in both this week and last week, compare best e1RM week-over-week. Rank the top 3 improved
-        exercises on the card (shown above). Roll the rest up into two headline percentages —
+        exercises on the card (shown above). Roll the rest up into two headline percentages -
         <span class="font-semibold text-foreground">% of tracked lifts that progressed</span> and
-        <span class="font-semibold text-foreground">% that regressed</span> — vs. last week.
+        <span class="font-semibold text-foreground">% that regressed</span> - vs. last week.
         Total volume (sets) stays visible but demoted to a small secondary figure, never the headline number.
       </p>
       <p class="text-xs text-muted-foreground mt-2">
-        Backend note: this needs a new aggregation — /progress/prs already computes e1RM per exercise, but
+        Backend note: this needs a new aggregation - /progress/prs already computes e1RM per exercise, but
         nothing currently diffs it week-over-week. That's new work in progress.ts, not a reuse of an existing route.
       </p>
     </div>
@@ -292,7 +292,7 @@
         <input type="radio" name="placement" value="At the top of /progress, above the strength chart" class="mt-1" checked>
         <span>
           <span class="font-semibold text-sm block">At the top, above "Strength over time"</span>
-          <span class="text-xs text-muted-foreground">First thing you see — fits now that progression, not the muscle chart, is the headline story.</span>
+          <span class="text-xs text-muted-foreground">First thing you see - fits now that progression, not the muscle chart, is the headline story.</span>
         </span>
       </label>
       <label class="pick-ring flex items-start gap-3 p-3 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/50">
@@ -306,7 +306,7 @@
         <input type="radio" name="placement" value="Replaces the muscle-volume bar chart entirely" class="mt-1">
         <span>
           <span class="font-semibold text-sm block">Replace the muscle-volume chart entirely</span>
-          <span class="text-xs text-muted-foreground">The expanded card's donut already covers per-muscle detail — the stacked bar chart becomes redundant.</span>
+          <span class="text-xs text-muted-foreground">The expanded card's donut already covers per-muscle detail - the stacked bar chart becomes redundant.</span>
         </span>
       </label>
       <button type="submit" class="pick-badge text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground">Queue this answer</button>

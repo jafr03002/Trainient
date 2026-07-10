@@ -27,7 +27,7 @@ type ProgramDay = {
   exercises: Exercise[];
 };
 
-// Soft translucent background to pair with a muscle's solid accent color —
+// Soft translucent background to pair with a muscle's solid accent color -
 // falls back to the app's default primary-blue badge for anything unrecognized
 // (blank/legacy muscle values).
 function muscleAccent(muscle: string): { solid: string; soft: string } | null {
@@ -128,7 +128,7 @@ function findMissingName(days: EditDay[]): { day: number; exercise?: number } | 
   return null;
 }
 
-// Rotating per-day accent so days are easy to tell apart at a glance — cycles
+// Rotating per-day accent so days are easy to tell apart at a glance - cycles
 // if there are more days than colors. Exercises stay neutral/zebra-striped;
 // only days get real color, per the "bland gray blends together" complaint.
 const DAY_ACCENT_HUES: { h: number; s: number; l: number }[] = [
@@ -155,7 +155,7 @@ type ProgramDraft = { programName: string; days: EditDay[]; savedAt: number };
 
 const PROGRAM_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
 
-// "new" covers the not-yet-created program in Independent mode — there's only
+// "new" covers the not-yet-created program in Independent mode - there's only
 // ever one program per user, so a single draft slot for it is enough.
 function programDraftKey(userId: string, programId: number | "new"): string {
   return `traintent:program-draft:${userId}:${programId}`;
@@ -178,7 +178,7 @@ function saveProgramDraft(key: string, programName: string, days: EditDay[]) {
   try {
     window.localStorage.setItem(key, JSON.stringify({ programName, days, savedAt: Date.now() } as ProgramDraft));
   } catch {
-    // localStorage unavailable (e.g. private browsing) — degrade to in-memory only
+    // localStorage unavailable (e.g. private browsing) - degrade to in-memory only
   }
 }
 
@@ -202,7 +202,7 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
   const queryClient = useQueryClient();
   const { user } = useUser();
   const draftKey = user?.id ? programDraftKey(user.id, editProgram?.id ?? "new") : null;
-  // Captured once at mount — if the user's id weren't loaded yet on the very
+  // Captured once at mount - if the user's id weren't loaded yet on the very
   // first render, draftKey may still be null then even though it resolves a
   // moment later, so the initializers below use this snapshot consistently.
   const initialDraft = useRef(draftKey ? loadProgramDraft(draftKey) : null).current;
@@ -226,7 +226,7 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
   const [showMuscleConfirm, setShowMuscleConfirm] = useState(false);
 
   // Mirror every change to localStorage so a reload never loses in-progress
-  // program edits — only cleared once the program actually saves.
+  // program edits - only cleared once the program actually saves.
   useEffect(() => {
     if (!draftKey) return;
     saveProgramDraft(draftKey, programName, days);
@@ -339,8 +339,8 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
     }
   }
 
-  // Gate before performSave: block on the first missing name — a day's own
-  // name or an exercise's name within it — one at a time (fixing it and
+  // Gate before performSave: block on the first missing name - a day's own
+  // name or an exercise's name within it - one at a time (fixing it and
   // saving again surfaces the next one, rather than dumping every error on
   // screen at once). Once every name is filled, a dismissible reminder covers
   // exercises with no muscle group set (allowed to proceed, unlike a name).
@@ -552,7 +552,7 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
 
       {nameError && (
         <p className="text-sm text-destructive" data-testid="name-error">
-          Missing fields above — fill them in before saving.
+          Missing fields above - fill them in before saving.
         </p>
       )}
 
@@ -623,13 +623,13 @@ export default function Program() {
   const [generating, setGenerating] = useState(false);
 
   const isIndependent = profileQuery.data?.mode === "independent";
-  // AI onboarding is the only place goal/experience get set — Independent
+  // AI onboarding is the only place goal/experience get set - Independent
   // mode's shorter flow skips them, so a mode switch can land here with a
   // profile that exists but isn't ready for the AI to generate from yet.
   const aiProfileReady = !!profileQuery.data?.goal && !!profileQuery.data?.experience;
 
   // Drop the user back into the builder, mid-edit, if a reload or crash
-  // interrupted them before they saved — a draft existing is exactly that
+  // interrupted them before they saved - a draft existing is exactly that
   // signal. Only checked once: after this, Cancel (which intentionally
   // leaves the draft in place) must not immediately snap back into it.
   // Editing only exists in Independent mode, so AI mode never resumes into it.
@@ -706,7 +706,7 @@ export default function Program() {
             <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-bold text-foreground mb-2">A few things to set before AI can build your program</h2>
             <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-              We don't have your goal, experience, or equipment yet — the AI coach needs those to write a program.
+              We don't have your goal, experience, or equipment yet - the AI coach needs those to write a program.
             </p>
             <Link href="/onboarding">
               <button className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
@@ -723,7 +723,7 @@ export default function Program() {
         <div className="text-center py-16">
           <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-xl font-bold text-foreground mb-2">No program yet</h2>
-          <p className="text-muted-foreground mb-8">Your AI coach has what it needs — generate your first program to get started.</p>
+          <p className="text-muted-foreground mb-8">Your AI coach has what it needs - generate your first program to get started.</p>
           <button
             onClick={handleGenerate}
             disabled={generating}
@@ -743,7 +743,7 @@ export default function Program() {
     );
   }
 
-  // Edit mode — reuse the builder, prefilled with this program. Past logged
+  // Edit mode - reuse the builder, prefilled with this program. Past logged
   // sessions are snapshots, so editing the program never changes them.
   // Independent-only: AI mode has no path to set `editing` true, but this
   // guard keeps it that way even if that ever changes.
@@ -822,7 +822,7 @@ export default function Program() {
                 <div>
                   <div className="text-xs text-muted-foreground">Goal weight</div>
                   <div className="font-medium text-foreground">
-                    {program.shortTermGoalWeight ?? "—"} → {program.longTermGoalWeight ?? "—"} {profileQuery.data?.weightUnit ?? "kg"}
+                    {program.shortTermGoalWeight ?? "-"} → {program.longTermGoalWeight ?? "-"} {profileQuery.data?.weightUnit ?? "kg"}
                   </div>
                 </div>
               )}

@@ -343,7 +343,7 @@ export default function Settings() {
                   data-testid="button-upgrade-pro"
                 >
                   {createCheckout.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Upgrade to Pro — £9.99/month
+                  Upgrade to Pro - £9.99/month
                 </button>
               </div>
             ) : (

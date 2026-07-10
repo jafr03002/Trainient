@@ -47,9 +47,9 @@ const WEEKDAYS = [
 ];
 
 const INJURY_SEVERITY = [
-  { value: "low", label: "Low", sub: "Mild discomfort — doesn't stop you training as normal" },
-  { value: "medium", label: "Medium", sub: "Noticeable pain — some movements need to be avoided or modified" },
-  { value: "high", label: "High", sub: "Significant pain or limitation — needs major changes, possibly medical clearance" },
+  { value: "low", label: "Low", sub: "Mild discomfort - doesn't stop you training as normal" },
+  { value: "medium", label: "Medium", sub: "Noticeable pain - some movements need to be avoided or modified" },
+  { value: "high", label: "High", sub: "Significant pain or limitation - needs major changes, possibly medical clearance" },
 ];
 
 const EXPERIENCE = [
@@ -68,13 +68,13 @@ const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 const SPLIT_HINTS: Record<number, string> = {
   2: "Upper / Lower split",
   3: "Push / Pull / Legs",
-  4: "Upper / Lower × 2 — optimal for most goals",
+  4: "Upper / Lower × 2 - optimal for most goals",
   5: "Upper / Lower + accessory day",
-  6: "Push / Pull / Legs × 2 — high frequency",
+  6: "Push / Pull / Legs × 2 - high frequency",
 };
 
 // Everyone gets mode + the profile basics also editable later in Settings
-// (name, age, weight). Everything else is AI-coaching input — it's only
+// (name, age, weight). Everything else is AI-coaching input - it's only
 // meaningful when the AI is the one building/adjusting your program, so
 // Independent mode skips straight to the review step.
 type StepKey =
@@ -136,7 +136,7 @@ export default function Onboarding() {
   const [program, setProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
   // Tracks which review-step button was clicked so only that one shows a
-  // spinner — both call the same createProfile mutation, so isPending alone
+  // spinner - both call the same createProfile mutation, so isPending alone
   // can't tell them apart.
   const [finishAction, setFinishAction] = useState<"generate" | "later" | null>(null);
   const [, setLocation] = useLocation();
@@ -145,7 +145,7 @@ export default function Onboarding() {
   const profileQuery = useGetProfile();
 
   // A profile that's in AI mode but missing goal/experience means AI
-  // coaching was never set up — either the user onboarded through
+  // coaching was never set up - either the user onboarded through
   // Independent mode (which skips those questions entirely) and later
   // switched modes in Settings, or a previous AI setup attempt didn't
   // finish. Either way, mode/name/bodyStats are already saved, so resume
@@ -169,7 +169,7 @@ export default function Onboarding() {
     setStep(stepsFor("ai").indexOf("goal"));
   }, [profileQuery.isLoading, profileQuery.data]);
 
-  // Recomputed from form.mode on every render — switching modes (only
+  // Recomputed from form.mode on every render - switching modes (only
   // possible while on the first step) never clears already-entered fields,
   // it just changes which steps are shown, so going back to Independent
   // after filling in AI questions (or vice versa) keeps everything intact.
@@ -232,7 +232,7 @@ export default function Onboarding() {
     });
   }
 
-  // `generateNow` only matters in AI mode — Independent mode never generates
+  // `generateNow` only matters in AI mode - Independent mode never generates
   // here regardless, it always lands on /dashboard and builds a program later
   // from /program's own empty state.
   async function handleFinish(generateNow: boolean) {
@@ -420,7 +420,7 @@ export default function Onboarding() {
               {currentStep === "mode" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">How do you want to train?</h2>
-                  <p className="text-muted-foreground mb-8">Choose your mode — you can switch later in Settings.</p>
+                  <p className="text-muted-foreground mb-8">Choose your mode - you can switch later in Settings.</p>
                   <div className="grid grid-cols-1 gap-4">
                     <button
                       data-testid="mode-ai"
@@ -458,7 +458,7 @@ export default function Onboarding() {
                         <span className="font-semibold text-foreground text-lg">Independent</span>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        You're in control. Build your own program, log your sessions, and track progression yourself — no AI involved
+                        You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved
                       </p>
                     </button>
                   </div>
@@ -469,7 +469,7 @@ export default function Onboarding() {
               {currentStep === "name" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">What should we call you?</h2>
-                  <p className="text-muted-foreground mb-8">Optional — you can change this later in Settings.</p>
+                  <p className="text-muted-foreground mb-8">Optional - you can change this later in Settings.</p>
                   <input
                     type="text"
                     value={form.name}
@@ -481,11 +481,11 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Body stats — age + weight, same as what's editable in Settings */}
+              {/* Body stats - age + weight, same as what's editable in Settings */}
               {currentStep === "bodyStats" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Body stats</h2>
-                  <p className="text-muted-foreground mb-8">Optional — you can change this later in Settings.</p>
+                  <p className="text-muted-foreground mb-8">Optional - you can change this later in Settings.</p>
                   <div className="space-y-5">
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Age</label>
@@ -531,7 +531,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Goal — AI mode only */}
+              {/* Goal - AI mode only */}
               {currentStep === "goal" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
@@ -575,12 +575,12 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Activity level — AI mode only */}
+              {/* Activity level - AI mode only */}
               {currentStep === "activity" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">How active are your days?</h2>
                   <p className="text-muted-foreground mb-8">
-                    Outside of training — this tells your coach how much you recover and burn.
+                    Outside of training - this tells your coach how much you recover and burn.
                   </p>
                   <div className="grid grid-cols-1 gap-3">
                     {ACTIVITY.map((a) => (
@@ -606,7 +606,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Experience — AI mode only */}
+              {/* Experience - AI mode only */}
               {currentStep === "experience" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Your experience level</h2>
@@ -631,7 +631,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Training days — AI mode only */}
+              {/* Training days - AI mode only */}
               {currentStep === "trainingDays" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Training days per week</h2>
@@ -658,12 +658,12 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Preferred rest days — AI mode only */}
+              {/* Preferred rest days - AI mode only */}
               {currentStep === "preferredRestDays" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Any preferred rest days?</h2>
                   <p className="text-muted-foreground mb-8">
-                    You picked {form.trainingDays} training days — choose the days you'd like to keep free. Optional.
+                    You picked {form.trainingDays} training days - choose the days you'd like to keep free. Optional.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {WEEKDAYS.map((d) => {
@@ -688,19 +688,19 @@ export default function Onboarding() {
                   </div>
                   {tooManyPreferredRestDays ? (
                     <p className="text-xs font-medium text-destructive" data-testid="text-rest-warning">
-                      Too many rest days to program around your {form.trainingDays} training days — remove one to continue.
+                      Too many rest days to program around your {form.trainingDays} training days - remove one to continue.
                     </p>
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       {form.preferredRestDays.length === 0
-                        ? "No preference — your coach schedules your days."
+                        ? "No preference - your coach schedules your days."
                         : `${form.preferredRestDays.length} of ${7 - form.trainingDays} rest days selected.`}
                     </p>
                   )}
                 </div>
               )}
 
-              {/* Equipment — AI mode only */}
+              {/* Equipment - AI mode only */}
               {currentStep === "equipment" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
@@ -724,11 +724,11 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Sex + injuries — AI mode only, only meaningful for the AI prompt */}
+              {/* Sex + injuries - AI mode only, only meaningful for the AI prompt */}
               {currentStep === "details" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">A bit more for your AI coach</h2>
-                  <p className="text-muted-foreground mb-8">Optional — helps tailor your program.</p>
+                  <p className="text-muted-foreground mb-8">Optional - helps tailor your program.</p>
                   <div className="space-y-5">
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Sex <span className="text-muted-foreground font-normal">(optional)</span></label>
@@ -798,7 +798,7 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Priority muscles — AI mode only */}
+              {/* Priority muscles - AI mode only */}
               {currentStep === "priorityMuscles" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Priority muscle groups</h2>

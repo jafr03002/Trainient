@@ -10,7 +10,7 @@ import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../l
 
 const router = Router();
 
-// Reduced to a single line rather than raw entries — cheap to interpolate
+// Reduced to a single line rather than raw entries - cheap to interpolate
 // into the prompt and reads the same "is this trending the right way"
 // signal a coach would glance at, without dumping a whole log array.
 function bodyweightTrendSummary(logs: { date: string; weight: number; weightUnit: string }[]): string {
@@ -34,7 +34,7 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
 }
 
 // `weekNumber` in the API response is always the live calendar week since
-// onboarding — see programs.ts for why the stored column can't be trusted.
+// onboarding - see programs.ts for why the stored column can't be trusted.
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   return {
     ...p,
@@ -126,7 +126,7 @@ Adjustment rules:
 - High soreness: swap high-impact exercises for lower-impact alternatives
 - Bodyweight trend vs the client's goal weight: if it's moving the wrong direction relative to their goal, factor that into volume/intensity guidance; if there's not enough data, ignore this signal
 - Apply any specific notes the user left
-- Re-evaluate short-term phase and energy balance for next week given the bodyweight trend and this week's adherence — do not just repeat last week's values if the trend suggests the phase should progress (e.g. bulk → deload after several weeks, or a diet nearing its goal weight → maintenance)
+- Re-evaluate short-term phase and energy balance for next week given the bodyweight trend and this week's adherence - do not just repeat last week's values if the trend suggests the phase should progress (e.g. bulk → deload after several weeks, or a diet nearing its goal weight → maintenance)
 
 Return ONLY valid JSON (no markdown):
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",

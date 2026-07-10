@@ -11,7 +11,7 @@ import { trainingWeekNumber } from "../lib/trainingWeek";
 const router = Router();
 
 // `weekNumber` in the API response is always the live calendar week since
-// onboarding — not the stored column, which is just an insert-order ordinal
+// onboarding - not the stored column, which is just an insert-order ordinal
 // (used internally for "find the latest program" / check-in versioning).
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   return {
@@ -27,7 +27,7 @@ router.get("/programs/current", requireAuth, async (req, res) => {
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
   // Independent and AI mode each own a separate program lineage (aiGenerated
   // false/true) so switching modes never surfaces or edits the other mode's
-  // program — "current" resolves within the active mode's lineage only.
+  // program - "current" resolves within the active mode's lineage only.
   const wantAiGenerated = profile?.mode !== "independent";
   const program = await db.query.programsTable.findFirst({
     where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, wantAiGenerated)),
@@ -145,18 +145,18 @@ ${JSON.stringify(latestProgram?.days ?? [])}
 Generate a new version of the program that directly addresses this feedback, while still following all the rules above.`
     : "";
 
-  // Static across every call for every user — persona, house training philosophy, and
+  // Static across every call for every user - persona, house training philosophy, and
   // output format never change per-request, so this is the part worth prompt-caching.
   const staticInstructions = `You are an expert strength and conditioning coach with deep knowledge of hypertrophy, powerlifting, and evidence-based training. You write structured, intelligent training programs tailored to the individual.
 
-Reference material — house training philosophy and program-generation rules to apply:
+Reference material - house training philosophy and program-generation rules to apply:
 ${programGenerationKnowledge}
 
 Apply these rules:
 - Beginners: full body or upper/lower, compound-focused, lower volume
 - Intermediate: upper/lower or PPL, mix of compounds and isolation
 - Advanced: PPL or specialisation splits, higher volume, more intensity techniques
-- Always respect injuries — avoid or regress exercises that stress injured areas
+- Always respect injuries - avoid or regress exercises that stress injured areas
 - Add extra sets to priority muscle groups (15–20% more volume)
 - Use progressive overload logic: rep ranges are designed to be beaten week over week
 - Determine the client's short-term phase (calibration, bulk, maintenance, reverse_diet, diet,
@@ -168,19 +168,19 @@ Apply these rules:
   a specific bodyweight bound); for a maintenance/general-fitness client, return
   short_term_goal_weight as null
 - Recommend a daily step target (low, moderate, or high) per the activity-evaluation guidance
-  above — bump it for clients with low/moderate activity and a weight-loss or general-fitness goal
+  above - bump it for clients with low/moderate activity and a weight-loss or general-fitness goal
 - Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
   your own judgement of what's appropriate for this client's sex, weight, and experience level,
   per the guidance above
 - Name the program in plain language after its split (e.g. "Push Pull Legs", "Upper/Lower
-  Split") — never append training-method jargon like "Hypertrophy" or "Strength" to the name,
+  Split") - never append training-method jargon like "Hypertrophy" or "Strength" to the name,
   and never pad it with redundant generic nouns like "Block", "Program", or "Plan"
 
-Also produce 3–5 "program highlights" — short explanations of why the program looks the
+Also produce 3–5 "program highlights" - short explanations of why the program looks the
 way it does. Each highlight MUST tie back to a concrete input from the profile above (the
 chosen split and why it fits the training-days/experience combo, an extra-volume bump for a
 priority muscle group, an exercise substitution or omission made for an injury, the
-progression logic used for this experience level, etc). Do not write generic filler —
+progression logic used for this experience level, etc). Do not write generic filler -
 every highlight should reference a specific choice this program actually makes.
 
 Return ONLY valid JSON (no markdown, no explanation) structured as:
@@ -203,7 +203,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
 - Age: ${profile.age ?? "not provided"}, Sex: ${profile.sex ?? "not provided"}, Weight: ${profile.weight ?? "not provided"} ${profile.weightUnit ?? "kg"}
 - Long-term goal weight: ${profile.goalWeight != null ? `${profile.goalWeight} ${profile.weightUnit ?? "kg"}` : "not provided"}
 - Daily activity level (outside training): ${profile.activityLevel ?? "not provided"}
-- Injuries/limitations: ${profile.injuries ?? "none"}${profile.injuries && profile.injurySeverity ? ` (severity: ${profile.injurySeverity} — ${
+- Injuries/limitations: ${profile.injuries ?? "none"}${profile.injuries && profile.injurySeverity ? ` (severity: ${profile.injurySeverity} - ${
     profile.injurySeverity === "high"
       ? "avoid loading the affected area entirely, substitute unaffected-area work"
       : profile.injurySeverity === "medium"

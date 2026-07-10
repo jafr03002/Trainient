@@ -123,7 +123,7 @@ export function SatisfactionGate({
 
         {showRegenerateNudge && (
           <div className="p-3 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground mb-4">
-            Programs improve as you train — consider starting and adjusting from real
+            Programs improve as you train - consider starting and adjusting from real
             sessions instead of regenerating again.
           </div>
         )}

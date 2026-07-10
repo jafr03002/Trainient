@@ -15,7 +15,7 @@ type LoggedSet = {
 };
 type LoggedExercise = { name: string; muscle: string; sets: LoggedSet[] };
 
-// A set counts once it has any logged data — we do NOT require the user to have
+// A set counts once it has any logged data - we do NOT require the user to have
 // pressed the "complete" check, since most sets are logged without it.
 function isPerformed(s: LoggedSet): boolean {
   return (s.weight || 0) > 0 || (s.reps || 0) > 0 || (s.repsLeft || 0) > 0 || (s.repsRight || 0) > 0;
@@ -33,7 +33,7 @@ function maxWeight(sets: LoggedSet[]): number {
   return ws.length ? Math.max(0, ...ws) : 0;
 }
 
-// Estimated one-rep max (Epley-style) — PRs are judged on this, not raw
+// Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
 // weight, so a heavier low-rep set and a lighter high-rep set can be compared.
 function estimatedOneRepMax(weight: number, reps: number): number {
   return weight * (1 + reps / 30);

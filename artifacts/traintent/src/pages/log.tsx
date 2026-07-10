@@ -40,7 +40,7 @@ type ActiveSessionPointer = {
 
 const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
 
-// Keyed on programId + day only — `weekNumber` is now a live calendar
+// Keyed on programId + day only - `weekNumber` is now a live calendar
 // calculation (see api-server's trainingWeek helper) that can roll over
 // mid-session, so it can't be used to identify a draft.
 function draftKey(userId: string, programId: string | number, dayNumber: number): string {
@@ -72,7 +72,7 @@ function saveDraft(key: string, logs: LoggedExercise[]) {
   try {
     window.localStorage.setItem(key, JSON.stringify({ logs, savedAt: Date.now() } as WorkoutDraft));
   } catch {
-    // localStorage unavailable (e.g. private browsing) — degrade to in-memory only
+    // localStorage unavailable (e.g. private browsing) - degrade to in-memory only
   }
 }
 
@@ -110,8 +110,8 @@ function clearActiveSession(userId: string) {
   }
 }
 
-// A set with no real data (weight and all rep fields zero/empty) — e.g. an
-// abandoned/empty session — should not count as "last time" or as "started".
+// A set with no real data (weight and all rep fields zero/empty) - e.g. an
+// abandoned/empty session - should not count as "last time" or as "started".
 function isEmptySet(s: any): boolean {
   if (!s) return true;
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
@@ -142,7 +142,7 @@ function buildFreshLogs(day: any): LoggedExercise[] {
   }));
 }
 
-// Estimated one-rep max (Epley-style) — PRs are judged on this, not raw
+// Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
 // weight, so a heavier low-rep set and a lighter high-rep set can be compared.
 function estimatedOneRepMax(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
@@ -173,7 +173,7 @@ export default function Log() {
   const flashIdRef = useRef(0);
 
   // Tracks which draft key `logs` currently reflects, so a refetch of
-  // `program` (e.g. on network reconnect) doesn't clobber in-progress data —
+  // `program` (e.g. on network reconnect) doesn't clobber in-progress data -
   // the seed/rehydrate effect below only runs again if the day actually changes.
   const initializedKeyRef = useRef<string | null>(null);
   const currentDraftKeyRef = useRef<string | null>(null);
@@ -190,7 +190,7 @@ export default function Log() {
     }
   }, [personalRecords]);
 
-  // Build "last time" lookup from workout history — keep the full set list of the
+  // Build "last time" lookup from workout history - keep the full set list of the
   // most recent prior log per exercise, so each set row can show its own match.
   // Also capture that session's note (per-exercise, not per-set) to surface under
   // the last set's hint.
@@ -210,7 +210,7 @@ export default function Log() {
 
   const sessionBestRef = useRef<Record<string, number>>({});
 
-  // Which program day to log — passed as ?day=<dayNumber> from the program page.
+  // Which program day to log - passed as ?day=<dayNumber> from the program page.
   const targetDayNumber = (() => {
     const raw = new URLSearchParams(window.location.search).get("day");
     const n = raw ? parseInt(raw) : NaN;
@@ -261,7 +261,7 @@ export default function Log() {
     activeSessionRef.current = { programId: program.id, dayNumber: day.dayNumber };
 
     // Already initialized for this exact day (e.g. `program` just refetched
-    // after a reconnect) — don't touch in-progress `logs`.
+    // after a reconnect) - don't touch in-progress `logs`.
     if (initializedKeyRef.current === key) return;
 
     initializedKeyRef.current = key;
@@ -278,7 +278,7 @@ export default function Log() {
 
   // Mirror every change to localStorage so a reconnect/reload can restore the
   // in-progress session instead of losing it. Only once real data has been
-  // entered — an untouched sheet shouldn't block starting a different day.
+  // entered - an untouched sheet shouldn't block starting a different day.
   useEffect(() => {
     const key = currentDraftKeyRef.current;
     if (!key || logs.length === 0 || !hasLoggedData(logs)) return;
@@ -288,7 +288,7 @@ export default function Log() {
     }
   }, [logs]);
 
-  // Sets are saved implicitly by typing — no separate "confirm" step. Weight
+  // Sets are saved implicitly by typing - no separate "confirm" step. Weight
   // and reps together mark a set as logged, and PR detection runs inline.
   function updateSet(exIdx: number, setIdx: number, field: "weight" | "reps" | "repsLeft" | "repsRight", value: number) {
     const ex = logs[exIdx];
@@ -411,7 +411,7 @@ export default function Log() {
               <Trophy className="w-4 h-4 shrink-0" />
               <div>
                 <div className="text-xs font-medium opacity-80">New personal record!</div>
-                <div>{flash.exercise} — {flash.weight} kg</div>
+                <div>{flash.exercise} - {flash.weight} kg</div>
               </div>
             </motion.div>
           ))}
@@ -424,7 +424,7 @@ export default function Log() {
             <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
             {resumedElsewhere && (
               <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
-                Resuming your in-progress session — finish it before starting a new one.
+                Resuming your in-progress session - finish it before starting a new one.
               </p>
             )}
           </div>
@@ -627,7 +627,7 @@ export default function Log() {
             {createWorkout.isPending ? (
               <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
             ) : sessionPrCount > 0 ? (
-              <><Trophy className="w-5 h-5 text-amber-300" /> Finish — {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+              <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
             ) : (
               "Finish workout"
             )}
@@ -701,7 +701,7 @@ export default function Log() {
               <div>
                 <h3 className="font-semibold text-foreground">Discard this workout?</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Everything you've logged in this session will be lost — it won't be saved.
+                  Everything you've logged in this session will be lost - it won't be saved.
                 </p>
               </div>
               <div className="flex gap-2">

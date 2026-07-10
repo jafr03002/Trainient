@@ -74,7 +74,7 @@ export default function Checkin() {
         {/* Q1 Energy */}
         <div data-testid="question-energy">
           <label className="text-sm font-semibold text-foreground block mb-1">
-            Q1 — Overall energy this week
+            Q1 - Overall energy this week
           </label>
           <div className="flex items-center gap-4 mt-3">
             <span className="text-3xl font-bold text-primary w-10">{energy}</span>
@@ -94,7 +94,7 @@ export default function Checkin() {
         {/* Q2 Sleep */}
         <div data-testid="question-sleep">
           <label className="text-sm font-semibold text-foreground block mb-1">
-            Q2 — Average sleep quality
+            Q2 - Average sleep quality
           </label>
           <div className="flex items-center gap-4 mt-3">
             <span className="text-3xl font-bold text-primary w-10">{sleep}</span>
@@ -114,7 +114,7 @@ export default function Checkin() {
         {/* Q3 Soreness */}
         <div data-testid="question-soreness">
           <label className="text-sm font-semibold text-foreground block mb-3">
-            Q3 — Muscle soreness going into sessions
+            Q3 - Muscle soreness going into sessions
           </label>
           <div className="flex gap-2">
             {["Low", "Moderate", "High"].map((s) => (
@@ -137,7 +137,7 @@ export default function Checkin() {
         {/* Q4 Completion */}
         <div data-testid="question-completion">
           <label className="text-sm font-semibold text-foreground block mb-3">
-            Q4 — Did you complete all sessions?
+            Q4 - Did you complete all sessions?
           </label>
           <div className="flex gap-2">
             {["Yes", "Mostly", "No"].map((c) => (
@@ -160,12 +160,12 @@ export default function Checkin() {
         {/* Q5 Notes */}
         <div data-testid="question-notes">
           <label className="text-sm font-semibold text-foreground block mb-3">
-            Q5 — Any notes for your AI coach?
+            Q5 - Any notes for your AI coach?
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional — mention anything that affected your training..."
+            placeholder="Optional - mention anything that affected your training..."
             rows={3}
             className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
             data-testid="input-checkin-notes"

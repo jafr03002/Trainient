@@ -1,4 +1,4 @@
-// Shared by /programs/generate and /checkins — the "server-computed" half of
+// Shared by /programs/generate and /checkins - the "server-computed" half of
 // the program monitoring parameters (the rest come from Claude's structured
 // output, see programSchema.ts). Kept out of the AI's hands because they're
 // either a trivial deterministic mapping or arithmetic Claude doesn't need to

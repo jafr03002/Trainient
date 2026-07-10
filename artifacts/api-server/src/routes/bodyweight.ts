@@ -35,7 +35,7 @@ router.post("/bodyweight", requireAuth, async (req, res) => {
     })
     .returning();
 
-  // Keeps user_profiles.weight — the field program generation reads — in
+  // Keeps user_profiles.weight - the field program generation reads - in
   // sync with the latest log, so AI mode always reasons from current weight.
   if (profile) {
     await db.update(userProfilesTable).set({ weight, weightUnit }).where(eq(userProfilesTable.userId, userId));

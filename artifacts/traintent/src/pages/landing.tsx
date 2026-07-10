@@ -62,7 +62,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">Independent</h3>
                 <p className="text-white/60 leading-relaxed">
-                  You're in control. Build your own program, log your sessions, and track progression yourself — no AI involved.
+                  You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved.
                 </p>
               </div>
             </div>
@@ -79,7 +79,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">Structured Programs</h3>
                 <p className="text-white/60 leading-relaxed">
-                  AI-generated or hand-built — every program is structured around your goals and schedule.
+                  AI-generated or hand-built - every program is structured around your goals and schedule.
                 </p>
               </div>
               <div className="p-8 rounded-2xl bg-card border border-white/5 flex flex-col items-start">

@@ -10,7 +10,7 @@ export const programsTable = pgTable("programs", {
   splitType: text("split_type").notNull(),
   programHighlights: jsonb("program_highlights").notNull().default([]),
   days: jsonb("days").notNull().default([]),
-  // AI-generated program monitoring — nullable since manual/Independent-mode
+  // AI-generated program monitoring - nullable since manual/Independent-mode
   // programs (no AI involved) and pre-existing rows never populate these.
   longTermPhase: text("long_term_phase"),
   shortTermPhase: text("short_term_phase"),
