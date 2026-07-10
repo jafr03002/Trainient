@@ -40,9 +40,12 @@ router.post("/workouts", requireAuth, async (req, res) => {
   // value - it may be stale (e.g. a page left open across a week boundary).
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
   const weekNumber = trainingWeekNumber(profile?.onboardingCompletedAt);
+  // Mode is stamped from the profile at logging time, not the client, so a
+  // session's recorded mode reflects what the user was actually in.
+  const mode = profile?.mode ?? "ai";
   const [log] = await db
     .insert(workoutLogsTable)
-    .values({ userId, ...parsed.data, weekNumber })
+    .values({ userId, ...parsed.data, weekNumber, mode })
     .returning();
   res.status(201).json(serializeLog(log));
 });

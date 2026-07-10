@@ -298,6 +298,17 @@ export interface LoggedExercise {
   sets: LoggedSet[];
 }
 
+/**
+ * Training mode the user was in when this session was logged
+ */
+export type WorkoutLogMode = typeof WorkoutLogMode[keyof typeof WorkoutLogMode];
+
+
+export const WorkoutLogMode = {
+  ai: 'ai',
+  independent: 'independent',
+} as const;
+
 export interface WorkoutLog {
   id: number;
   userId: string;
@@ -306,6 +317,8 @@ export interface WorkoutLog {
   weekNumber: number;
   /** @nullable */
   dayLabel?: string | null;
+  /** Training mode the user was in when this session was logged */
+  mode: WorkoutLogMode;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;

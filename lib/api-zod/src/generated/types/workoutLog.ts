@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LoggedExercise } from './loggedExercise';
+import type { WorkoutLogMode } from './workoutLogMode';
 
 export interface WorkoutLog {
   id: number;
@@ -15,6 +16,8 @@ export interface WorkoutLog {
   weekNumber: number;
   /** @nullable */
   dayLabel?: string | null;
+  /** Training mode the user was in when this session was logged */
+  mode: WorkoutLogMode;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
