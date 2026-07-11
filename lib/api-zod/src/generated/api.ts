@@ -135,7 +135,7 @@ export const GetCurrentProgramResponse = zod.object({
 })),
   "generatedAt": zod.string(),
   "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
-  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
   "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
   "trainingWorkload": zod.object({
   "daysTrained": zod.number().optional(),
@@ -184,7 +184,7 @@ export const ListProgramsResponseItem = zod.object({
 })),
   "generatedAt": zod.string(),
   "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
-  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
   "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
   "trainingWorkload": zod.object({
   "daysTrained": zod.number().optional(),
@@ -291,7 +291,7 @@ export const UpdateProgramResponse = zod.object({
 })),
   "generatedAt": zod.string(),
   "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
-  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
   "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
   "trainingWorkload": zod.object({
   "daysTrained": zod.number().optional(),

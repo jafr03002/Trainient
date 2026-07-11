@@ -13,6 +13,8 @@ import {
   getGetProfileQueryKey,
   getGetSubscriptionQueryKey,
   getGetCalendarColorsQueryKey,
+  getGetCurrentProgramQueryKey,
+  getGetWorkoutStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -78,6 +80,11 @@ export default function Settings() {
     if (!pendingMode) return;
     await updateProfile.mutateAsync({ data: { mode: pendingMode } });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
+    // "Current program" and week-number stats are mode-scoped server-side,
+    // so a mode switch must force both to refetch - otherwise dashboard.tsx
+    // and program.tsx can keep serving stale data from the other mode.
+    queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetWorkoutStatsQueryKey() });
     setShowModeConfirm(false);
     setPendingMode(null);
   }

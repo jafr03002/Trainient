@@ -5,6 +5,7 @@ import type { Program } from "@workspace/api-client-react";
 import { MuscleVolumeChart } from "@/components/onboarding/MuscleVolumeChart";
 import { ProgramHighlights } from "@/components/onboarding/ProgramHighlights";
 import { SatisfactionGate, type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
+import { formatSplitType } from "@/lib/utils";
 
 type ProgramDay = Program["days"][number];
 
@@ -213,6 +214,7 @@ export function PresentationDeck({
                       .split(/[\/,]/)
                       .map((part) => part.trim())
                       .filter(Boolean)
+                      .map((part) => formatSplitType(part))
                       .map((part, i) => (
                         <span key={i} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                           {part}
