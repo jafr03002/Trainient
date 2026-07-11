@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, MapPin, Target } from "lucide-react";
 import { useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { CalibrationReviewStep } from "@/components/calibration/CalibrationReviewStep";
+
+// Source copy: docs/mammanotes.txt, "Calibration step 1" - tightened here, same
+// icon-card treatment as ProgramHighlights.tsx for visual consistency with the
+// rest of the deck.
+const INTRO_FOCUS_ITEMS = [
+  { icon: Dumbbell, title: "Try the program", detail: "Run through your sessions and get a feel for the plan." },
+  { icon: MapPin, title: "Learn your gym", detail: "Find where every exercise lives and get comfortable with the equipment." },
+  { icon: Target, title: "Standardize your form", detail: "Settle into consistent technique you can build on." },
+] as const;
 
 // Shown once, full-screen, the first time a client is living in an active
 // calibration window (see lib/calibration.ts's shouldShowCalibrationWalkthrough).
@@ -48,12 +57,31 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
             <>
               <div className="text-xs font-semibold tracking-wider uppercase text-primary">Calibration</div>
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-1">You're in calibration</h2>
+                <h2 className="text-2xl font-bold text-foreground mb-1">Welcome to calibration</h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  This first stretch is where we learn how your body responds to training, before
-                  the real program locks in.
+                  This is your smooth on-ramp into training. Over this first phase you'll try the
+                  program, get to know your gym, and lock in solid form on each exercise.
                 </p>
               </div>
+
+              <div className="space-y-2.5">
+                {INTRO_FOCUS_ITEMS.map((item) => (
+                  <div key={item.title} className="p-4 rounded-xl bg-primary/5 border border-primary/15">
+                    <div className="flex items-start gap-2.5">
+                      <item.icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+                        <p className="text-sm text-muted-foreground mt-0.5">{item.detail}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Everything you notice feeds back to your AI coach, who fine-tunes your program
+                before you move toward your goal.
+              </p>
             </>
           )}
 
