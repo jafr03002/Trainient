@@ -39,6 +39,7 @@ export * from './programFeedbackCategoriesItem';
 export * from './programHighlight';
 export * from './programLongTermPhase';
 export * from './programShortTermPhase';
+export * from './programStartDateUpdate';
 export * from './programTrainingWorkload';
 export * from './strengthPoint';
 export * from './subscription';

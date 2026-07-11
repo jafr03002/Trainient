@@ -13,6 +13,7 @@ import {
   useGetProfile,
   useGetTodaysBodyweight,
   useLogBodyweight,
+  useListPrograms,
   getGetTodaysBodyweightQueryKey,
   getGetBodyweightProgressQueryKey,
   getGetProfileQueryKey,
@@ -24,6 +25,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { phaseSolid } from "@/lib/phaseColors";
+import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough } from "@/lib/calibration";
+import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 
 // Local calendar date, not UTC - so logging just after midnight lands on the
 // day the user actually sees, not a day that already rolled over server-side.
@@ -73,6 +77,7 @@ export default function Dashboard() {
   const recentWorkouts = useGetRecentWorkouts();
   const personalRecords = useGetPersonalRecords();
   const profileQuery = useGetProfile();
+  const programsQuery = useListPrograms();
 
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
@@ -99,6 +104,18 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: getGetBodyweightProgressQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     setBodyweightDialogOpen(false);
+  }
+
+  // One-time, full-screen: shows in place of the dashboard the first time a
+  // client is living in an active calibration window (see lib/calibration.ts).
+  if (
+    profile &&
+    !isIndependent &&
+    shouldShowCalibrationWalkthrough(programsQuery.data ?? [], profile.onboardingCompletedAt, profile.calibrationWalkthroughSeenAt, new Date())
+  ) {
+    const groups = buildCalibrationGroups(buildPhaseRanges(programsQuery.data ?? [], profile.onboardingCompletedAt));
+    const activeGroup = findCalibrationGroup(groups, new Date())!;
+    return <CalibrationWalkthrough calibrationStart={activeGroup.start} />;
   }
 
   const showCheckinBanner = (() => {
@@ -194,8 +211,16 @@ export default function Dashboard() {
         >
           <div>
             <div className="text-xs text-muted-foreground uppercase tracking-wider">Current phase</div>
-            <div className="text-lg font-bold text-foreground capitalize">
-              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "-"}
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {program.data.shortTermPhase && (
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: phaseSolid(program.data.shortTermPhase) }}
+                />
+              )}
+              <span className="text-lg font-bold text-foreground capitalize">
+                {program.data.shortTermPhase?.replace(/_/g, " ") ?? "-"}
+              </span>
             </div>
           </div>
           <div className="text-right">

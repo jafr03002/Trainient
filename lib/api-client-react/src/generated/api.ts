@@ -41,6 +41,7 @@ import type {
   PersonalRecord,
   PortalSession,
   Program,
+  ProgramStartDateUpdate,
   StrengthPoint,
   Subscription,
   UserProfile,
@@ -725,6 +726,78 @@ export const useUpdateProgram = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateProgramMutationOptions(options));
+    }
+
+export const getSetProgramStartDateUrl = (id: number,) => {
+
+
+
+
+  return `/api/programs/${id}`
+}
+
+/**
+ * @summary Set the user-chosen start date for a program (AI or manual)
+ */
+export const setProgramStartDate = async (id: number,
+    programStartDateUpdate: ProgramStartDateUpdate, options?: RequestInit): Promise<Program> => {
+
+  return customFetch<Program>(getSetProgramStartDateUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      programStartDateUpdate,)
+  }
+);}
+
+
+
+
+export const getSetProgramStartDateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProgramStartDate>>, TError,{id: number;data: BodyType<ProgramStartDateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setProgramStartDate>>, TError,{id: number;data: BodyType<ProgramStartDateUpdate>}, TContext> => {
+
+const mutationKey = ['setProgramStartDate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setProgramStartDate>>, {id: number;data: BodyType<ProgramStartDateUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setProgramStartDate(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetProgramStartDateMutationResult = NonNullable<Awaited<ReturnType<typeof setProgramStartDate>>>
+    export type SetProgramStartDateMutationBody = BodyType<ProgramStartDateUpdate>
+    export type SetProgramStartDateMutationError = ErrorType<void>
+
+    /**
+ * @summary Set the user-chosen start date for a program (AI or manual)
+ */
+export const useSetProgramStartDate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProgramStartDate>>, TError,{id: number;data: BodyType<ProgramStartDateUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setProgramStartDate>>,
+        TError,
+        {id: number;data: BodyType<ProgramStartDateUpdate>},
+        TContext
+      > => {
+      return useMutation(getSetProgramStartDateMutationOptions(options));
     }
 
 export const getListWorkoutsUrl = (params?: ListWorkoutsParams,) => {

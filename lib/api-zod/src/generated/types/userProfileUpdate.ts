@@ -20,4 +20,6 @@ export interface UserProfileUpdate {
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileUpdateInjurySeverity;
+  /** @nullable */
+  calibrationWalkthroughSeenAt?: string | null;
 }

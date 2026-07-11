@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { formatSplitType } from "@/lib/utils";
+import { phaseSolid } from "@/lib/phaseColors";
 
 type Exercise = {
   name: string;
@@ -802,7 +803,11 @@ export default function Program() {
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program monitoring</h2>
             <div className="flex flex-wrap gap-2">
               {program.shortTermPhase && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary border border-border font-medium capitalize">
+                <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border font-medium capitalize">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ background: phaseSolid(program.shortTermPhase) }}
+                  />
                   {program.shortTermPhase.replace(/_/g, " ")}
                 </span>
               )}

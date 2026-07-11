@@ -51,6 +51,8 @@ export interface UserProfile {
   onboardingComplete: boolean;
   /** @nullable */
   onboardingCompletedAt?: string | null;
+  /** @nullable */
+  calibrationWalkthroughSeenAt?: string | null;
   createdAt: string;
 }
 
@@ -118,6 +120,8 @@ export interface UserProfileUpdate {
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileUpdateInjurySeverity;
+  /** @nullable */
+  calibrationWalkthroughSeenAt?: string | null;
 }
 
 export interface Exercise {
@@ -245,6 +249,12 @@ export interface Program {
   dailyStepTarget?: ProgramDailyStepTarget;
   /** @nullable */
   cardioIntensity?: ProgramCardioIntensity;
+  /** @nullable */
+  startDate?: string | null;
+}
+
+export interface ProgramStartDateUpdate {
+  startDate: string;
 }
 
 export interface ManualProgramInput {

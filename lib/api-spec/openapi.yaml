@@ -176,6 +176,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/Program"
 
+  /programs/{id}:
+    patch:
+      operationId: setProgramStartDate
+      tags: [programs]
+      summary: Set the user-chosen start date for a program (AI or manual)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramStartDateUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Program"
+        "404":
+          description: Program not found
+
   # ── Workouts ─────────────────────────────────────────────────────────────────
   /workouts:
     get:
@@ -597,6 +624,7 @@ components:
         priorityMuscles:        { type: array, items: { type: string } }
         onboardingComplete:     { type: boolean }
         onboardingCompletedAt:  { type: ["string", "null"] }
+        calibrationWalkthroughSeenAt: { type: ["string", "null"] }
         createdAt:              { type: string }
 
     UserProfileInput:
@@ -630,6 +658,7 @@ components:
         weightUnit:     { type: ["string", "null"] }
         injuries:       { type: ["string", "null"] }
         injurySeverity: { type: ["string", "null"], enum: [low, medium, high, null] }
+        calibrationWalkthroughSeenAt: { type: ["string", "null"] }
 
     # ── Programs ───────────────────────────────────────────────────────────────
     Exercise:
@@ -701,6 +730,13 @@ components:
             bpmMin: { type: integer }
             bpmMax: { type: integer }
             level:  { type: string, enum: [low, moderate, high] }
+        startDate:           { type: ["string", "null"] }
+
+    ProgramStartDateUpdate:
+      type: object
+      required: [startDate]
+      properties:
+        startDate: { type: string, format: date }
 
     ManualProgramInput:
       type: object

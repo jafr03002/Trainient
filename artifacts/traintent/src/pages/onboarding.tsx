@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
+import { isSameDay, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile, useGenerateProgram, useGetProfile, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
+import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
+import { CommitmentScreen } from "@/components/onboarding/CommitmentScreen";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 import { toast } from "@/hooks/use-toast";
 
@@ -124,7 +126,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [showGoalWeight, setShowGoalWeight] = useState(false);
-  const [phase, setPhase] = useState<"form" | "generating" | "presentation">("form");
+  const [phase, setPhase] = useState<"form" | "generating" | "presentation" | "commitment">("form");
   const [program, setProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
   // Tracks which review-step button was clicked so only that one shows a
@@ -134,7 +136,22 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
+  const setProgramStartDate = useSetProgramStartDate();
   const profileQuery = useGetProfile();
+
+  // Testing-only shortcut: /onboarding?step=commitment jumps straight to the
+  // commitment screen using whatever program already exists, skipping the
+  // form/generation/presentation steps. Not a real product flow.
+  const debugStep = new URLSearchParams(useSearch()).get("step");
+  const debugProgramQuery = useGetCurrentProgram({
+    query: { enabled: debugStep === "commitment", queryKey: getGetCurrentProgramQueryKey() },
+  });
+  useEffect(() => {
+    if (debugStep === "commitment" && debugProgramQuery.data) {
+      setProgram(debugProgramQuery.data);
+      setPhase("commitment");
+    }
+  }, [debugStep, debugProgramQuery.data]);
 
   // A profile that's in AI mode but missing goal/experience means AI
   // coaching was never set up - either the user onboarded through
@@ -278,6 +295,24 @@ export default function Onboarding() {
     }
   }
 
+  async function handleCommit(startDate: Date) {
+    if (!program) return;
+    try {
+      await setProgramStartDate.mutateAsync({
+        id: program.id,
+        data: { startDate: startDate.toISOString() },
+      });
+    } catch {
+      toast({
+        title: "Couldn't save your start date",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLocation(isSameDay(startDate, startOfToday()) ? "/calibration" : "/dashboard");
+  }
+
   async function handleRegenerateFeedback(feedback: ProgramFeedback) {
     setPhase("generating");
     setRegenerateCount((c) => c + 1);
@@ -319,12 +354,22 @@ export default function Onboarding() {
             program={program}
             goal={form.goal}
             weightUnit={form.weightUnit}
-            onSatisfied={() => setLocation("/dashboard")}
+            onSatisfied={() => setPhase("commitment")}
             onSubmitFeedback={handleRegenerateFeedback}
             isSubmitting={generateProgram.isPending}
             showRegenerateNudge={regenerateCount >= 3}
             error={generateProgram.isError}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "commitment" && program) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center px-4 py-12">
+          <CommitmentScreen program={program} onConfirm={handleCommit} />
         </div>
       </div>
     );

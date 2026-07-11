@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, userProfilesTable, programsTable } from "@workspace/db";
+import { SetProgramStartDateBody } from "@workspace/api-zod";
 import { requireAuth, getUserId } from "../lib/auth";
 import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
@@ -108,6 +109,33 @@ router.put("/programs/:id", requireAuth, async (req, res) => {
     .update(programsTable)
     .set({ programName, splitType, days })
     .where(and(eq(programsTable.id, id), eq(programsTable.userId, userId), eq(programsTable.aiGenerated, false)))
+    .returning();
+
+  if (!program) {
+    res.status(404).json({ error: "Program not found" });
+    return;
+  }
+
+  const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
+  res.json(serializeProgram(program, profile?.onboardingCompletedAt));
+});
+
+// Sets when the user wants to begin training - called from the
+// post-presentation commitment screen. Not restricted to manual programs
+// (unlike the PUT above) since this only ever runs against AI-generated ones.
+router.patch("/programs/:id", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const id = parseInt(String(req.params["id"] ?? "0"));
+  const parsed = SetProgramStartDateBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [program] = await db
+    .update(programsTable)
+    .set({ startDate: parsed.data.startDate.toISOString().slice(0, 10) })
+    .where(and(eq(programsTable.id, id), eq(programsTable.userId, userId)))
     .returning();
 
   if (!program) {
