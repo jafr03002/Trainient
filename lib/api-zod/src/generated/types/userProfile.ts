@@ -37,5 +37,7 @@ export interface UserProfile {
   onboardingComplete: boolean;
   /** @nullable */
   onboardingCompletedAt?: string | null;
+  /** @nullable */
+  calibrationWalkthroughSeenAt?: string | null;
   createdAt: string;
 }

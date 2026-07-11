@@ -40,4 +40,6 @@ export interface Program {
   dailyStepTarget?: ProgramDailyStepTarget;
   /** @nullable */
   cardioIntensity?: ProgramCardioIntensity;
+  /** @nullable */
+  startDate?: string | null;
 }

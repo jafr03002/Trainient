@@ -20,6 +20,9 @@ export const programsTable = pgTable("programs", {
   shortTermGoalWeight: real("short_term_goal_weight"),
   dailyStepTarget: text("daily_step_target"),
   cardioIntensity: jsonb("cardio_intensity"),
+  // User-chosen day (YYYY-MM-DD) to begin training, set via the
+  // post-presentation commitment screen. Null until they've confirmed one.
+  startDate: text("start_date"),
   // Server-internal phase-template bookkeeping (see lib/phaseTemplate.ts) -
   // which hard-template segment the client is in and how many weeks they've
   // been there. Never returned to clients (stripped in serializeProgram).

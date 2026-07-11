@@ -39,6 +39,7 @@ export const GetProfileResponse = zod.object({
   "priorityMuscles": zod.array(zod.string()),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
+  "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -76,7 +77,8 @@ export const UpdateProfileBody = zod.object({
   "weight": zod.number().nullish(),
   "weightUnit": zod.string().nullish(),
   "injuries": zod.string().nullish(),
-  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish()
+  "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "calibrationWalkthroughSeenAt": zod.string().nullish()
 })
 
 export const UpdateProfileResponse = zod.object({
@@ -99,6 +101,7 @@ export const UpdateProfileResponse = zod.object({
   "priorityMuscles": zod.array(zod.string()),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
+  "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -148,7 +151,8 @@ export const GetCurrentProgramResponse = zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
-}).nullish()
+}).nullish(),
+  "startDate": zod.string().nullish()
 })
 
 
@@ -197,7 +201,8 @@ export const ListProgramsResponseItem = zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
-}).nullish()
+}).nullish(),
+  "startDate": zod.string().nullish()
 })
 export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
 
@@ -304,7 +309,66 @@ export const UpdateProgramResponse = zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
-}).nullish()
+}).nullish(),
+  "startDate": zod.string().nullish()
+})
+
+
+/**
+ * @summary Set the user-chosen start date for a program (AI or manual)
+ */
+export const SetProgramStartDateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetProgramStartDateBody = zod.object({
+  "startDate": zod.coerce.date()
+})
+
+export const SetProgramStartDateResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "weekNumber": zod.number(),
+  "programName": zod.string(),
+  "splitType": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
+  "aiGenerated": zod.boolean(),
+  "days": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string(),
+  "focus": zod.string(),
+  "exercises": zod.array(zod.object({
+  "name": zod.string(),
+  "sets": zod.number(),
+  "reps": zod.string(),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional()
+}))
+})),
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish(),
+  "startDate": zod.string().nullish()
 })
 
 

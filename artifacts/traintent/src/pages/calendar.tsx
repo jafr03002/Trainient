@@ -17,6 +17,15 @@ import {
   getGetMuscleVolumeBreakdownQueryKey,
   getGetWorkoutsByDayLabelQueryKey,
 } from "@workspace/api-client-react";
+import { phaseSolid, phaseSoft, phaseLabel } from "@/lib/phaseColors";
+import {
+  buildPhaseRanges,
+  buildCalibrationGroups,
+  findPhaseRange,
+  findCalibrationGroup,
+  isReviewPossible,
+  CALIBRATION_FAMILY,
+} from "@/lib/calibration";
 
 const DEFAULT_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -27,107 +36,6 @@ function getColor(label: string, colorMap: Record<string, string>, allLabels: st
   if (colorMap[label]) return colorMap[label];
   const idx = allLabels.indexOf(label);
   return DEFAULT_COLORS[idx % DEFAULT_COLORS.length] ?? "#3b82f6";
-}
-
-// One fixed hue per short-term phase (ProgramShortTermPhase), mirroring the
-// rotating-hue accent pattern used for program days in program.tsx.
-const PHASE_HUES: Record<string, { h: number; s: number; l: number }> = {
-  calibration: { h: 199, s: 89, l: 48 },
-  calibration_review: { h: 210, s: 70, l: 60 },
-  bulk: { h: 142, s: 71, l: 45 },
-  maintenance: { h: 38, s: 92, l: 50 },
-  reverse_diet: { h: 160, s: 84, l: 39 },
-  diet: { h: 350, s: 75, l: 55 },
-  mini_cut: { h: 24, s: 90, l: 55 },
-  deload: { h: 217, s: 91, l: 60 },
-};
-
-function phaseSolid(phase: string): string {
-  const c = PHASE_HUES[phase];
-  return c ? `hsl(${c.h}, ${c.s}%, ${c.l}%)` : "#6b7280";
-}
-
-function phaseSoft(phase: string): string {
-  const c = PHASE_HUES[phase];
-  return c ? `hsla(${c.h}, ${c.s}%, ${c.l}%, 0.16)` : "rgba(107, 114, 128, 0.16)";
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-type PhaseRange = { phase: string; start: Date; end: Date };
-
-// Program rows only carry a week number and a phase enum value - no dates.
-// A week's real calendar range is onboardingCompletedAt + (weekNumber-1)*7
-// through +6 days (mirrors trainingWeekNumber() on the API). Adjacent weeks
-// sharing the same phase are merged into one continuous range.
-function buildPhaseRanges(
-  programs: { weekNumber: number; shortTermPhase?: string | null }[],
-  onboardingCompletedAt: string | null | undefined
-): PhaseRange[] {
-  if (!onboardingCompletedAt) return [];
-  // Calendar day cells are midnight-aligned local dates, but onboardingCompletedAt
-  // carries a time-of-day - normalize to that calendar date so week boundaries
-  // land on whole days instead of splitting a day between two phases.
-  const base = new Date(onboardingCompletedAt);
-  base.setHours(0, 0, 0, 0);
-
-  const weeks = programs
-    .filter((p): p is { weekNumber: number; shortTermPhase: string } => !!p.shortTermPhase)
-    .map((p) => {
-      const start = addDays(base, (p.weekNumber - 1) * 7);
-      return { phase: p.shortTermPhase, start, end: addDays(start, 6) };
-    })
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-  const ranges: PhaseRange[] = [];
-  for (const w of weeks) {
-    const last = ranges[ranges.length - 1];
-    if (last && last.phase === w.phase && addDays(last.end, 1).getTime() === w.start.getTime()) {
-      last.end = w.end;
-    } else {
-      ranges.push({ ...w });
-    }
-  }
-  return ranges;
-}
-
-function findPhaseRange(ranges: PhaseRange[], date: Date): PhaseRange | undefined {
-  const t = date.getTime();
-  return ranges.find((r) => t >= r.start.getTime() && t <= r.end.getTime());
-}
-
-// calibration can run 1-3 weeks before a calibration_review week hands off to
-// whatever phase comes next. While "today" falls anywhere in that stretch,
-// other (still-provisional) future phases stay hidden from the calendar, and
-// a persistent "review possible" nudge appears from day 8 onward.
-const CALIBRATION_FAMILY = new Set(["calibration", "calibration_review"]);
-
-type CalibrationGroup = { start: Date; end: Date };
-
-function buildCalibrationGroups(ranges: PhaseRange[]): CalibrationGroup[] {
-  const family = ranges
-    .filter((r) => CALIBRATION_FAMILY.has(r.phase))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
-
-  const groups: CalibrationGroup[] = [];
-  for (const r of family) {
-    const last = groups[groups.length - 1];
-    if (last && addDays(last.end, 1).getTime() === r.start.getTime()) {
-      last.end = r.end;
-    } else {
-      groups.push({ start: r.start, end: r.end });
-    }
-  }
-  return groups;
-}
-
-function findCalibrationGroup(groups: CalibrationGroup[], date: Date): CalibrationGroup | undefined {
-  const t = date.getTime();
-  return groups.find((g) => t >= g.start.getTime() && t <= g.end.getTime());
 }
 
 type WorkoutLog = {
@@ -383,9 +291,70 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
   );
 }
 
+type DayAgendaProps = {
+  date: string;
+  sessions: WorkoutLog[];
+  colorFor: (label: string) => string;
+  onSelect: (session: WorkoutLog) => void;
+  onClose: () => void;
+};
+
+// Mobile-only bottom sheet: tapping a cramped day's dot row opens this to show
+// every session's full label, instead of trying to fit them as text in-cell.
+function DayAgendaSheet({ date, sessions, colorFor, onSelect, onClose }: DayAgendaProps) {
+  const dateLabel = new Date(date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[55] flex items-end justify-center md:hidden">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ duration: 0.22 }}
+          className="relative z-10 w-full max-w-lg bg-card border border-border rounded-t-2xl overflow-hidden"
+        >
+          <div className="pt-2.5 pb-1 flex justify-center shrink-0">
+            <div className="w-10 h-1.5 rounded-full bg-border" />
+          </div>
+          <div className="px-5 pb-4 pt-1">
+            <span className="font-bold text-foreground text-base">{dateLabel}</span>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {sessions.length} session{sessions.length === 1 ? "" : "s"} - tap one to open
+            </p>
+          </div>
+          <div className="px-5 pb-6 space-y-2">
+            {sessions.map((session) => {
+              const label = session.dayLabel ?? "Workout";
+              const color = colorFor(label);
+              return (
+                <button
+                  key={session.id}
+                  onClick={() => onSelect(session)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/60 bg-secondary/20 text-left hover:bg-secondary/40 transition-colors"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="font-medium text-foreground">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
+
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedSession, setSelectedSession] = useState<WorkoutLog | null>(null);
+  const [dayAgenda, setDayAgenda] = useState<{ date: string; sessions: WorkoutLog[] } | null>(null);
   const workoutsQuery = useListWorkouts({ limit: 200 });
   const colorsQuery = useGetCalendarColors();
   const programsQuery = useListPrograms();
@@ -423,6 +392,18 @@ export default function Calendar() {
   const monthName = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
   const today = new Date().toISOString().split("T")[0];
+
+  // Phases actually shown this month, post calibration-suppression - drives the
+  // mobile-only color legend since in-cell phase labels are dot-only there.
+  const visiblePhases = new Set<string>();
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - startPadding + 1;
+    if (dayNum < 1 || dayNum > lastDay.getDate()) continue;
+    const raw = findPhaseRange(phaseRanges, new Date(year, month, dayNum));
+    if (!raw) continue;
+    if (activeCalibrationGroup && !CALIBRATION_FAMILY.has(raw.phase)) continue;
+    visiblePhases.add(raw.phase);
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -479,11 +460,7 @@ export default function Calendar() {
           const phaseRange = suppressed ? undefined : rawPhaseRange;
           const showPhaseChip = !!phaseRange && (dayNum === 1 || phaseRange.start.getTime() === cellDate!.getTime());
           const showReviewNudge =
-            !!cellDate &&
-            !!activeCalibrationGroup &&
-            cellDate.getTime() >= activeCalibrationGroup.start.getTime() &&
-            cellDate.getTime() <= activeCalibrationGroup.end.getTime() &&
-            cellDate.getTime() >= addDays(activeCalibrationGroup.start, 7).getTime();
+            !!cellDate && !!activeCalibrationGroup && isReviewPossible(activeCalibrationGroup, cellDate);
 
           return (
             <div
@@ -500,18 +477,26 @@ export default function Calendar() {
               {isCurrentMonth && (
                 <>
                   {showPhaseChip && phaseRange && (
-                    <div className="flex items-center gap-1 mb-1 min-w-0">
+                    <>
+                      {/* Desktop/tablet: dot + full phase name */}
+                      <div className="hidden md:flex items-center gap-1 mb-1 min-w-0">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: phaseSolid(phaseRange.phase) }}
+                        />
+                        <span
+                          className="text-[9px] font-bold uppercase tracking-wide truncate capitalize"
+                          style={{ color: phaseSolid(phaseRange.phase) }}
+                        >
+                          {phaseLabel(phaseRange.phase)} phase
+                        </span>
+                      </div>
+                      {/* Mobile: dot only - name isn't legible in a ~40px cell, see legend below */}
                       <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        className="md:hidden block w-1.5 h-1.5 rounded-full mb-1"
                         style={{ background: phaseSolid(phaseRange.phase) }}
                       />
-                      <span
-                        className="text-[9px] font-bold uppercase tracking-wide truncate capitalize"
-                        style={{ color: phaseSolid(phaseRange.phase) }}
-                      >
-                        {phaseRange.phase.replace(/_/g, " ")} phase
-                      </span>
-                    </div>
+                    </>
                   )}
                   <div className={`text-xs font-medium mb-1 flex items-center gap-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                     {dayNum}
@@ -519,7 +504,8 @@ export default function Calendar() {
                       <MessageSquare className="w-2.5 h-2.5 text-muted-foreground/60" />
                     )}
                   </div>
-                  <div className="space-y-0.5">
+                  {/* Desktop/tablet: full pills, one session per row */}
+                  <div className="hidden md:block space-y-0.5">
                     {sessions.map((session) => {
                       const label = session.dayLabel ?? "Workout";
                       const color = getColor(label, colorMap, allLabels);
@@ -539,6 +525,24 @@ export default function Calendar() {
                       );
                     })}
                   </div>
+                  {/* Mobile: dots (capped, +N overflow) - tap opens the day's full agenda */}
+                  {sessions.length > 0 && (
+                    <button
+                      onClick={() => setDayAgenda({ date: dateStr, sessions })}
+                      className="md:hidden flex flex-wrap items-center gap-1"
+                    >
+                      {sessions.slice(0, 4).map((session) => (
+                        <span
+                          key={session.id}
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ background: getColor(session.dayLabel ?? "Workout", colorMap, allLabels) }}
+                        />
+                      ))}
+                      {sessions.length > 4 && (
+                        <span className="text-[8px] font-bold text-muted-foreground">+{sessions.length - 4}</span>
+                      )}
+                    </button>
+                  )}
                   {showReviewNudge && (
                     <div className="mt-1 px-1 py-0.5 rounded text-[8px] font-semibold leading-tight text-amber-300 bg-amber-500/10 border border-amber-500/25">
                       Calibration review possible
@@ -561,6 +565,32 @@ export default function Calendar() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Phase legend - mobile only, since in-cell phase labels are dot-only there */}
+      {visiblePhases.size > 0 && (
+        <div className="md:hidden flex flex-wrap gap-3 -mt-2">
+          {[...visiblePhases].map((phase) => (
+            <div key={phase} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: phaseSolid(phase) }} />
+              <span className="capitalize">{phaseLabel(phase)} phase</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Day agenda sheet (mobile) */}
+      {dayAgenda && (
+        <DayAgendaSheet
+          date={dayAgenda.date}
+          sessions={dayAgenda.sessions}
+          colorFor={(label) => getColor(label, colorMap, allLabels)}
+          onSelect={(session) => {
+            setSelectedSession(session);
+            setDayAgenda(null);
+          }}
+          onClose={() => setDayAgenda(null)}
+        />
       )}
 
       {/* Session modal */}

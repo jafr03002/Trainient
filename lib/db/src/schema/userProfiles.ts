@@ -22,6 +22,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   priorityMuscles: text("priority_muscles").array().notNull().default([]),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   onboardingCompletedAt: timestamp("onboarding_completed_at"),
+  calibrationWalkthroughSeenAt: timestamp("calibration_walkthrough_seen_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
