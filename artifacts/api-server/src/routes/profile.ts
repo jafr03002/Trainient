@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, userProfilesTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import {
@@ -81,7 +81,10 @@ router.post("/profile", requireAuth, async (req, res) => {
         injurySeverity: data.injurySeverity ?? null,
         priorityMuscles: data.priorityMuscles ?? [],
         onboardingComplete: true,
-        onboardingCompletedAt: now,
+        // Re-onboarding (e.g. switching mode back to AI) must not reset the
+        // clock the app's "Week N" displays are computed from - only stamp
+        // this the first time a profile is ever completed.
+        onboardingCompletedAt: sql`COALESCE(${userProfilesTable.onboardingCompletedAt}, ${now})`,
       },
     })
     .returning();

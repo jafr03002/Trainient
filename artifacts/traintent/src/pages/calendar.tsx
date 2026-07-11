@@ -6,6 +6,8 @@ import {
   useListWorkouts,
   useGetCalendarColors,
   useDeleteWorkout,
+  useListPrograms,
+  useGetProfile,
   getListWorkoutsQueryKey,
   getGetRecentWorkoutsQueryKey,
   getGetWorkoutStatsQueryKey,
@@ -25,6 +27,107 @@ function getColor(label: string, colorMap: Record<string, string>, allLabels: st
   if (colorMap[label]) return colorMap[label];
   const idx = allLabels.indexOf(label);
   return DEFAULT_COLORS[idx % DEFAULT_COLORS.length] ?? "#3b82f6";
+}
+
+// One fixed hue per short-term phase (ProgramShortTermPhase), mirroring the
+// rotating-hue accent pattern used for program days in program.tsx.
+const PHASE_HUES: Record<string, { h: number; s: number; l: number }> = {
+  calibration: { h: 199, s: 89, l: 48 },
+  calibration_review: { h: 210, s: 70, l: 60 },
+  bulk: { h: 142, s: 71, l: 45 },
+  maintenance: { h: 38, s: 92, l: 50 },
+  reverse_diet: { h: 160, s: 84, l: 39 },
+  diet: { h: 350, s: 75, l: 55 },
+  mini_cut: { h: 24, s: 90, l: 55 },
+  deload: { h: 217, s: 91, l: 60 },
+};
+
+function phaseSolid(phase: string): string {
+  const c = PHASE_HUES[phase];
+  return c ? `hsl(${c.h}, ${c.s}%, ${c.l}%)` : "#6b7280";
+}
+
+function phaseSoft(phase: string): string {
+  const c = PHASE_HUES[phase];
+  return c ? `hsla(${c.h}, ${c.s}%, ${c.l}%, 0.16)` : "rgba(107, 114, 128, 0.16)";
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+type PhaseRange = { phase: string; start: Date; end: Date };
+
+// Program rows only carry a week number and a phase enum value - no dates.
+// A week's real calendar range is onboardingCompletedAt + (weekNumber-1)*7
+// through +6 days (mirrors trainingWeekNumber() on the API). Adjacent weeks
+// sharing the same phase are merged into one continuous range.
+function buildPhaseRanges(
+  programs: { weekNumber: number; shortTermPhase?: string | null }[],
+  onboardingCompletedAt: string | null | undefined
+): PhaseRange[] {
+  if (!onboardingCompletedAt) return [];
+  // Calendar day cells are midnight-aligned local dates, but onboardingCompletedAt
+  // carries a time-of-day - normalize to that calendar date so week boundaries
+  // land on whole days instead of splitting a day between two phases.
+  const base = new Date(onboardingCompletedAt);
+  base.setHours(0, 0, 0, 0);
+
+  const weeks = programs
+    .filter((p): p is { weekNumber: number; shortTermPhase: string } => !!p.shortTermPhase)
+    .map((p) => {
+      const start = addDays(base, (p.weekNumber - 1) * 7);
+      return { phase: p.shortTermPhase, start, end: addDays(start, 6) };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const ranges: PhaseRange[] = [];
+  for (const w of weeks) {
+    const last = ranges[ranges.length - 1];
+    if (last && last.phase === w.phase && addDays(last.end, 1).getTime() === w.start.getTime()) {
+      last.end = w.end;
+    } else {
+      ranges.push({ ...w });
+    }
+  }
+  return ranges;
+}
+
+function findPhaseRange(ranges: PhaseRange[], date: Date): PhaseRange | undefined {
+  const t = date.getTime();
+  return ranges.find((r) => t >= r.start.getTime() && t <= r.end.getTime());
+}
+
+// calibration can run 1-3 weeks before a calibration_review week hands off to
+// whatever phase comes next. While "today" falls anywhere in that stretch,
+// other (still-provisional) future phases stay hidden from the calendar, and
+// a persistent "review possible" nudge appears from day 8 onward.
+const CALIBRATION_FAMILY = new Set(["calibration", "calibration_review"]);
+
+type CalibrationGroup = { start: Date; end: Date };
+
+function buildCalibrationGroups(ranges: PhaseRange[]): CalibrationGroup[] {
+  const family = ranges
+    .filter((r) => CALIBRATION_FAMILY.has(r.phase))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  const groups: CalibrationGroup[] = [];
+  for (const r of family) {
+    const last = groups[groups.length - 1];
+    if (last && addDays(last.end, 1).getTime() === r.start.getTime()) {
+      last.end = r.end;
+    } else {
+      groups.push({ start: r.start, end: r.end });
+    }
+  }
+  return groups;
+}
+
+function findCalibrationGroup(groups: CalibrationGroup[], date: Date): CalibrationGroup | undefined {
+  const t = date.getTime();
+  return groups.find((g) => t >= g.start.getTime() && t <= g.end.getTime());
 }
 
 type WorkoutLog = {
@@ -285,6 +388,8 @@ export default function Calendar() {
   const [selectedSession, setSelectedSession] = useState<WorkoutLog | null>(null);
   const workoutsQuery = useListWorkouts({ limit: 200 });
   const colorsQuery = useGetCalendarColors();
+  const programsQuery = useListPrograms();
+  const profileQuery = useGetProfile();
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -295,6 +400,11 @@ export default function Calendar() {
   const totalCells = Math.ceil((startPadding + lastDay.getDate()) / 7) * 7;
 
   const workouts = (workoutsQuery.data ?? []) as WorkoutLog[];
+  const phaseRanges = buildPhaseRanges(programsQuery.data ?? [], profileQuery.data?.onboardingCompletedAt);
+  const calibrationGroups = buildCalibrationGroups(phaseRanges);
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  const activeCalibrationGroup = findCalibrationGroup(calibrationGroups, todayMidnight);
 
   const colorMap: Record<string, string> = {};
   (colorsQuery.data ?? []).forEach((c) => { colorMap[c.dayLabel] = c.hexColor; });
@@ -360,6 +470,20 @@ export default function Calendar() {
           const hasNotes = sessions.some((s) =>
             (s.exercisesLogged as any[]).some((ex: any) => ex.notes)
           );
+          const cellDate = isCurrentMonth ? new Date(year, month, dayNum) : null;
+          const rawPhaseRange = cellDate ? findPhaseRange(phaseRanges, cellDate) : undefined;
+          // Other phases stay hidden anywhere on the calendar while today is still
+          // inside a calibration/calibration_review run - they're provisional until
+          // the review actually happens.
+          const suppressed = !!activeCalibrationGroup && !!rawPhaseRange && !CALIBRATION_FAMILY.has(rawPhaseRange.phase);
+          const phaseRange = suppressed ? undefined : rawPhaseRange;
+          const showPhaseChip = !!phaseRange && (dayNum === 1 || phaseRange.start.getTime() === cellDate!.getTime());
+          const showReviewNudge =
+            !!cellDate &&
+            !!activeCalibrationGroup &&
+            cellDate.getTime() >= activeCalibrationGroup.start.getTime() &&
+            cellDate.getTime() <= activeCalibrationGroup.end.getTime() &&
+            cellDate.getTime() >= addDays(activeCalibrationGroup.start, 7).getTime();
 
           return (
             <div
@@ -371,9 +495,24 @@ export default function Calendar() {
                   ? "border-primary/30 bg-primary/5"
                   : "border-border/40 bg-card/50 hover:bg-card"
               }`}
+              style={phaseRange ? { background: phaseSoft(phaseRange.phase) } : undefined}
             >
               {isCurrentMonth && (
                 <>
+                  {showPhaseChip && phaseRange && (
+                    <div className="flex items-center gap-1 mb-1 min-w-0">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: phaseSolid(phaseRange.phase) }}
+                      />
+                      <span
+                        className="text-[9px] font-bold uppercase tracking-wide truncate capitalize"
+                        style={{ color: phaseSolid(phaseRange.phase) }}
+                      >
+                        {phaseRange.phase.replace(/_/g, " ")} phase
+                      </span>
+                    </div>
+                  )}
                   <div className={`text-xs font-medium mb-1 flex items-center gap-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
                     {dayNum}
                     {hasNotes && (
@@ -400,6 +539,11 @@ export default function Calendar() {
                       );
                     })}
                   </div>
+                  {showReviewNudge && (
+                    <div className="mt-1 px-1 py-0.5 rounded text-[8px] font-semibold leading-tight text-amber-300 bg-amber-500/10 border border-amber-500/25">
+                      Calibration review possible
+                    </div>
+                  )}
                 </>
               )}
             </div>

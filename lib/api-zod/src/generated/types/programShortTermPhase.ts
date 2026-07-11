@@ -14,6 +14,7 @@ export type ProgramShortTermPhase = typeof ProgramShortTermPhase[keyof typeof Pr
 
 export const ProgramShortTermPhase = {
   calibration: 'calibration',
+  calibration_review: 'calibration_review',
   bulk: 'bulk',
   maintenance: 'maintenance',
   reverse_diet: 'reverse_diet',

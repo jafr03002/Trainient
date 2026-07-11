@@ -21,6 +21,7 @@ Step 12: review: Build your program button
 Long term phase (Gain weight, lose weight, maintain)
 Short term phase (kgs are in weekly weight gain)
 calibration (maintenance +/-1kg entering weight into the phase), 
+calibration_review (only after at least 1 full week of calibration has passed - the week where the client reviews their calibration data with the coach and exits into whatever phase the goal-evaluation timeline calls for next; never assign this as the very first week),
 bulk phase (surplus +0.25 to 0.5kg), 
 maintenance (maintenance+/-1kg entering weight into the phase), 
 reverse diet (small surplus +0,25 to 0.5kg compared to bulk phase here we are just reversing the diet), 

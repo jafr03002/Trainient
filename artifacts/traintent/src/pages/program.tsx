@@ -7,6 +7,7 @@ import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
+import { formatSplitType } from "@/lib/utils";
 
 type Exercise = {
   name: string;
@@ -773,7 +774,7 @@ export default function Program() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
             <p className="text-muted-foreground mt-1">
-              {program.splitType} · Week {program.weekNumber}
+              {formatSplitType(program.splitType)} · Week {program.weekNumber}
               {!program.aiGenerated && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">Custom</span>}
             </p>
           </div>
@@ -788,6 +789,14 @@ export default function Program() {
             </button>
           )}
         </div>
+        {program.aiGenerated && !(program.shortTermPhase || program.energyBalance || program.dailyStepTarget || program.trainingWorkload) && (
+          <div className="mt-3 p-4 rounded-xl bg-card border border-border" data-testid="program-monitoring-unavailable">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Program monitoring</h2>
+            <p className="text-sm text-muted-foreground">
+              Monitoring data isn't available for this program - regenerate to get phase, energy balance, and step/cardio targets.
+            </p>
+          </div>
+        )}
         {program.aiGenerated && (program.shortTermPhase || program.energyBalance || program.dailyStepTarget || program.trainingWorkload) && (
           <div className="mt-3 p-4 rounded-xl bg-card border border-border space-y-3" data-testid="program-monitoring">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program monitoring</h2>

@@ -685,7 +685,7 @@ components:
             $ref: "#/components/schemas/ProgramDay"
         generatedAt:  { type: string }
         longTermPhase:       { type: ["string", "null"], enum: [gain_weight, lose_weight, maintain, null] }
-        shortTermPhase:      { type: ["string", "null"], enum: [calibration, bulk, maintenance, reverse_diet, diet, mini_cut, deload, null] }
+        shortTermPhase:      { type: ["string", "null"], enum: [calibration, calibration_review, bulk, maintenance, reverse_diet, diet, mini_cut, deload, null] }
         energyBalance:       { type: ["string", "null"], enum: [surplus, maintenance, deficit, high_deficit, null] }
         trainingWorkload:
           type: ["object", "null"]
