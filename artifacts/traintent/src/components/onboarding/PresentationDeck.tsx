@@ -39,49 +39,46 @@ function scheduleFor(days: ProgramDay[]): (ProgramDay | null)[] {
   return week;
 }
 
-type Phase = { weeks: string; title: string; motive: string; color: string };
+type Phase = { phase: string; weeks: string; title: string; motive: string; color: string };
 
-// A light, template-driven arc keyed to the user's goal. Not model-generated -
-// it frames the long game so week one doesn't feel like the whole plan. Every
-// arc opens with a short calibration window (the AI's own shortTermPhase enum
-// includes "calibration" for the same reason: the first couple of weeks are
-// about learning how this client actually responds, not chasing numbers yet).
+// Mirrors the hard-set per-goal phase sequence the server enforces
+// (api-server/src/lib/phaseTemplate.ts's PHASE_TEMPLATES, see
+// lib/knowledge/ti-program-generation.md). Kept as a separate, hand-written
+// copy rather than a shared import - traintent and api-server are separate
+// workspace packages, and this is display-only (the source of truth for
+// what phase a client is actually in is program.shortTermPhase).
 function timelineFor(goal: string, goalWeight?: number | null, weightUnit?: string): Phase[] {
-  const c = ["#64748b", "#3b82f6", "#8b5cf6", "#f59e0b", "#10b981"];
+  const c = ["#64748b", "#3b82f6", "#8b5cf6", "#f59e0b"];
   const unit = weightUnit ?? "kg";
   const goalWeeks = goalWeight != null ? ` · Goal ${goalWeight}${unit}` : "";
-  const goalMotive = goalWeight != null ? ` and check in against your goal weight of ${goalWeight}${unit}` : "";
+  const goalMotive = goalWeight != null ? ` toward your goal weight of ${goalWeight}${unit}` : "";
+  const longTermPhase = goal === "gain_weight" || goal === "lose_weight" ? goal : "maintain";
   const byGoal: Record<string, Phase[]> = {
-    hypertrophy: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
-      { weeks: "Weeks 4–7", title: "Foundation", motive: "Groove the main lifts and build the work capacity heavier training will demand.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Growth block", motive: "Progressive overload where it counts - your widest muscle-building window.", color: c[2] },
-      { weeks: "Weeks 16–21", title: "Intensify", motive: "Heavier loads and tighter rest turn new size into strength.", color: c[3] },
-      { weeks: `Week 22 →${goalWeeks}`, title: "Deload & reassess", motive: `Recover, retest your lifts${goalMotive}, then build the next block on fresh numbers.`, color: c[4] },
+    gain_weight: [
+      { phase: "calibration", weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
+      { phase: "bulk", weeks: `Weeks 4–29${goalWeeks}`, title: "Bulk phase", motive: `A steady surplus to build size, with a 1-week deload every 8 weeks to stay fresh${goalMotive}. Nothing is planned past this yet - that's a future reassessment.`, color: c[1] },
     ],
-    strength: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
-      { weeks: "Weeks 4–7", title: "Foundation", motive: "Dial in technique and build a base you can load heavily later.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Build", motive: "Add weight to the bar week over week on your main lifts.", color: c[2] },
-      { weeks: "Weeks 16–21", title: "Peak", motive: "Fewer reps, heavier loads - express the strength you've built.", color: c[3] },
-      { weeks: `Week 22 →${goalWeeks}`, title: "Deload & reassess", motive: `Back off, retest your maxes${goalMotive}, then start the next cycle.`, color: c[4] },
+    lose_weight: [
+      { phase: "calibration", weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to the deficit before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
+      { phase: "mini_cut", weeks: "Weeks 4–9", title: "Mini cut", motive: "A short, high-deficit push to kick off the fat loss before the longer diet phase.", color: c[1] },
+      { phase: "deload", weeks: "Week 10", title: "Deload", motive: "One week back at maintenance to recover before the main diet phase.", color: c[2] },
+      { phase: "diet", weeks: `Weeks 11–24${goalWeeks}`, title: "Diet", motive: `A steady deficit${goalMotive}. Nothing is planned past this yet - that's a future reassessment.`, color: c[3] },
     ],
-    fat_loss: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to the deficit before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
-      { weeks: "Weeks 4–7", title: "Foundation", motive: "Build the habit and work capacity while your calories settle in.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Lean out", motive: "Hold strength while the deficit does its job - protect your muscle.", color: c[2] },
-      { weeks: "Weeks 16–21", title: "Refine", motive: "Keep intensity high and tighten up as you near your target.", color: c[3] },
-      { weeks: `Week 22 →${goalWeeks}`, title: "Reassess", motive: `Reset, review the numbers${goalMotive}, and plan the next phase.`, color: c[4] },
-    ],
-    general: [
-      { weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
-      { weeks: "Weeks 4–7", title: "Foundation", motive: "Build the routine and groove the movements.", color: c[1] },
-      { weeks: "Weeks 8–15", title: "Build", motive: "Progress steadily across strength and conditioning.", color: c[2] },
-      { weeks: "Weeks 16–21", title: "Challenge", motive: "Push a little harder as the basics become second nature.", color: c[3] },
-      { weeks: `Week 22 →${goalWeeks}`, title: "Reassess", motive: `Check in on your goals${goalMotive}, and set up the next block.`, color: c[4] },
+    maintain: [
+      { phase: "calibration", weeks: "Weeks 1–3", title: "Calibration", motive: "We dial in your calories and see how your body responds to training before pushing intensity - this sets the true starting point for everything after.", color: c[0] },
+      { phase: "maintenance", weeks: "Week 4 →", title: "Maintenance", motive: "Steady training at maintenance until you change your goal.", color: c[1] },
     ],
   };
-  return byGoal[goal] ?? byGoal.general;
+  return byGoal[longTermPhase]!;
+}
+
+// Deload during a bulk is a display-only overlay on the bulk segment (see
+// phaseTemplate.ts's effectivePhase), not its own timeline card - so a
+// reported "deload" phase should still highlight the bulk card for that goal.
+function isCurrentPhase(phase: string, shortTermPhase: string | null | undefined, goal: string): boolean {
+  if (!shortTermPhase) return false;
+  if (shortTermPhase === "deload" && goal === "gain_weight") return phase === "bulk";
+  return phase === shortTermPhase;
 }
 
 // A short narrative sentence weaving the current monitoring parameters
@@ -243,7 +240,7 @@ export function PresentationDeck({
                     className="absolute left-2 top-2 bottom-2 w-0.5 rounded-full"
                     style={{ background: `linear-gradient(${phases.map((p) => p.color).join(",")})` }}
                   />
-                  {phases.map((p, i) => (
+                  {phases.map((p) => (
                     <div key={p.title} className="relative pb-5 last:pb-0" style={{ color: p.color }}>
                       <span
                         className="absolute -left-[26px] top-1 w-3 h-3 rounded-full border-2 border-background"
@@ -251,7 +248,7 @@ export function PresentationDeck({
                       />
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] font-semibold text-muted-foreground">{p.weeks}</span>
-                        {i === 0 && (
+                        {isCurrentPhase(p.phase, program.shortTermPhase, goal) && (
                           <span className="text-[9px] font-bold uppercase tracking-wide text-primary bg-primary/10 border border-primary/30 rounded-full px-1.5 py-0.5">
                             You are here
                           </span>
