@@ -157,9 +157,9 @@ export default function Settings() {
               data-testid="input-settings-age"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-muted-foreground block mb-1.5">Weight</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 min-w-0">
               <input
                 type="number"
                 value={weight}
