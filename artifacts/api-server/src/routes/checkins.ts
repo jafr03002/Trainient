@@ -7,6 +7,7 @@ import { anthropic } from "../lib/anthropic";
 import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
+import { PHASE_TEMPLATES, resolvePhaseProgression, effectivePhase } from "../lib/phaseTemplate";
 
 const router = Router();
 
@@ -36,10 +37,11 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
 // `weekNumber` in the API response is always the live calendar week since
 // onboarding - see programs.ts for why the stored column can't be trusted.
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
+  const { phaseSegmentIndex, weeksInPhaseSegment, ...rest } = p;
   return {
-    ...p,
+    ...rest,
     weekNumber: trainingWeekNumber(onboardingCompletedAt),
-    days: p.days as object[],
+    days: rest.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
 }
@@ -102,6 +104,24 @@ router.post("/checkins", requireAuth, async (req, res) => {
     return;
   }
 
+  // The AI never picks the next short-term phase directly (see
+  // lib/phaseTemplate.ts) - it only recommends stay/advance, bounded by the
+  // current segment's min/max week window. A goal change or a legacy/manual
+  // row with no prior bookkeeping starts fresh at the new template's segment 0.
+  const longTermPhase = longTermPhaseFor(profile?.goal ?? "");
+  const template = PHASE_TEMPLATES[longTermPhase];
+  const startingFresh =
+    currentProgram.longTermPhase !== longTermPhase ||
+    currentProgram.phaseSegmentIndex == null ||
+    currentProgram.weeksInPhaseSegment == null;
+  const priorSegmentIndex = startingFresh ? 0 : currentProgram.phaseSegmentIndex!;
+  const priorWeeksInSegment = startingFresh ? 0 : currentProgram.weeksInPhaseSegment!;
+
+  const currentSegment = template[priorSegmentIndex]!;
+  const isTerminal = priorSegmentIndex === template.length - 1;
+  const nextSegment = isTerminal ? null : template[priorSegmentIndex + 1]!;
+  const weekWindowLabel = `${currentSegment.maxWeeks ?? "unbounded"}`;
+
   const adjustmentPrompt = `You are an AI personal trainer reviewing a client's weekly check-in to adjust their training program for next week.
 
 Client profile: ${JSON.stringify(profile)}
@@ -115,6 +135,13 @@ This week's check-in:
 - Notes: ${parsed.data.notes ?? "none"}
 Workout logs this week: ${JSON.stringify(recentLogs.slice(0, 5))}
 
+Current phase-template position (server-tracked - use this as context, do not restate these
+values yourself, they are not part of your output):
+- Long-term goal: ${longTermPhase}
+- Current phase segment: ${currentSegment.phase}, week ${priorWeeksInSegment + 1} of ${weekWindowLabel}
+- If you recommend "stay": next week continues as "${currentSegment.phase}"
+- If you recommend "advance": ${nextSegment ? `next week moves to "${nextSegment.phase}"` : `there is no next phase defined yet for this goal - the server will keep the client in "${currentSegment.phase}" regardless of your recommendation`}
+
 Analyse their performance and fatigue. Then return:
 1. A brief message to the client (2–3 sentences, encouraging and specific)
 2. An updated program JSON for next week with any adjustments made
@@ -126,12 +153,18 @@ Adjustment rules:
 - High soreness: swap high-impact exercises for lower-impact alternatives
 - Bodyweight trend vs the client's goal weight: if it's moving the wrong direction relative to their goal, factor that into volume/intensity guidance; if there's not enough data, ignore this signal
 - Apply any specific notes the user left
-- Re-evaluate short-term phase and energy balance for next week given the bodyweight trend and this week's adherence - do not just repeat last week's values if the trend suggests the phase should progress (e.g. bulk → deload after several weeks, or a diet nearing its goal weight → maintenance)
+- Recommend whether the client should stay in their current phase segment or advance to the
+  next one (phase_progress.recommendation), with reasoning tied to the bodyweight trend vs this
+  phase's weekly-rate target and this week's adherence. The server enforces the template's
+  min/max week bounds - your recommendation only matters when the client is within that window.
+- Set short_term_goal_weight consistent with whichever phase you're recommending (bulk/diet/
+  mini_cut phases target a specific bodyweight bound); for calibration/maintenance/deload return
+  short_term_goal_weight as null
 
 Return ONLY valid JSON (no markdown):
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
   "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...],
-  "short_term_phase": "...", "energy_balance": "...", "short_term_goal_weight": null,
+  "phase_progress": { "reasoning": "...", "recommendation": "stay" }, "short_term_goal_weight": null,
   "daily_step_target": "...", "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
 
   const completion = await anthropic.messages.create({
@@ -170,19 +203,31 @@ Return ONLY valid JSON (no markdown):
     detail: h.detail,
   }));
 
+  const resolved = resolvePhaseProgression(
+    template,
+    priorSegmentIndex,
+    priorWeeksInSegment,
+    raw.updated_program.phase_progress.recommendation,
+  );
+  const { shortTermPhase, energyBalance } = effectivePhase(template, resolved.segmentIndex, resolved.weeksInSegment);
+  const phaseHasWeightTarget = shortTermPhase === "bulk" || shortTermPhase === "diet" || shortTermPhase === "mini_cut";
+  const shortTermGoalWeight = phaseHasWeightTarget ? raw.updated_program.short_term_goal_weight : null;
+
   const [updatedProgram] = await db
     .insert(programsTable)
     .values({
       userId,
       weekNumber: currentProgram.weekNumber + 1,
-      longTermPhase: longTermPhaseFor(profile?.goal ?? ""),
-      shortTermPhase: raw.updated_program.short_term_phase,
-      energyBalance: raw.updated_program.energy_balance,
+      longTermPhase,
+      shortTermPhase,
+      energyBalance,
       trainingWorkload: trainingWorkloadFor(updatedDays),
       longTermGoalWeight: profile?.goalWeight,
-      shortTermGoalWeight: raw.updated_program.short_term_goal_weight,
+      shortTermGoalWeight,
       dailyStepTarget: raw.updated_program.daily_step_target,
       cardioIntensity: cardioIntensityFrom(raw.updated_program.cardio_intensity),
+      phaseSegmentIndex: resolved.segmentIndex,
+      weeksInPhaseSegment: resolved.weeksInSegment,
       programName: raw.updated_program.program_name,
       splitType: raw.updated_program.split_type,
       programHighlights: updatedHighlights,

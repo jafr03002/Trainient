@@ -6,6 +6,7 @@ import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
 import { programGenerationKnowledge } from "../lib/knowledge";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
+import { PHASE_TEMPLATES, INITIAL_PHASE_STATE, energyBalanceForPhase } from "../lib/phaseTemplate";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -13,11 +14,14 @@ const router = Router();
 // `weekNumber` in the API response is always the live calendar week since
 // onboarding - not the stored column, which is just an insert-order ordinal
 // (used internally for "find the latest program" / check-in versioning).
+// `phaseSegmentIndex`/`weeksInPhaseSegment` are server-internal phase-template
+// bookkeeping (see lib/phaseTemplate.ts) and never leave this server.
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
+  const { phaseSegmentIndex, weeksInPhaseSegment, ...rest } = p;
   return {
-    ...p,
+    ...rest,
     weekNumber: trainingWeekNumber(onboardingCompletedAt),
-    days: p.days as object[],
+    days: rest.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
 }
@@ -63,7 +67,7 @@ router.post("/programs", requireAuth, async (req, res) => {
 
   const [latestProgram, profile] = await Promise.all([
     db.query.programsTable.findFirst({
-      where: eq(programsTable.userId, userId),
+      where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, false)),
       orderBy: [desc(programsTable.weekNumber)],
     }),
     db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
@@ -128,7 +132,7 @@ router.post("/programs/generate", requireAuth, async (req, res) => {
   }
 
   const latestProgram = await db.query.programsTable.findFirst({
-    where: eq(programsTable.userId, userId),
+    where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
     orderBy: [desc(programsTable.weekNumber)],
   });
   const newWeekNumber = (latestProgram?.weekNumber ?? 0) + 1;
@@ -159,14 +163,6 @@ Apply these rules:
 - Always respect injuries - avoid or regress exercises that stress injured areas
 - Add extra sets to priority muscle groups (15–20% more volume)
 - Use progressive overload logic: rep ranges are designed to be beaten week over week
-- Determine the client's short-term phase (calibration, bulk, maintenance, reverse_diet, diet,
-  mini_cut, or deload) and matching energy balance (surplus, maintenance, deficit, or
-  high_deficit), applying the goal-evaluation timeline template and the short-term phase
-  weekly-rate definitions in the reference material above, based on their goal, experience,
-  and current stats
-- Set a short-term goal weight only if the phase implies one (bulk/diet/mini_cut phases target
-  a specific bodyweight bound); for a maintenance/general-fitness client, return
-  short_term_goal_weight as null
 - Recommend a daily step target (low, moderate, or high) per the activity-evaluation guidance
   above - bump it for clients with low/moderate activity and a weight-loss or general-fitness goal
 - Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
@@ -189,8 +185,6 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
     "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
-  "short_term_phase": "bulk", "energy_balance": "surplus",
-  "short_term_goal_weight": 82.5,
   "daily_step_target": "moderate",
   "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "moderate" } }`;
 
@@ -261,19 +255,29 @@ For each day, provide 5–7 exercises. For each exercise provide:
     detail: h.detail,
   }));
 
+  // Every generation is a fresh start into the goal's hard phase template -
+  // this route only ever runs before a program has been accepted (see
+  // program.tsx/onboarding.tsx, both only call it while `!program`), so
+  // there's never prior phase state to carry forward.
+  const longTermPhase = longTermPhaseFor(profile.goal);
+  const template = PHASE_TEMPLATES[longTermPhase];
+  const initialPhase = template[INITIAL_PHASE_STATE.segmentIndex]!.phase;
+
   const [program] = await db
     .insert(programsTable)
     .values({
       userId,
       weekNumber: newWeekNumber,
-      longTermPhase: longTermPhaseFor(profile.goal),
-      shortTermPhase: raw.short_term_phase,
-      energyBalance: raw.energy_balance,
+      longTermPhase,
+      shortTermPhase: initialPhase,
+      energyBalance: energyBalanceForPhase(initialPhase),
       trainingWorkload: trainingWorkloadFor(days),
       longTermGoalWeight: profile.goalWeight,
-      shortTermGoalWeight: raw.short_term_goal_weight,
+      shortTermGoalWeight: null,
       dailyStepTarget: raw.daily_step_target,
       cardioIntensity: cardioIntensityFrom(raw.cardio_intensity),
+      phaseSegmentIndex: INITIAL_PHASE_STATE.segmentIndex,
+      weeksInPhaseSegment: INITIAL_PHASE_STATE.weeksInSegment,
       programName: raw.program_name,
       splitType: raw.split_type,
       programHighlights,

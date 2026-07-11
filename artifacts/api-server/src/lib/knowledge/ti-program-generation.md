@@ -40,13 +40,25 @@ THEN trainingWorkload can be increased
 
 ## Goal evaluation with timeline setups template:
 
-Gaining weight/Building muscle choice
-Enter calibration week (1-3W) > Bulk phase (18-26W) with deloads every 8 weeks if not needed for other reasons.
-     - Losing weight/building muscle
-Enter calibration week (1-3W) > Mini cut 4-6W(HIGH DEFICIT) > Maintenance/deload 1 Week > Diet 4W-14W (depending on weight goal)>
-     - General fitness
-Enter calibration week (1-3W) > maintenance forever until client changes goals. No weight goals here.
-- Each short-term phase shall have weight goals. To stay in between certain bodyweight go down to a spciefic or go up to a speicifc
+This template is a hard sequence, enforced in code at
+`artifacts/api-server/src/lib/phaseTemplate.ts` (`PHASE_TEMPLATES`) - the AI is never asked to
+choose the short-term phase directly. Its only input is a bounded "stay in this phase one more
+week" vs "advance to the next phase" recommendation per check-in, and the server clamps that
+recommendation to each phase's min/max week window below. The AI can never invent, skip, or
+reorder a phase.
+
+IF: Gaining weight/Building muscle choice
+     THEN: Enter calibration week (1-3W) > Bulk phase (18-26W) with a 1-week deload every 8 weeks (deload is a display-only overlay on top of Bulk, not a separate step - see phaseTemplate.ts).
+     Nothing is defined once the 26-week ceiling is reached - the phase simply holds there. Reassessing the goal at that point is a separate, not-yet-built feature.
+
+IF: Losing weight/building muscle
+     THEN: Enter calibration week (1-3W) > Mini cut 4-6W(HIGH DEFICIT) > Maintenance/deload 1 Week > Diet 4W-14W (depending on weight goal).
+     Nothing is defined once Diet ends - the phase simply holds there. `reverse_diet` is a known gap in this template (it's a valid short-term phase, but this sequence never reaches it) - deferred to a future revision alongside goal reassessment.
+
+IF General fitness
+     THEN:Enter calibration week (1-3W) > maintenance forever until client changes goals. No weight goals here.
+
+Each short-term phase shall have weight goals. To stay in between certain bodyweight go down to a spciefic or go up to a speicifc
 
 ## Experience evaluation:
 IF the person selects beginner
