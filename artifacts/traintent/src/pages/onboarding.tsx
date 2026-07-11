@@ -203,13 +203,21 @@ export default function Onboarding() {
     }));
   }
 
+  // "Full gym" means access to everything, so it's exclusive - picking it
+  // clears any other selection, and picking anything else drops it.
   function toggleEquipment(item: string) {
-    setForm((f) => ({
-      ...f,
-      equipment: f.equipment.includes(item)
-        ? f.equipment.filter((e) => e !== item)
-        : [...f.equipment, item],
-    }));
+    setForm((f) => {
+      if (item === "Full gym") {
+        return { ...f, equipment: f.equipment.includes("Full gym") ? [] : ["Full gym"] };
+      }
+      const withoutFullGym = f.equipment.filter((e) => e !== "Full gym");
+      return {
+        ...f,
+        equipment: withoutFullGym.includes(item)
+          ? withoutFullGym.filter((e) => e !== item)
+          : [...withoutFullGym, item],
+      };
+    });
   }
 
   function toggleMuscle(item: string) {
@@ -695,8 +703,11 @@ export default function Onboarding() {
               {currentStep === "equipment" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
-                  <p className="text-muted-foreground mb-8">Select everything you have access to.</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-muted-foreground mb-8">
+                    Select everything you have access to, or just "Full gym" if that covers it - it's a single
+                    choice that can't be combined with the others.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {EQUIPMENT.map((item) => (
                       <button
                         key={item}
@@ -712,6 +723,13 @@ export default function Onboarding() {
                       </button>
                     ))}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    {form.equipment.includes("Full gym")
+                      ? "Full gym selected - covers everything"
+                      : form.equipment.length > 0
+                        ? `${form.equipment.length} selected`
+                        : null}
+                  </p>
                 </div>
               )}
 
