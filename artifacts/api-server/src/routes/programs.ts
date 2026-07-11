@@ -172,12 +172,15 @@ Apply these rules:
   Split") - never append training-method jargon like "Hypertrophy" or "Strength" to the name,
   and never pad it with redundant generic nouns like "Block", "Program", or "Plan"
 
-Also produce 3–5 "program highlights" - short explanations of why the program looks the
-way it does. Each highlight MUST tie back to a concrete input from the profile above (the
-chosen split and why it fits the training-days/experience combo, an extra-volume bump for a
-priority muscle group, an exercise substitution or omission made for an injury, the
-progression logic used for this experience level, etc). Do not write generic filler -
-every highlight should reference a specific choice this program actually makes.
+Also produce exactly 2 "program highlights" - short explanations of why the program looks
+the way it does. Do not write one highlight per input factor (split, priority muscle,
+injury, progression logic, etc all crammed into separate cards) - instead, group the
+relevant factors into 2 broader headlines that each weave together whichever concrete
+inputs from the profile above actually drove that part of the program (e.g. one headline
+covering the split choice + why it fits their training-days/experience/injuries, a second
+covering volume/progression choices + any priority-muscle bump). Do not write generic
+filler - each headline should still reference specific choices this program actually makes,
+just fewer, denser headlines instead of many thin ones.
 
 Return ONLY valid JSON (no markdown, no explanation) structured as:
 { "program_name": "...", "split_type": "...",
