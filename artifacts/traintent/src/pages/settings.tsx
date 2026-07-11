@@ -165,7 +165,7 @@ export default function Settings() {
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="e.g. 80"
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                className="flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                 data-testid="input-settings-weight"
               />
               <div className="flex rounded-xl border border-border overflow-hidden">
