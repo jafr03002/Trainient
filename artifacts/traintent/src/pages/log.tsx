@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle } from "lucide-react";
 import { useUser } from "@clerk/react";
-import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
+import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 
@@ -163,6 +163,8 @@ export default function Log() {
   const [, setLocation] = useLocation();
   const { user } = useUser();
   const { data: program } = useGetCurrentProgram();
+  const { data: profile } = useGetProfile();
+  const isIndependent = profile?.mode === "independent";
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });
   const createWorkout = useCreateWorkout();
@@ -487,7 +489,19 @@ export default function Log() {
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
                 )}
               </div>
-              <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
+              <div className="flex items-center gap-1.5 mt-1">
+                <h3 className="font-semibold text-foreground">{ex.name}</h3>
+                {!isIndependent && (
+                  <button
+                    onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
+                    className="p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                    title="How to perform this exercise"
+                    data-testid={`button-exercise-help-${exIdx}`}
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Target: {ex.targetSets} × {ex.targetReps}
               </p>
