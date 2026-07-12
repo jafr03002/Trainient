@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Scale } from "lucide-react";
+import { format } from "date-fns";
+import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Scale, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetWorkoutStats,
@@ -14,9 +15,11 @@ import {
   useGetTodaysBodyweight,
   useLogBodyweight,
   useListPrograms,
+  useSetProgramStartDate,
   getGetTodaysBodyweightQueryKey,
   getGetBodyweightProgressQueryKey,
   getGetProfileQueryKey,
+  getGetCurrentProgramQueryKey,
 } from "@workspace/api-client-react";
 import {
   Dialog,
@@ -26,8 +29,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { phaseSolid } from "@/lib/phaseColors";
-import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough } from "@/lib/calibration";
+import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
+import { toast } from "@/hooks/use-toast";
 
 // Local calendar date, not UTC - so logging just after midnight lands on the
 // day the user actually sees, not a day that already rolled over server-side.
@@ -104,6 +108,62 @@ export default function Dashboard() {
     queryClient.invalidateQueries({ queryKey: getGetBodyweightProgressQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     setBodyweightDialogOpen(false);
+  }
+
+  const setProgramStartDate = useSetProgramStartDate();
+
+  async function handleStartToday() {
+    if (!program.data) return;
+    try {
+      await setProgramStartDate.mutateAsync({
+        id: program.data.id,
+        data: { startDate: new Date().toISOString() },
+      });
+      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+    } catch {
+      toast({
+        title: "Couldn't update your start date",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // preCalibrationPhase: an AI-generated program committed to a future start
+  // date. Full-screen takeover like the calibration walkthrough below, but
+  // this one takes precedence - the walkthrough gate is only reachable once
+  // today >= startDate, so the two can never both fire on the same render.
+  if (!program.isLoading && isPreCalibrationLocked(program.data, new Date())) {
+    return (
+      <div className="p-6 max-w-5xl mx-auto space-y-8">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <h1 className="text-2xl font-bold text-foreground">
+            {greet()}, {user?.firstName ?? "Coach"}.
+          </h1>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+          className="p-5 rounded-xl bg-card border border-border space-y-4"
+          data-testid="card-pre-calibration-lock"
+        >
+          <p className="text-foreground">
+            You chose to start on {format(parseLocalDateString(program.data!.startDate!), "EEE, MMM d")} but you can start today.
+          </p>
+          <button
+            onClick={handleStartToday}
+            disabled={setProgramStartDate.isPending}
+            className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            data-testid="button-start-today"
+          >
+            {setProgramStartDate.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            Start today
+          </button>
+        </motion.div>
+      </div>
+    );
   }
 
   // One-time, full-screen: shows in place of the dashboard the first time a
