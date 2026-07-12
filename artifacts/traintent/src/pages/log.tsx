@@ -480,31 +480,31 @@ export default function Log() {
             className="bg-card border border-border rounded-xl overflow-hidden"
             data-testid={`log-exercise-${exIdx}`}
           >
-            <div className="p-4 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
-                  {ex.muscle}
-                </span>
-                {ex.isUnilateral && (
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
-                )}
+            <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                    {ex.muscle}
+                  </span>
+                  {ex.isUnilateral && (
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
+                  )}
+                </div>
+                <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Target: {ex.targetSets} × {ex.targetReps}
+                </p>
               </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <h3 className="font-semibold text-foreground">{ex.name}</h3>
-                {!isIndependent && (
-                  <button
-                    onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
-                    className="p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                    title="How to perform this exercise"
-                    data-testid={`button-exercise-help-${exIdx}`}
-                  >
-                    <HelpCircle className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Target: {ex.targetSets} × {ex.targetReps}
-              </p>
+              {!isIndependent && (
+                <button
+                  onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
+                  className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                  title="How to perform this exercise"
+                  data-testid={`button-exercise-help-${exIdx}`}
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <div className="p-4">
