@@ -369,7 +369,14 @@ export default function Calendar() {
   const totalCells = Math.ceil((startPadding + lastDay.getDate()) / 7) * 7;
 
   const workouts = (workoutsQuery.data ?? []) as WorkoutLog[];
-  const phaseRanges = buildPhaseRanges(programsQuery.data ?? [], profileQuery.data?.onboardingCompletedAt);
+  // Independent mode has no AI-generated phase lineage - phases/calibration
+  // only ever apply to AI mode (mirrors dashboard.tsx's isIndependent gate).
+  // Skipping this avoids surfacing a leftover calibration phase from a
+  // program lineage the user switched away from.
+  const isIndependent = profileQuery.data?.mode === "independent";
+  const phaseRanges = isIndependent
+    ? []
+    : buildPhaseRanges(programsQuery.data ?? [], profileQuery.data?.onboardingCompletedAt);
   const calibrationGroups = buildCalibrationGroups(phaseRanges);
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
