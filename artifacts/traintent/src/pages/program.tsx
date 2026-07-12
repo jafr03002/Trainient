@@ -9,6 +9,8 @@ import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { formatSplitType } from "@/lib/utils";
 import { phaseSolid } from "@/lib/phaseColors";
+import { isPreCalibrationLocked } from "@/lib/calibration";
+import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 
 type Exercise = {
   name: string;
@@ -623,6 +625,7 @@ export default function Program() {
   const [building, setBuilding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
 
   const isIndependent = profileQuery.data?.mode === "independent";
   // AI onboarding is the only place goal/experience get set - Independent
@@ -767,6 +770,7 @@ export default function Program() {
 
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
+  const locked = isPreCalibrationLocked(program, new Date());
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -877,14 +881,24 @@ export default function Program() {
               <h2 className="font-semibold text-foreground">{day.focus}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{day.exercises.length} exercises</p>
             </div>
-            <Link href={`/log?day=${day.dayNumber}`}>
+            {locked ? (
               <button
+                onClick={() => setLockDialogOpen(true)}
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                 data-testid="button-start-workout-program"
               >
                 Start workout
               </button>
-            </Link>
+            ) : (
+              <Link href={`/log?day=${day.dayNumber}`}>
+                <button
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  data-testid="button-start-workout-program"
+                >
+                  Start workout
+                </button>
+              </Link>
+            )}
           </div>
 
           {day.exercises.map((ex) => (
@@ -892,6 +906,12 @@ export default function Program() {
           ))}
         </motion.div>
       )}
+
+      <WorkoutLogLockDialog
+        open={lockDialogOpen}
+        programId={program.id}
+        onCancel={() => setLockDialogOpen(false)}
+      />
     </div>
   );
 }

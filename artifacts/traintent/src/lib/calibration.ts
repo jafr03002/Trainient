@@ -96,3 +96,33 @@ export function shouldShowCalibrationWalkthrough(
   const groups = buildCalibrationGroups(buildPhaseRanges(programs, onboardingCompletedAt));
   return !!findCalibrationGroup(groups, today);
 }
+
+// Local YYYY-MM-DD for a Date, matching how program.startDate is stored
+// server-side (see api-server's programs.ts PATCH handler). Comparing
+// calendar strings avoids parsing startDate with `new Date()`, which reads
+// a bare YYYY-MM-DD as UTC midnight and can skew a day near the UTC boundary.
+export function localDateString(date: Date): string {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+// Inverse of localDateString - builds a local midnight Date from a
+// YYYY-MM-DD string, instead of `new Date(str)`, which reads it as UTC
+// midnight and can display a day off near the UTC boundary.
+export function parseLocalDateString(dateStr: string): Date {
+  const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// preCalibrationPhase: an AI-generated program has been committed to a start
+// date that's still in the future. Purely date-derived, like the calibration
+// walkthrough gate above - not a persisted/backend concept. Independent
+// (manual) programs are never locked, regardless of startDate.
+export function isPreCalibrationLocked(
+  program: { startDate?: string | null; aiGenerated?: boolean } | null | undefined,
+  today: Date
+): boolean {
+  if (!program?.aiGenerated || !program.startDate) return false;
+  return program.startDate.slice(0, 10) > localDateString(today);
+}

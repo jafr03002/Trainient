@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Trophy, MessageSquare, ChevronDown } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts } from "@workspace/api-client-react";
+import { isPreCalibrationLocked } from "@/lib/calibration";
+import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 
 type LoggedSet = {
   setNumber: number;
@@ -381,6 +383,18 @@ export default function Log() {
     if (user?.id) clearActiveSession(user.id);
     setShowCancelConfirm(false);
     setLocation("/program");
+  }
+
+  if (program && isPreCalibrationLocked(program, new Date())) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-64">
+        <WorkoutLogLockDialog
+          open
+          programId={program.id}
+          onCancel={() => setLocation("/dashboard")}
+        />
+      </div>
+    );
   }
 
   if (!program || !activeDay) {
