@@ -15,6 +15,7 @@ import {
   getGetCalendarColorsQueryKey,
   getGetCurrentProgramQueryKey,
   getGetWorkoutStatsQueryKey,
+  getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -85,6 +86,10 @@ export default function Settings() {
     // and program.tsx can keep serving stale data from the other mode.
     queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetWorkoutStatsQueryKey() });
+    // calendar.tsx derives phase/calibration bands from the full program
+    // list, which spans both mode lineages - stale cache here would keep
+    // showing the other mode's phases after switching.
+    queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
     setShowModeConfirm(false);
     setPendingMode(null);
   }
