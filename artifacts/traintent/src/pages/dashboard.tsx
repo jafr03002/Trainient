@@ -138,7 +138,7 @@ export default function Dashboard() {
       <div className="p-6 max-w-5xl mx-auto space-y-8">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <h1 className="text-2xl font-bold text-foreground">
-            {greet()}, {user?.firstName ?? "Coach"}.
+            {greet()}, {profile?.name || user?.firstName || "Coach"}.
           </h1>
         </motion.div>
 
@@ -203,7 +203,7 @@ export default function Dashboard() {
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <h1 className="text-2xl font-bold text-foreground">
-          {greet()}, {user?.firstName ?? "Coach"}.
+          {greet()}, {profile?.name || user?.firstName || "Coach"}.
         </h1>
         {stats.data && (
           <p className="text-muted-foreground mt-1">
