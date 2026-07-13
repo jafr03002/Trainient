@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
-import { isSameDay, startOfToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
@@ -310,7 +309,7 @@ export default function Onboarding() {
       });
       return;
     }
-    setLocation(isSameDay(startDate, startOfToday()) ? "/calibration" : "/dashboard");
+    setLocation("/dashboard");
   }
 
   async function handleRegenerateFeedback(feedback: ProgramFeedback) {

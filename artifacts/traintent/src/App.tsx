@@ -11,7 +11,6 @@ import { Layout } from "@/components/layout";
 
 import Landing from "@/pages/landing";
 import Onboarding from "@/pages/onboarding";
-import Calibration from "@/pages/calibration";
 import Dashboard from "@/pages/dashboard";
 import Program from "@/pages/program";
 import Log from "@/pages/log";
@@ -189,7 +188,6 @@ function App() {
                       <Layout>
                         <Switch>
                           <Route path="/onboarding" component={Onboarding} />
-                          <Route path="/calibration" component={Calibration} />
                           <Route path="/dashboard" component={Dashboard} />
                           <Route path="/program" component={Program} />
                           <Route path="/log" component={Log} />

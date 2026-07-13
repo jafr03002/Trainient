@@ -151,12 +151,12 @@ function estimatedOneRepMax(weight: number, reps: number): number {
 }
 
 // Section 10: format a single previous set for the per-set "last time" hint.
-function formatPrevSet(s: any): string | null {
+function formatPrevSet(s: any, weightUnit: string): string | null {
   if (isEmptySet(s)) return null;
   if (s.repsLeft != null || s.repsRight != null) {
-    return `${s.weight ?? 0}kg × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
+    return `${s.weight ?? 0} ${weightUnit} × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
   }
-  return `${s.weight ?? 0}kg × ${s.reps ?? 0}`;
+  return `${s.weight ?? 0} ${weightUnit} × ${s.reps ?? 0}`;
 }
 
 export default function Log() {
@@ -165,6 +165,7 @@ export default function Log() {
   const { data: program } = useGetCurrentProgram();
   const { data: profile } = useGetProfile();
   const isIndependent = profile?.mode === "independent";
+  const weightUnit = profile?.weightUnit ?? "kg";
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });
   const createWorkout = useCreateWorkout();
@@ -427,7 +428,7 @@ export default function Log() {
               <Trophy className="w-4 h-4 shrink-0" />
               <div>
                 <div className="text-xs font-medium opacity-80">New personal record!</div>
-                <div>{flash.exercise} - {flash.weight} kg</div>
+                <div>{flash.exercise} - {flash.weight} {weightUnit}</div>
               </div>
             </motion.div>
           ))}
@@ -526,7 +527,7 @@ export default function Log() {
 
               <div className="space-y-2">
                 {ex.sets.map((set, setIdx) => {
-                  const prevStr = formatPrevSet(prevSets?.[setIdx]);
+                  const prevStr = formatPrevSet(prevSets?.[setIdx], weightUnit);
                   return (
                   <div key={set.setNumber}>
                   <motion.div
