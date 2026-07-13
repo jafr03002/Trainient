@@ -625,6 +625,8 @@ components:
         onboardingComplete:     { type: boolean }
         onboardingCompletedAt:  { type: ["string", "null"] }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
+        programPageTourSeenAt: { type: ["string", "null"] }
+        weightLoggingTourSeenAt: { type: ["string", "null"] }
         createdAt:              { type: string }
 
     UserProfileInput:
@@ -659,6 +661,8 @@ components:
         injuries:       { type: ["string", "null"] }
         injurySeverity: { type: ["string", "null"], enum: [low, medium, high, null] }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
+        programPageTourSeenAt: { type: ["string", "null"] }
+        weightLoggingTourSeenAt: { type: ["string", "null"] }
 
     # ── Programs ───────────────────────────────────────────────────────────────
     Exercise:

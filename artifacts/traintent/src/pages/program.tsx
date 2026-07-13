@@ -2,14 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { useUser } from "@clerk/react";
-import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, customFetch } from "@workspace/api-client-react";
+import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, useUpdateProfile, customFetch } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
+import { getGetCurrentProgramQueryKey, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 
 type Exercise = {
   name: string;
@@ -625,6 +626,17 @@ export default function Program() {
   const [editing, setEditing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
+  const updateProfile = useUpdateProfile();
+  const tourHeaderRef = useRef<HTMLDivElement>(null);
+  const tourDayTabsRef = useRef<HTMLDivElement>(null);
+  const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
+
+  function finishProgramTour() {
+    updateProfile.mutate(
+      { data: { programPageTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+  }
 
   const isIndependent = profileQuery.data?.mode === "independent";
   // AI onboarding is the only place goal/experience get set - Independent
@@ -770,11 +782,17 @@ export default function Program() {
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
+  const showProgramTour = !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !locked;
+  const programTourSteps: CoachmarkStep[] = [
+    { target: tourHeaderRef, text: "Here you can find your programs." },
+    { target: tourDayTabsRef, text: "Here is your program." },
+    { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
+  ];
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-start justify-between gap-3">
+        <div ref={tourHeaderRef} className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
             <p className="text-muted-foreground mt-1">
@@ -796,7 +814,7 @@ export default function Program() {
       </motion.div>
 
       {/* Day tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1" data-testid="program-day-tabs">
+      <div ref={tourDayTabsRef} className="flex gap-2 overflow-x-auto pb-1" data-testid="program-day-tabs">
         {days.map((d, i) => (
           <button
             key={d.dayNumber}
@@ -838,6 +856,7 @@ export default function Program() {
             ) : (
               <Link href={`/log?day=${day.dayNumber}`}>
                 <button
+                  ref={tourStartWorkoutRef}
                   className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
                   data-testid="button-start-workout-program"
                 >
@@ -852,6 +871,8 @@ export default function Program() {
           ))}
         </motion.div>
       )}
+
+      {showProgramTour && <CoachmarkTour steps={programTourSteps} onDone={finishProgramTour} testIdPrefix="program-tour" />}
 
       <WorkoutLogLockDialog
         open={lockDialogOpen}

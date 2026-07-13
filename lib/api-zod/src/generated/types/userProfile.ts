@@ -39,5 +39,9 @@ export interface UserProfile {
   onboardingCompletedAt?: string | null;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
+  /** @nullable */
+  programPageTourSeenAt?: string | null;
+  /** @nullable */
+  weightLoggingTourSeenAt?: string | null;
   createdAt: string;
 }
