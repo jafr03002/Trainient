@@ -22,4 +22,8 @@ export interface UserProfileUpdate {
   injurySeverity?: UserProfileUpdateInjurySeverity;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
+  /** @nullable */
+  programPageTourSeenAt?: string | null;
+  /** @nullable */
+  weightLoggingTourSeenAt?: string | null;
 }

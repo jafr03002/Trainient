@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle } from "lucide-react";
 import { useUser } from "@clerk/react";
-import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile } from "@workspace/api-client-react";
+import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 
 type LoggedSet = {
   setNumber: number;
@@ -176,6 +178,19 @@ export default function Log() {
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const flashIdRef = useRef(0);
+  const queryClient = useQueryClient();
+  const updateProfile = useUpdateProfile();
+  const tourWeightRef = useRef<HTMLInputElement>(null);
+  const tourHelpRef = useRef<HTMLButtonElement>(null);
+  const tourFinishRef = useRef<HTMLButtonElement>(null);
+
+  function finishLogTour() {
+    updateProfile.mutate(
+      { data: { weightLoggingTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+    setLocation("/dashboard");
+  }
 
   // Tracks which draft key `logs` currently reflects, so a refetch of
   // `program` (e.g. on network reconnect) doesn't clobber in-progress data -
@@ -410,6 +425,12 @@ export default function Log() {
 
   const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
+  const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
+  const logTourSteps: CoachmarkStep[] = [
+    { target: tourWeightRef, text: "Here you track your weight and reps." },
+    ...(!isIndependent ? [{ target: tourHelpRef, text: "Not sure how to perform this exercise? Tap the ? whenever you need it." }] : []),
+    { target: tourFinishRef, text: "This is where you save your workout - and that's the end of the walkthrough." },
+  ];
 
   return (
     <div className="p-6 max-w-3xl mx-auto pb-48 md:pb-32">
@@ -498,6 +519,7 @@ export default function Log() {
               </div>
               {!isIndependent && (
                 <button
+                  ref={exIdx === 0 ? tourHelpRef : undefined}
                   onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
                   className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                   title="How to perform this exercise"
@@ -546,6 +568,7 @@ export default function Log() {
                       )}
                     </div>
                     <input
+                      ref={exIdx === 0 && setIdx === 0 ? tourWeightRef : undefined}
                       type="number"
                       value={set.weight || ""}
                       onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
@@ -648,6 +671,7 @@ export default function Log() {
       <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border z-40">
         <div className="max-w-3xl mx-auto">
           <button
+            ref={tourFinishRef}
             onClick={handleFinishClick}
             disabled={createWorkout.isPending}
             className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
@@ -663,6 +687,8 @@ export default function Log() {
           </button>
         </div>
       </div>
+
+      {showLogTour && <CoachmarkTour steps={logTourSteps} onDone={finishLogTour} testIdPrefix="log-tour" />}
 
       {/* Incomplete-sets confirmation */}
       <AnimatePresence>
