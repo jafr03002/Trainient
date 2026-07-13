@@ -81,6 +81,12 @@ function isCurrentPhase(phase: string, shortTermPhase: string | null | undefined
   return phase === shortTermPhase;
 }
 
+function joinWithAnd(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
 // A short narrative sentence weaving the current monitoring parameters
 // together, instead of a terse label grid - reads like a coach's note rather
 // than a stats readout.
@@ -91,11 +97,12 @@ function rightNowSentence(program: Program): string {
   let sentence = parts.length ? `Right now, ${parts.join(", ")}.` : "";
 
   const tail: string[] = [];
-  if (program.dailyStepTarget) tail.push(`aim for ${program.dailyStepTarget} daily steps`);
+  if (program.dailyStepTarget != null) tail.push(`aim for ${program.dailyStepTarget.toLocaleString()} daily steps`);
+  if (program.dailyCalorieTarget != null) tail.push(`eat around ${program.dailyCalorieTarget.toLocaleString()} kcal a day`);
   if (program.cardioIntensity) tail.push(`keep cardio ${program.cardioIntensity.level}`);
   if (tail.length) {
-    const [first, second] = tail;
-    sentence += ` ${first.charAt(0).toUpperCase()}${first.slice(1)}${second ? `, and ${second}` : ""}.`;
+    const joined = joinWithAnd(tail);
+    sentence += ` ${joined.charAt(0).toUpperCase()}${joined.slice(1)}.`;
   }
   return sentence;
 }

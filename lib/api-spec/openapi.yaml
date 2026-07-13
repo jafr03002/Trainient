@@ -499,6 +499,58 @@ paths:
                 items:
                   $ref: "#/components/schemas/BodyweightPoint"
 
+  /progress/goal:
+    get:
+      operationId: getGoalProgress
+      tags: [progress]
+      summary: Trend weight vs. goal weight, with a 14-day trailing-rate projected target date
+      responses:
+        "200":
+          description: Goal progress summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalProgress"
+
+  # ── Daily logs (calories / steps / cardio) ──────────────────────────────────
+  /daily-checkin:
+    post:
+      operationId: submitDailyCheckin
+      tags: [dailyLogs]
+      summary: Log (upsert) today's calories/steps/cardio, and optionally bodyweight, in one call
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyCheckinInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyCheckinResult"
+
+  /daily-logs/week:
+    get:
+      operationId: getDailyLogsWeek
+      tags: [dailyLogs]
+      summary: Get a 7-day window of daily logs (calories/steps/cardio/weight) plus this week's phase
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 7 days of merged daily-log data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyLogsWeekResult"
+
   # ── Calendar colours ──────────────────────────────────────────────────────────
   /calendar/colors:
     get:
@@ -727,7 +779,10 @@ components:
             totalVolumeSets: { type: integer }
         longTermGoalWeight:  { type: ["number", "null"] }
         shortTermGoalWeight: { type: ["number", "null"] }
-        dailyStepTarget:     { type: ["string", "null"], enum: [low, moderate, high, null] }
+        dailyStepTarget:     { type: ["integer", "null"] }
+        dailyCalorieTarget:  { type: ["integer", "null"] }
+        weekInPhase:         { type: ["integer", "null"] }
+        phaseTotalWeeks:     { type: ["integer", "null"] }
         cardioIntensity:
           type: ["object", "null"]
           properties:
@@ -950,6 +1005,76 @@ components:
       properties:
         date:       { type: string }
         weight:     { type: number }
+
+    # ── Daily logs (calories / steps / cardio) ─────────────────────────────────
+    DailyLog:
+      type: object
+      required: [id, userId, date, createdAt]
+      properties:
+        id:            { type: integer }
+        userId:        { type: string }
+        date:          { type: string }
+        calories:      { type: ["integer", "null"] }
+        steps:         { type: ["integer", "null"] }
+        cardioType:    { type: ["string", "null"] }
+        cardioMinutes: { type: ["integer", "null"] }
+        createdAt:     { type: string }
+        updatedAt:     { type: string }
+
+    DailyCheckinInput:
+      type: object
+      required: [date]
+      properties:
+        date:          { type: string }
+        weight:        { type: ["number", "null"] }
+        calories:      { type: ["integer", "null"] }
+        steps:         { type: ["integer", "null"] }
+        cardioType:    { type: ["string", "null"] }
+        cardioMinutes: { type: ["integer", "null"] }
+
+    DailyCheckinResult:
+      type: object
+      required: [dailyLog]
+      properties:
+        dailyLog:
+          $ref: "#/components/schemas/DailyLog"
+        bodyweightLog:
+          oneOf:
+            - $ref: "#/components/schemas/BodyweightLog"
+            - type: "null"
+
+    DailyLogWeekEntry:
+      type: object
+      required: [date]
+      properties:
+        date:          { type: string }
+        calories:      { type: ["integer", "null"] }
+        steps:         { type: ["integer", "null"] }
+        cardioType:    { type: ["string", "null"] }
+        cardioMinutes: { type: ["integer", "null"] }
+        weight:        { type: ["number", "null"] }
+        weightUnit:    { type: ["string", "null"] }
+
+    DailyLogsWeekResult:
+      type: object
+      required: [days]
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyLogWeekEntry"
+        shortTermPhase: { type: ["string", "null"], enum: [calibration, calibration_review, bulk, maintenance, reverse_diet, diet, mini_cut, deload, null] }
+
+    GoalProgress:
+      type: object
+      required: [startWeight, startDate, currentTrendWeight]
+      properties:
+        startWeight:        { type: number }
+        startDate:          { type: string }
+        currentTrendWeight: { type: number }
+        goalWeight:         { type: ["number", "null"] }
+        percentToGoal:      { type: ["number", "null"] }
+        targetDate:         { type: ["string", "null"] }
 
     # ── Calendar colours ──────────────────────────────────────────────────────
     CalendarColor:

@@ -18,7 +18,8 @@ export const programsTable = pgTable("programs", {
   trainingWorkload: jsonb("training_workload"),
   longTermGoalWeight: real("long_term_goal_weight"),
   shortTermGoalWeight: real("short_term_goal_weight"),
-  dailyStepTarget: text("daily_step_target"),
+  dailyStepTarget: integer("daily_step_target"),
+  dailyCalorieTarget: integer("daily_calorie_target"),
   cardioIntensity: jsonb("cardio_intensity"),
   // User-chosen day (YYYY-MM-DD) to begin training, set via the
   // post-presentation commitment screen. Null until they've confirmed one.

@@ -30,10 +30,15 @@ import type {
   CheckinResult,
   CheckoutInput,
   CheckoutSession,
+  DailyCheckinInput,
+  DailyCheckinResult,
+  DailyLogsWeekResult,
   GenerateProgramInput,
+  GetDailyLogsWeekParams,
   GetStrengthProgressParams,
   GetTodaysBodyweightParams,
   GetWorkoutsByDayLabelParams,
+  GoalProgress,
   HealthStatus,
   ListWorkoutsParams,
   ManualProgramInput,
@@ -2100,6 +2105,238 @@ export function useGetBodyweightProgress<TData = Awaited<ReturnType<typeof getBo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetBodyweightProgressQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetGoalProgressUrl = () => {
+
+
+
+
+  return `/api/progress/goal`
+}
+
+/**
+ * @summary Trend weight vs. goal weight, with a 14-day trailing-rate projected target date
+ */
+export const getGoalProgress = async ( options?: RequestInit): Promise<GoalProgress> => {
+
+  return customFetch<GoalProgress>(getGetGoalProgressUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGoalProgressQueryKey = () => {
+    return [
+    `/api/progress/goal`
+    ] as const;
+    }
+
+
+export const getGetGoalProgressQueryOptions = <TData = Awaited<ReturnType<typeof getGoalProgress>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGoalProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGoalProgressQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGoalProgress>>> = ({ signal }) => getGoalProgress({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGoalProgress>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGoalProgressQueryResult = NonNullable<Awaited<ReturnType<typeof getGoalProgress>>>
+export type GetGoalProgressQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Trend weight vs. goal weight, with a 14-day trailing-rate projected target date
+ */
+
+export function useGetGoalProgress<TData = Awaited<ReturnType<typeof getGoalProgress>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGoalProgress>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGoalProgressQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitDailyCheckinUrl = () => {
+
+
+
+
+  return `/api/daily-checkin`
+}
+
+/**
+ * @summary Log (upsert) today's calories/steps/cardio, and optionally bodyweight, in one call
+ */
+export const submitDailyCheckin = async (dailyCheckinInput: DailyCheckinInput, options?: RequestInit): Promise<DailyCheckinResult> => {
+
+  return customFetch<DailyCheckinResult>(getSubmitDailyCheckinUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dailyCheckinInput,)
+  }
+);}
+
+
+
+
+export const getSubmitDailyCheckinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitDailyCheckin>>, TError,{data: BodyType<DailyCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitDailyCheckin>>, TError,{data: BodyType<DailyCheckinInput>}, TContext> => {
+
+const mutationKey = ['submitDailyCheckin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitDailyCheckin>>, {data: BodyType<DailyCheckinInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitDailyCheckin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitDailyCheckinMutationResult = NonNullable<Awaited<ReturnType<typeof submitDailyCheckin>>>
+    export type SubmitDailyCheckinMutationBody = BodyType<DailyCheckinInput>
+    export type SubmitDailyCheckinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log (upsert) today's calories/steps/cardio, and optionally bodyweight, in one call
+ */
+export const useSubmitDailyCheckin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitDailyCheckin>>, TError,{data: BodyType<DailyCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitDailyCheckin>>,
+        TError,
+        {data: BodyType<DailyCheckinInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitDailyCheckinMutationOptions(options));
+    }
+
+export const getGetDailyLogsWeekUrl = (params: GetDailyLogsWeekParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/daily-logs/week?${stringifiedParams}` : `/api/daily-logs/week`
+}
+
+/**
+ * @summary Get a 7-day window of daily logs (calories/steps/cardio/weight) plus this week's phase
+ */
+export const getDailyLogsWeek = async (params: GetDailyLogsWeekParams, options?: RequestInit): Promise<DailyLogsWeekResult> => {
+
+  return customFetch<DailyLogsWeekResult>(getGetDailyLogsWeekUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDailyLogsWeekQueryKey = (params?: GetDailyLogsWeekParams,) => {
+    return [
+    `/api/daily-logs/week`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDailyLogsWeekQueryOptions = <TData = Awaited<ReturnType<typeof getDailyLogsWeek>>, TError = ErrorType<unknown>>(params: GetDailyLogsWeekParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyLogsWeek>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDailyLogsWeekQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDailyLogsWeek>>> = ({ signal }) => getDailyLogsWeek(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDailyLogsWeek>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDailyLogsWeekQueryResult = NonNullable<Awaited<ReturnType<typeof getDailyLogsWeek>>>
+export type GetDailyLogsWeekQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a 7-day window of daily logs (calories/steps/cardio/weight) plus this week's phase
+ */
+
+export function useGetDailyLogsWeek<TData = Awaited<ReturnType<typeof getDailyLogsWeek>>, TError = ErrorType<unknown>>(
+ params: GetDailyLogsWeekParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyLogsWeek>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDailyLogsWeekQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

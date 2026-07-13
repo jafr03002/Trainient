@@ -7,7 +7,7 @@ import { anthropic } from "../lib/anthropic";
 import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
-import { PHASE_TEMPLATES, resolvePhaseProgression, effectivePhase } from "../lib/phaseTemplate";
+import { PHASE_TEMPLATES, resolvePhaseProgression, effectivePhase, type LongTermPhase } from "../lib/phaseTemplate";
 
 const router = Router();
 
@@ -36,11 +36,18 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
 
 // `weekNumber` in the API response is always the live calendar week since
 // onboarding - see programs.ts for why the stored column can't be trusted.
+// `weekInPhase`/`phaseTotalWeeks` mirror the same derivation as programs.ts's
+// serializeProgram - see that file for why the raw segment index isn't
+// returned as-is.
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   const { phaseSegmentIndex, weeksInPhaseSegment, ...rest } = p;
+  const template = p.longTermPhase ? PHASE_TEMPLATES[p.longTermPhase as LongTermPhase] : null;
+  const segment = template && phaseSegmentIndex != null ? template[phaseSegmentIndex] : null;
   return {
     ...rest,
     weekNumber: trainingWeekNumber(onboardingCompletedAt),
+    weekInPhase: weeksInPhaseSegment,
+    phaseTotalWeeks: segment?.maxWeeks ?? null,
     days: rest.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
@@ -160,12 +167,18 @@ Adjustment rules:
 - Set short_term_goal_weight consistent with whichever phase you're recommending (bulk/diet/
   mini_cut phases target a specific bodyweight bound); for calibration/maintenance/deload return
   short_term_goal_weight as null
+- Recalibrate daily_calorie_target and daily_step_target using the same bodyweight-trend-vs-phase-
+  target evidence as the phase_progress recommendation: if the trend is moving faster than the
+  phase's expected weekly rate, ease the target (smaller deficit/surplus); if it's stalled or
+  moving the wrong way, tighten it; if there's not enough bodyweight data yet, keep last week's
+  numbers roughly unchanged rather than guessing
 
 Return ONLY valid JSON (no markdown):
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
   "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [...same structure as above...],
   "phase_progress": { "reasoning": "...", "recommendation": "stay" }, "short_term_goal_weight": null,
-  "daily_step_target": "...", "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
+  "daily_step_target": 8000, "daily_calorie_target": 1900,
+  "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
 
   const completion = await anthropic.messages.create({
     model: "claude-opus-4-8",
@@ -225,6 +238,7 @@ Return ONLY valid JSON (no markdown):
       longTermGoalWeight: profile?.goalWeight,
       shortTermGoalWeight,
       dailyStepTarget: raw.updated_program.daily_step_target,
+      dailyCalorieTarget: raw.updated_program.daily_calorie_target,
       cardioIntensity: cardioIntensityFrom(raw.updated_program.cardio_intensity),
       phaseSegmentIndex: resolved.segmentIndex,
       weeksInPhaseSegment: resolved.weeksInSegment,

@@ -213,18 +213,6 @@ export type ProgramTrainingWorkload = {
 /**
  * @nullable
  */
-export type ProgramDailyStepTarget = typeof ProgramDailyStepTarget[keyof typeof ProgramDailyStepTarget] | null;
-
-
-export const ProgramDailyStepTarget = {
-  low: 'low',
-  moderate: 'moderate',
-  high: 'high',
-} as const;
-
-/**
- * @nullable
- */
 export type ProgramCardioIntensity = {
   bpmMin?: number;
   bpmMax?: number;
@@ -254,7 +242,13 @@ export interface Program {
   /** @nullable */
   shortTermGoalWeight?: number | null;
   /** @nullable */
-  dailyStepTarget?: ProgramDailyStepTarget;
+  dailyStepTarget?: number | null;
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  weekInPhase?: number | null;
+  /** @nullable */
+  phaseTotalWeeks?: number | null;
   /** @nullable */
   cardioIntensity?: ProgramCardioIntensity;
   /** @nullable */
@@ -447,6 +441,92 @@ export interface BodyweightLogInput {
   weight: number;
 }
 
+export interface DailyLog {
+  id: number;
+  userId: string;
+  date: string;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  steps?: number | null;
+  /** @nullable */
+  cardioType?: string | null;
+  /** @nullable */
+  cardioMinutes?: number | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface DailyCheckinInput {
+  date: string;
+  /** @nullable */
+  weight?: number | null;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  steps?: number | null;
+  /** @nullable */
+  cardioType?: string | null;
+  /** @nullable */
+  cardioMinutes?: number | null;
+}
+
+export interface DailyCheckinResult {
+  dailyLog: DailyLog;
+  bodyweightLog?: BodyweightLog | null;
+}
+
+export interface DailyLogWeekEntry {
+  date: string;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  steps?: number | null;
+  /** @nullable */
+  cardioType?: string | null;
+  /** @nullable */
+  cardioMinutes?: number | null;
+  /** @nullable */
+  weight?: number | null;
+  /** @nullable */
+  weightUnit?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type DailyLogsWeekResultShortTermPhase = typeof DailyLogsWeekResultShortTermPhase[keyof typeof DailyLogsWeekResultShortTermPhase] | null;
+
+
+export const DailyLogsWeekResultShortTermPhase = {
+  calibration: 'calibration',
+  calibration_review: 'calibration_review',
+  bulk: 'bulk',
+  maintenance: 'maintenance',
+  reverse_diet: 'reverse_diet',
+  diet: 'diet',
+  mini_cut: 'mini_cut',
+  deload: 'deload',
+} as const;
+
+export interface DailyLogsWeekResult {
+  days: DailyLogWeekEntry[];
+  /** @nullable */
+  shortTermPhase?: DailyLogsWeekResultShortTermPhase;
+}
+
+export interface GoalProgress {
+  startWeight: number;
+  startDate: string;
+  currentTrendWeight: number;
+  /** @nullable */
+  goalWeight?: number | null;
+  /** @nullable */
+  percentToGoal?: number | null;
+  /** @nullable */
+  targetDate?: string | null;
+}
+
 export interface CalendarColor {
   id: number;
   userId: string;
@@ -500,5 +580,9 @@ exercise: string;
 
 export type GetTodaysBodyweightParams = {
 date: string;
+};
+
+export type GetDailyLogsWeekParams = {
+startDate: string;
 };
 

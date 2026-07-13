@@ -73,10 +73,29 @@ const programCoreSchema = {
     },
     program_highlights: { type: "array", items: programHighlightSchema },
     days: { type: "array", items: programDaySchema },
-    daily_step_target: { type: "string", enum: ["low", "moderate", "high"] },
+    daily_step_target: {
+      type: "integer",
+      description: "A concrete daily step count target (e.g. 6000-12000), not a category.",
+    },
+    daily_calorie_target: {
+      type: "integer",
+      description:
+        "A concrete daily calorie target in kcal, derived from an estimated TDEE (using the " +
+        "client's weight, sex, age, and activity level) and the client's goal/phase energy " +
+        "balance - a deficit for weight loss, a surplus for muscle gain, roughly maintenance " +
+        "otherwise.",
+    },
     cardio_intensity: cardioIntensitySchema,
   },
-  required: ["program_name", "split_type", "program_highlights", "days", "daily_step_target", "cardio_intensity"],
+  required: [
+    "program_name",
+    "split_type",
+    "program_highlights",
+    "days",
+    "daily_step_target",
+    "daily_calorie_target",
+    "cardio_intensity",
+  ],
   additionalProperties: false,
 };
 

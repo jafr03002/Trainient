@@ -1,34 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@clerk/react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Scale, Loader2 } from "lucide-react";
+import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Check, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetWorkoutStats,
   useGetCurrentProgram,
   useGetLatestCheckin,
-  useGetRecentWorkouts,
   useGetPersonalRecords,
   useGetProfile,
-  useGetTodaysBodyweight,
-  useLogBodyweight,
+  useGetDailyLogsWeek,
+  useSubmitDailyCheckin,
+  useGetGoalProgress,
   useListPrograms,
   useSetProgramStartDate,
-  getGetTodaysBodyweightQueryKey,
-  getGetBodyweightProgressQueryKey,
+  getGetDailyLogsWeekQueryKey,
+  getGetGoalProgressQueryKey,
   getGetProfileQueryKey,
   getGetCurrentProgramQueryKey,
 } from "@workspace/api-client-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { phaseSolid } from "@/lib/phaseColors";
+import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +30,18 @@ import { toast } from "@/hooks/use-toast";
 // day the user actually sees, not a day that already rolled over server-side.
 function todayDateString(): string {
   const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+// Monday of the current local week - the weekly table always starts there
+// regardless of what day "today" is.
+function startOfWeekDateString(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0 = Sunday
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${d.getFullYear()}-${mm}-${dd}`;
@@ -72,13 +77,14 @@ function startWorkoutLine(): string {
   return START_WORKOUT_LINES[dayOfYear % START_WORKOUT_LINES.length];
 }
 
+const CARDIO_TYPES = ["Run", "Bike", "Row", "Swim", "Walk", "Other"];
+
 export default function Dashboard() {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const stats = useGetWorkoutStats();
   const program = useGetCurrentProgram();
   const latestCheckin = useGetLatestCheckin();
-  const recentWorkouts = useGetRecentWorkouts();
   const personalRecords = useGetPersonalRecords();
   const profileQuery = useGetProfile();
   const programsQuery = useListPrograms();
@@ -86,28 +92,59 @@ export default function Dashboard() {
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
 
-  // Works identically in both modes - bodyweight is a body metric, not a
-  // program concern, so it isn't gated by Independent/AI mode like the rest
-  // of this page.
   const todayStr = todayDateString();
-  const todaysBodyweight = useGetTodaysBodyweight({ date: todayStr });
-  const logBodyweight = useLogBodyweight();
-  const [bodyweightDialogOpen, setBodyweightDialogOpen] = useState(false);
-  const [bodyweightInput, setBodyweightInput] = useState("");
+  const weekStartStr = startOfWeekDateString();
+  const weekLogs = useGetDailyLogsWeek({ startDate: weekStartStr });
+  const goalProgress = useGetGoalProgress();
+  const submitDailyCheckin = useSubmitDailyCheckin();
 
-  function openBodyweightDialog() {
-    setBodyweightInput(todaysBodyweight.data ? String(todaysBodyweight.data.weight) : "");
-    setBodyweightDialogOpen(true);
-  }
+  const todayEntry = weekLogs.data?.days.find((d) => d.date === todayStr);
 
-  async function handleSaveBodyweight() {
-    const weight = parseFloat(bodyweightInput);
-    if (!Number.isFinite(weight) || weight <= 0) return;
-    await logBodyweight.mutateAsync({ data: { date: todayStr, weight } });
-    queryClient.invalidateQueries({ queryKey: getGetTodaysBodyweightQueryKey({ date: todayStr }) });
-    queryClient.invalidateQueries({ queryKey: getGetBodyweightProgressQueryKey() });
+  const [weightInput, setWeightInput] = useState("");
+  const [caloriesInput, setCaloriesInput] = useState("");
+  const [stepsInput, setStepsInput] = useState("");
+  const [cardioTypeInput, setCardioTypeInput] = useState("");
+  const [cardioMinutesInput, setCardioMinutesInput] = useState("");
+
+  // Pre-fill the check-in form from today's already-saved entry once it
+  // loads - only on load, so it doesn't clobber what the user is mid-typing
+  // if the query refetches in the background.
+  useEffect(() => {
+    if (!todayEntry) return;
+    setWeightInput(todayEntry.weight != null ? String(todayEntry.weight) : "");
+    setCaloriesInput(todayEntry.calories != null ? String(todayEntry.calories) : "");
+    setStepsInput(todayEntry.steps != null ? String(todayEntry.steps) : "");
+    setCardioTypeInput(todayEntry.cardioType ?? "");
+    setCardioMinutesInput(todayEntry.cardioMinutes != null ? String(todayEntry.cardioMinutes) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekLogs.dataUpdatedAt]);
+
+  const loggedCount = [
+    todayEntry?.weight != null,
+    todayEntry?.calories != null,
+    todayEntry?.steps != null,
+    todayEntry?.cardioType != null,
+  ].filter(Boolean).length;
+
+  async function handleSaveDailyCheckin() {
+    const weight = weightInput ? parseFloat(weightInput) : undefined;
+    const calories = caloriesInput ? parseInt(caloriesInput, 10) : undefined;
+    const steps = stepsInput ? parseInt(stepsInput, 10) : undefined;
+    const cardioMinutes = cardioMinutesInput ? parseInt(cardioMinutesInput, 10) : undefined;
+
+    await submitDailyCheckin.mutateAsync({
+      data: {
+        date: todayStr,
+        weight: weight != null && Number.isFinite(weight) ? weight : undefined,
+        calories: calories != null && Number.isFinite(calories) ? calories : undefined,
+        steps: steps != null && Number.isFinite(steps) ? steps : undefined,
+        cardioType: cardioTypeInput || undefined,
+        cardioMinutes: cardioMinutes != null && Number.isFinite(cardioMinutes) ? cardioMinutes : undefined,
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: getGetDailyLogsWeekQueryKey({ startDate: weekStartStr }) });
+    queryClient.invalidateQueries({ queryKey: getGetGoalProgressQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
-    setBodyweightDialogOpen(false);
   }
 
   const setProgramStartDate = useSetProgramStartDate();
@@ -199,6 +236,10 @@ export default function Dashboard() {
 
   const nextDay = program.data?.days?.[0] as any;
 
+  const weightUnit = profile?.weightUnit ?? "kg";
+  const goal = goalProgress.data;
+  const kgToGo = goal?.goalWeight != null ? Math.abs(goal.currentTrendWeight - goal.goalWeight) : null;
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
@@ -260,201 +301,301 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* Current phase */}
-      {program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.energyBalance) && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.09 }}
-          className="p-4 rounded-xl bg-card border border-border flex items-center justify-between"
-          data-testid="card-program-phase"
-        >
+      {/* This week's program */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.09 }}
+        className="p-5 rounded-xl bg-card border border-border"
+        data-testid="card-todays-session"
+      >
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">This week's program</h2>
+        {program.isLoading ? (
+          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+        ) : !program.data ? (
+          <div className="text-center py-6">
+            <p className="text-muted-foreground text-sm mb-3">
+              {isIndependent ? "No program built yet" : "No program yet"}
+            </p>
+            <Link href="/program" className="text-primary text-sm font-semibold hover:underline">
+              {isIndependent ? "Build your program" : "Generate one"}
+            </Link>
+          </div>
+        ) : nextDay ? (
           <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wider">Current phase</div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {program.data.shortTermPhase && (
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: phaseSolid(program.data.shortTermPhase) }}
-                />
-              )}
-              <span className="text-lg font-bold text-foreground capitalize">
-                {program.data.shortTermPhase?.replace(/_/g, " ") ?? "-"}
-              </span>
-            </div>
+            <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
+            <Link href="/log">
+              <button
+                className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                data-testid="button-start-workout"
+              >
+                Start workout
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </Link>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-muted-foreground uppercase tracking-wider">Energy balance</div>
-            <div className="text-sm font-semibold text-foreground capitalize">
-              {program.data.energyBalance?.replace(/_/g, " ") ?? "-"}
-            </div>
-          </div>
-        </motion.div>
-      )}
+        ) : null}
+      </motion.div>
 
-      {/* Bodyweight */}
+      {/* Weekly table */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
         className="p-5 rounded-xl bg-card border border-border"
-        data-testid="card-bodyweight"
+        data-testid="card-week-table"
       >
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's bodyweight</h2>
-          <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-              todaysBodyweight.data
-                ? "bg-primary/15 text-primary border border-primary/20"
-                : "bg-secondary text-muted-foreground"
-            }`}
-          >
-            {todaysBodyweight.data ? "Logged" : "Not logged"}
-          </span>
-        </div>
-        {todaysBodyweight.data ? (
-          <div className="flex items-end justify-between mt-3">
-            <div>
-              <div className="text-2xl font-bold text-foreground">
-                {todaysBodyweight.data.weight} <span className="text-sm font-medium text-muted-foreground">{todaysBodyweight.data.weightUnit}</span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Logged at {new Date(todaysBodyweight.data.updatedAt ?? todaysBodyweight.data.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-              </div>
-            </div>
-            <button
-              onClick={openBodyweightDialog}
-              className="h-9 px-4 rounded-lg border border-border text-sm font-semibold hover:bg-secondary/60 transition-colors"
-              data-testid="button-edit-bodyweight"
-            >
-              Edit
-            </button>
-          </div>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">This week</h2>
+        {weekLogs.isLoading ? (
+          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
         ) : (
-          <div>
-            <p className="text-lg font-bold text-foreground mt-3 mb-4">Add today's bodyweight</p>
-            <button
-              onClick={openBodyweightDialog}
-              className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-              data-testid="button-log-bodyweight"
-            >
-              <Scale className="w-4 h-4" />
-              Log weight
-            </button>
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="text-left font-semibold py-2 pl-1">Day</th>
+                  <th className="text-right font-semibold py-2">Calories</th>
+                  <th className="text-right font-semibold py-2">Steps</th>
+                  <th className="text-center font-semibold py-2">Cardio</th>
+                  <th className="text-right font-semibold py-2 pr-1">Phase</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weekLogs.data?.days.map((day) => {
+                  const isToday = day.date === todayStr;
+                  const parsed = parseLocalDateString(day.date);
+                  const shortTermPhase = weekLogs.data!.shortTermPhase;
+                  return (
+                    <tr
+                      key={day.date}
+                      className={`border-b border-border/50 last:border-0 ${isToday ? "bg-primary/5" : ""}`}
+                      data-testid={`week-row-${day.date}`}
+                    >
+                      <td className={`py-2 pl-1 font-medium ${isToday ? "text-primary" : "text-foreground"}`}>
+                        {format(parsed, "EEE d")}
+                      </td>
+                      <td className="py-2 text-right tabular-nums">
+                        {day.calories != null ? day.calories.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      </td>
+                      <td className="py-2 text-right tabular-nums">
+                        {day.steps != null ? day.steps.toLocaleString() : <span className="text-muted-foreground">-</span>}
+                      </td>
+                      <td className="py-2 text-center">
+                        {day.cardioType ? (
+                          <Check className="w-3.5 h-3.5 inline text-chart-2" />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-1 text-right">
+                        {shortTermPhase && (
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap capitalize"
+                            style={{ background: phaseSoft(shortTermPhase), color: phaseSolid(shortTermPhase) }}
+                          >
+                            {shortTermPhase.replace(/_/g, " ")}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </motion.div>
 
-      <Dialog open={bodyweightDialogOpen} onOpenChange={setBodyweightDialogOpen}>
-        <DialogContent data-testid="dialog-bodyweight">
-          <DialogHeader>
-            <DialogTitle>Log today's bodyweight</DialogTitle>
-          </DialogHeader>
+      {/* This week narrative */}
+      {program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.dailyCalorieTarget != null || program.data?.dailyStepTarget != null) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="p-5 rounded-xl bg-card border-l-4 border border-border"
+          style={program.data.shortTermPhase ? { borderLeftColor: phaseSolid(program.data.shortTermPhase) } : undefined}
+          data-testid="card-week-narrative"
+        >
+          <div className="flex items-center gap-1.5 mb-3">
+            {program.data.shortTermPhase && (
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: phaseSolid(program.data.shortTermPhase) }} />
+            )}
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground capitalize">
+              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "This week"}
+              {program.data.weekInPhase != null &&
+                ` - week ${program.data.weekInPhase}${program.data.phaseTotalWeeks != null ? ` of ${program.data.phaseTotalWeeks}` : ""}`}
+            </span>
+          </div>
+          <dl className="space-y-2">
+            {program.data.dailyCalorieTarget != null && (
+              <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
+                <dt className="text-muted-foreground">Calorie target</dt>
+                <dd className="font-semibold text-foreground">{program.data.dailyCalorieTarget.toLocaleString()} kcal / day</dd>
+              </div>
+            )}
+            {program.data.dailyStepTarget != null && (
+              <div className="flex items-center justify-between text-sm py-1">
+                <dt className="text-muted-foreground">Step target</dt>
+                <dd className="font-semibold text-foreground">{program.data.dailyStepTarget.toLocaleString()} steps / day</dd>
+              </div>
+            )}
+          </dl>
+        </motion.div>
+      )}
+
+      {/* Daily check-in */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="p-5 rounded-xl bg-card border border-border"
+        data-testid="card-daily-checkin"
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's check-in</h2>
+          <span
+            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+              loggedCount === 4
+                ? "bg-primary/15 text-primary border border-primary/20"
+                : "bg-secondary text-muted-foreground"
+            }`}
+          >
+            {loggedCount}/4 logged
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weight</label>
-            <div className="mt-1.5 flex items-center gap-2 h-12 rounded-xl border border-border bg-secondary/30 px-4 focus-within:border-primary">
+            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
               <input
                 type="number"
                 step="0.1"
-                autoFocus
-                value={bodyweightInput}
-                onChange={(e) => setBodyweightInput(e.target.value)}
+                value={weightInput}
+                onChange={(e) => setWeightInput(e.target.value)}
                 placeholder="0.0"
-                className="flex-1 bg-transparent text-xl font-bold tabular-nums focus:outline-none"
-                data-testid="input-bodyweight"
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                data-testid="input-checkin-weight"
               />
-              <span className="text-sm text-muted-foreground">{profile?.weightUnit ?? "kg"}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{weightUnit}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">Unit follows your profile setting - change it in Settings.</p>
           </div>
-          <DialogFooter>
-            <button
-              onClick={() => setBodyweightDialogOpen(false)}
-              className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold hover:bg-secondary/60 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveBodyweight}
-              disabled={logBodyweight.isPending || !bodyweightInput}
-              className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-              data-testid="button-save-bodyweight"
-            >
-              {logBodyweight.isPending ? "Saving..." : "Save"}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* This week's session */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18 }}
-          className="p-5 rounded-xl bg-card border border-border"
-          data-testid="card-todays-session"
-        >
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">This week's program</h2>
-          {program.isLoading ? (
-            <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
-          ) : !program.data ? (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground text-sm mb-3">
-                {isIndependent ? "No program built yet" : "No program yet"}
-              </p>
-              <Link href="/program" className="text-primary text-sm font-semibold hover:underline">
-                {isIndependent ? "Build your program" : "Generate one"}
-              </Link>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Calories</label>
+            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+              <input
+                type="number"
+                value={caloriesInput}
+                onChange={(e) => setCaloriesInput(e.target.value)}
+                placeholder="0"
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                data-testid="input-checkin-calories"
+              />
+              <span className="text-xs text-muted-foreground shrink-0">kcal</span>
             </div>
-          ) : nextDay ? (
-            <div>
-              <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
-              <Link href="/log">
-                <button
-                  className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-                  data-testid="button-start-workout"
-                >
-                  Start workout
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </Link>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Steps</label>
+            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+              <input
+                type="number"
+                value={stepsInput}
+                onChange={(e) => setStepsInput(e.target.value)}
+                placeholder="0"
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                data-testid="input-checkin-steps"
+              />
             </div>
-          ) : null}
-        </motion.div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cardio</label>
+            <div className="mt-1.5 flex items-center gap-1 h-12 rounded-xl border border-border bg-secondary/30 px-2 focus-within:border-primary">
+              <select
+                value={cardioTypeInput}
+                onChange={(e) => setCardioTypeInput(e.target.value)}
+                className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
+                data-testid="select-checkin-cardio-type"
+              >
+                <option value="">None</option>
+                {CARDIO_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={cardioMinutesInput}
+                onChange={(e) => setCardioMinutesInput(e.target.value)}
+                placeholder="min"
+                className="w-12 shrink-0 bg-transparent text-sm text-right focus:outline-none"
+                data-testid="input-checkin-cardio-minutes"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={handleSaveDailyCheckin}
+            disabled={submitDailyCheckin.isPending}
+            className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50"
+            data-testid="button-save-checkin"
+          >
+            {submitDailyCheckin.isPending ? "Saving..." : "Save today's check-in"}
+          </button>
+        </div>
+      </motion.div>
 
-        {/* Recent sessions */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22 }}
-          className="p-5 rounded-xl bg-card border border-border"
-          data-testid="card-recent-sessions"
-        >
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Recent sessions</h2>
-          {recentWorkouts.isLoading ? (
-            <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
-          ) : !recentWorkouts.data?.length ? (
-            <div className="text-center py-6 text-muted-foreground text-sm">No sessions logged yet</div>
-          ) : (
-            <div className="space-y-3">
-              {recentWorkouts.data.map((w) => {
-                const label = (w as any).dayLabel ?? "Workout";
-                return (
-                  <div key={w.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0" data-testid={`session-${w.id}`}>
-                    <div>
-                      <div className="text-sm font-medium text-foreground">{label}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(w.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                      </div>
-                    </div>
+      {/* Progress toward goal */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.22 }}
+        className="p-5 rounded-xl bg-card border border-border"
+        data-testid="card-progress"
+      >
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Progress toward goal</h2>
+        {goalProgress.isLoading ? (
+          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+        ) : !goal ? (
+          <div className="text-center py-6 text-muted-foreground text-sm">Log your bodyweight to start tracking progress</div>
+        ) : (
+          <>
+            <div className="flex items-end justify-between mb-3">
+              <div>
+                <div className="text-3xl font-bold text-foreground">
+                  {goal.currentTrendWeight.toFixed(1)}
+                  <span className="text-base font-medium text-muted-foreground"> {weightUnit}</span>
+                </div>
+              </div>
+              {goal.goalWeight != null && kgToGo != null && (
+                <div className="text-right">
+                  <div className="text-lg font-bold text-chart-2">
+                    {kgToGo.toFixed(1)} {weightUnit} to go
                   </div>
-                );
-              })}
+                  <div className="text-xs text-muted-foreground mt-0.5">goal {goal.goalWeight} {weightUnit}</div>
+                </div>
+              )}
             </div>
-          )}
-        </motion.div>
-      </div>
+
+            {goal.goalWeight != null && goal.percentToGoal != null && (
+              <>
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden mb-1">
+                  <div className="h-full rounded-full bg-chart-2" style={{ width: `${goal.percentToGoal}%` }} />
+                </div>
+                <div className="flex items-start justify-between text-[10px] text-muted-foreground">
+                  <span className="flex flex-col">
+                    <span className="font-medium text-foreground">{goal.startWeight} {weightUnit}</span>
+                    <span>started {format(parseLocalDateString(goal.startDate), "MMM d")}</span>
+                  </span>
+                  <span className="self-center">{Math.round(goal.percentToGoal)}% there</span>
+                  <span className="flex flex-col items-end">
+                    <span className="font-medium text-foreground">{goal.goalWeight} {weightUnit}</span>
+                    <span>{goal.targetDate ? `~${format(parseLocalDateString(goal.targetDate), "MMM d")} at this rate` : "still calibrating"}</span>
+                  </span>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </motion.div>
     </div>
   );
 }
