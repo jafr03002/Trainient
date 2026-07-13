@@ -71,7 +71,7 @@ const programCoreSchema = {
         "Short, plain-language label for the split (e.g. \"Push Pull Legs\", \"Upper/Lower\", " +
         "\"Full Body\"). Space-separated words, no underscores or code-style casing.",
     },
-    program_highlights: { type: "array", items: programHighlightSchema, minItems: 2, maxItems: 2 },
+    program_highlights: { type: "array", items: programHighlightSchema },
     days: { type: "array", items: programDaySchema },
     daily_step_target: { type: "string", enum: ["low", "moderate", "high"] },
     cardio_intensity: cardioIntensitySchema,
