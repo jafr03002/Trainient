@@ -57,6 +57,8 @@ export interface UserProfile {
   programPageTourSeenAt?: string | null;
   /** @nullable */
   weightLoggingTourSeenAt?: string | null;
+  /** @nullable */
+  dashboardTourSeenAt?: string | null;
   createdAt: string;
 }
 
@@ -130,6 +132,8 @@ export interface UserProfileUpdate {
   programPageTourSeenAt?: string | null;
   /** @nullable */
   weightLoggingTourSeenAt?: string | null;
+  /** @nullable */
+  dashboardTourSeenAt?: string | null;
 }
 
 export interface Exercise {

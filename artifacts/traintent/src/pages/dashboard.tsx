@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Check, Loader2 } from "lucide-react";
@@ -16,6 +16,7 @@ import {
   useGetGoalProgress,
   useListPrograms,
   useSetProgramStartDate,
+  useUpdateProfile,
   getGetDailyLogsWeekQueryKey,
   getGetGoalProgressQueryKey,
   getGetProfileQueryKey,
@@ -24,6 +25,7 @@ import {
 import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
 
 // Local calendar date, not UTC - so logging just after midnight lands on the
@@ -81,6 +83,7 @@ const CARDIO_TYPES = ["Run", "Bike", "Row", "Swim", "Walk", "Other"];
 
 export default function Dashboard() {
   const { user } = useUser();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const stats = useGetWorkoutStats();
   const program = useGetCurrentProgram();
@@ -88,6 +91,18 @@ export default function Dashboard() {
   const personalRecords = useGetPersonalRecords();
   const profileQuery = useGetProfile();
   const programsQuery = useListPrograms();
+  const updateProfile = useUpdateProfile();
+  const tourDailyTaskRef = useRef<HTMLDivElement>(null);
+  const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
+  const tourProgressRef = useRef<HTMLDivElement>(null);
+
+  function finishDashboardTour() {
+    updateProfile.mutate(
+      { data: { dashboardTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+    setLocation("/program");
+  }
 
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
@@ -235,6 +250,12 @@ export default function Dashboard() {
     : "No new PRs yet this week";
 
   const nextDay = program.data?.days?.[0] as any;
+  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !!nextDay;
+  const dashboardTourSteps: CoachmarkStep[] = [
+    { target: tourDailyTaskRef, text: "This is where you'll see what you need to do each day." },
+    { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
+    { target: tourProgressRef, text: "And down here you can track your progress." },
+  ];
 
   const weightUnit = profile?.weightUnit ?? "kg";
   const goal = goalProgress.data;
@@ -303,6 +324,7 @@ export default function Dashboard() {
 
       {/* This week's program */}
       <motion.div
+        ref={tourDailyTaskRef}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.09 }}
@@ -326,6 +348,7 @@ export default function Dashboard() {
             <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
             <Link href="/log">
               <button
+                ref={tourStartWorkoutRef}
                 className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                 data-testid="button-start-workout"
               >
@@ -545,6 +568,7 @@ export default function Dashboard() {
 
       {/* Progress toward goal */}
       <motion.div
+        ref={tourProgressRef}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.22 }}
@@ -596,6 +620,10 @@ export default function Dashboard() {
           </>
         )}
       </motion.div>
+
+      {showDashboardTour && (
+        <CoachmarkTour steps={dashboardTourSteps} onDone={finishDashboardTour} testIdPrefix="dashboard-tour" />
+      )}
     </div>
   );
 }

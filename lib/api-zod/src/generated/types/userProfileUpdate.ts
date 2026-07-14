@@ -26,4 +26,6 @@ export interface UserProfileUpdate {
   programPageTourSeenAt?: string | null;
   /** @nullable */
   weightLoggingTourSeenAt?: string | null;
+  /** @nullable */
+  dashboardTourSeenAt?: string | null;
 }

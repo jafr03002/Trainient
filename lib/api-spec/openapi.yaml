@@ -679,6 +679,7 @@ components:
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
+        dashboardTourSeenAt: { type: ["string", "null"] }
         createdAt:              { type: string }
 
     UserProfileInput:
@@ -715,6 +716,7 @@ components:
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
+        dashboardTourSeenAt: { type: ["string", "null"] }
 
     # ── Programs ───────────────────────────────────────────────────────────────
     Exercise:
