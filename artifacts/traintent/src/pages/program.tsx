@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
 import { useUser } from "@clerk/react";
-import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, useUpdateProfile, customFetch } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, useUpdateProfile, customFetch, type Program } from "@workspace/api-client-react";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetCurrentProgramQueryKey, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
@@ -11,6 +11,9 @@ import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
+import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
+import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 
 type Exercise = {
   name: string;
@@ -624,7 +627,10 @@ export default function Program() {
   const [activeDay, setActiveDay] = useState(0);
   const [building, setBuilding] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "generating" | "presentation">("idle");
+  const [freshProgram, setFreshProgram] = useState<Program | null>(null);
+  const [regenerateCount, setRegenerateCount] = useState(0);
+  const [, setLocation] = useLocation();
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const updateProfile = useUpdateProfile();
   const tourHeaderRef = useRef<HTMLDivElement>(null);
@@ -662,13 +668,57 @@ export default function Program() {
   }, [isLoading, profileQuery.isLoading, user?.id, program, isIndependent]);
 
   async function handleGenerate() {
-    setGenerating(true);
+    setPhase("generating");
     try {
-      await generateProgram.mutateAsync({});
+      const result = await generateProgram.mutateAsync({});
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-    } finally {
-      setGenerating(false);
+      setFreshProgram(result);
+      setPhase("presentation");
+    } catch {
+      setPhase("idle");
     }
+  }
+
+  async function handleRegenerateFeedback(feedback: ProgramFeedback) {
+    setPhase("generating");
+    setRegenerateCount((c) => c + 1);
+    try {
+      const result = await generateProgram.mutateAsync({ data: { feedback } });
+      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      setFreshProgram(result);
+    } catch {
+      // keep the previous program on screen; the error banner in the deck reports it
+    }
+    setPhase("presentation");
+  }
+
+  if (phase === "generating") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="w-full max-w-lg">
+          <GeneratingScreen />
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "presentation" && freshProgram) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center px-4 py-12">
+          <PresentationDeck
+            program={freshProgram}
+            goal={profileQuery.data?.goal ?? ""}
+            weightUnit={profileQuery.data?.weightUnit ?? undefined}
+            onSatisfied={() => setLocation("/dashboard")}
+            onSubmitFeedback={handleRegenerateFeedback}
+            isSubmitting={generateProgram.isPending}
+            showRegenerateNudge={regenerateCount >= 3}
+            error={generateProgram.isError}
+          />
+        </div>
+      </div>
+    );
   }
 
   if (isLoading || profileQuery.isLoading) {
@@ -742,16 +792,11 @@ export default function Program() {
           <p className="text-muted-foreground mb-8">Your AI coach has what it needs - generate your first program to get started.</p>
           <button
             onClick={handleGenerate}
-            disabled={generating}
             className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
           >
-            {generating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-            ) : (
-              "Generate my program"
-            )}
+            Generate my program
           </button>
-          {generateProgram.isError && !generating && (
+          {generateProgram.isError && (
             <p className="text-sm text-destructive mt-4">Something went wrong generating your program. Try again.</p>
           )}
         </div>
