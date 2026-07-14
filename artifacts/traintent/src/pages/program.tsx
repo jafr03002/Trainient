@@ -11,6 +11,7 @@ import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
@@ -636,6 +637,7 @@ export default function Program() {
   const tourHeaderRef = useRef<HTMLDivElement>(null);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
+  const logNavTarget = useNavTourTarget("/log");
 
   function finishProgramTour() {
     updateProfile.mutate(
@@ -643,6 +645,10 @@ export default function Program() {
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
     );
   }
+
+  const showProgramTour =
+    !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !isPreCalibrationLocked(program, new Date());
+  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
   const isIndependent = profileQuery.data?.mode === "independent";
   // AI onboarding is the only place goal/experience get set - Independent
@@ -827,11 +833,11 @@ export default function Program() {
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
-  const showProgramTour = !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !locked;
   const programTourSteps: CoachmarkStep[] = [
     { target: tourHeaderRef, text: "Here you can find your programs." },
     { target: tourDayTabsRef, text: "Here is your program." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
+    { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
   return (
