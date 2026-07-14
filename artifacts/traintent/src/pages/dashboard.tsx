@@ -257,6 +257,11 @@ export default function Dashboard() {
     { target: tourProgressRef, text: "And down here you can track your progress." },
   ];
 
+  // No program has been generated yet (e.g. "Generate program later" during
+  // onboarding) - daily targets don't exist yet, so today's check-in is
+  // locked until a program exists.
+  const dailyCheckinLocked = !program.isLoading && !program.data;
+
   const weightUnit = profile?.weightUnit ?? "kg";
   const goal = goalProgress.data;
   const kgToGo = goal?.goalWeight != null ? Math.abs(goal.currentTrendWeight - goal.goalWeight) : null;
@@ -486,7 +491,12 @@ export default function Dashboard() {
             {loggedCount}/4 logged
           </span>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+        {dailyCheckinLocked && (
+          <p className="text-xs text-muted-foreground mt-1" data-testid="text-checkin-locked">
+            Generate a program to start logging your daily check-in.
+          </p>
+        )}
+        <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 ${dailyCheckinLocked ? "opacity-50" : ""}`}>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weight</label>
             <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
@@ -496,7 +506,8 @@ export default function Dashboard() {
                 value={weightInput}
                 onChange={(e) => setWeightInput(e.target.value)}
                 placeholder="0.0"
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                disabled={dailyCheckinLocked}
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
                 data-testid="input-checkin-weight"
               />
               <span className="text-xs text-muted-foreground shrink-0">{weightUnit}</span>
@@ -510,7 +521,8 @@ export default function Dashboard() {
                 value={caloriesInput}
                 onChange={(e) => setCaloriesInput(e.target.value)}
                 placeholder="0"
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                disabled={dailyCheckinLocked}
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
                 data-testid="input-checkin-calories"
               />
               <span className="text-xs text-muted-foreground shrink-0">kcal</span>
@@ -524,7 +536,8 @@ export default function Dashboard() {
                 value={stepsInput}
                 onChange={(e) => setStepsInput(e.target.value)}
                 placeholder="0"
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                disabled={dailyCheckinLocked}
+                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
                 data-testid="input-checkin-steps"
               />
             </div>
@@ -535,7 +548,8 @@ export default function Dashboard() {
               <select
                 value={cardioTypeInput}
                 onChange={(e) => setCardioTypeInput(e.target.value)}
-                className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
+                disabled={dailyCheckinLocked}
+                className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none disabled:cursor-not-allowed"
                 data-testid="select-checkin-cardio-type"
               >
                 <option value="">None</option>
@@ -548,7 +562,8 @@ export default function Dashboard() {
                 value={cardioMinutesInput}
                 onChange={(e) => setCardioMinutesInput(e.target.value)}
                 placeholder="min"
-                className="w-12 shrink-0 bg-transparent text-sm text-right focus:outline-none"
+                disabled={dailyCheckinLocked}
+                className="w-12 shrink-0 bg-transparent text-sm text-right focus:outline-none disabled:cursor-not-allowed"
                 data-testid="input-checkin-cardio-minutes"
               />
             </div>
@@ -557,7 +572,7 @@ export default function Dashboard() {
         <div className="flex justify-end mt-4">
           <button
             onClick={handleSaveDailyCheckin}
-            disabled={submitDailyCheckin.isPending}
+            disabled={submitDailyCheckin.isPending || dailyCheckinLocked}
             className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50"
             data-testid="button-save-checkin"
           >
