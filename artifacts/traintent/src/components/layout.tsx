@@ -41,11 +41,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const profileSettled = !profileQuery.isLoading;
   const needsOnboarding = profileQuery.error?.status === 404;
 
+  // Don't redirect on a stale 404 that's currently being refetched - the error
+  // lingers in cache until the in-flight fetch resolves, and bouncing on it
+  // would send a freshly-onboarded user back to /onboarding mid-refetch.
   useEffect(() => {
-    if (profileSettled && needsOnboarding && location !== "/onboarding") {
+    if (profileSettled && !profileQuery.isFetching && needsOnboarding && location !== "/onboarding") {
       setLocation("/onboarding", { replace: true });
     }
-  }, [profileSettled, needsOnboarding, location, setLocation]);
+  }, [profileSettled, profileQuery.isFetching, needsOnboarding, location, setLocation]);
 
   if (location === "/onboarding") {
     return <main className="min-h-screen bg-background">{children}</main>;
