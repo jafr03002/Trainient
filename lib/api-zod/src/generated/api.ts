@@ -42,6 +42,7 @@ export const GetProfileResponse = zod.object({
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
+  "dashboardTourSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -82,7 +83,8 @@ export const UpdateProfileBody = zod.object({
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
-  "weightLoggingTourSeenAt": zod.string().nullish()
+  "weightLoggingTourSeenAt": zod.string().nullish(),
+  "dashboardTourSeenAt": zod.string().nullish()
 })
 
 export const UpdateProfileResponse = zod.object({
@@ -108,6 +110,7 @@ export const UpdateProfileResponse = zod.object({
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
+  "dashboardTourSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

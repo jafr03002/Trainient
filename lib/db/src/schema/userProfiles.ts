@@ -25,6 +25,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   calibrationWalkthroughSeenAt: timestamp("calibration_walkthrough_seen_at"),
   programPageTourSeenAt: timestamp("program_page_tour_seen_at"),
   weightLoggingTourSeenAt: timestamp("weight_logging_tour_seen_at"),
+  dashboardTourSeenAt: timestamp("dashboard_tour_seen_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

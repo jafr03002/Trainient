@@ -32,7 +32,7 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
   async function finish() {
     await updateProfile.mutateAsync({ data: { calibrationWalkthroughSeenAt: new Date().toISOString() } });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
-    setLocation("/program");
+    setLocation("/dashboard");
   }
 
   return (
