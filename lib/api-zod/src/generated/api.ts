@@ -152,7 +152,10 @@ export const GetCurrentProgramResponse = zod.object({
 }).nullish(),
   "longTermGoalWeight": zod.number().nullish(),
   "shortTermGoalWeight": zod.number().nullish(),
-  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
   "cardioIntensity": zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
@@ -202,7 +205,10 @@ export const ListProgramsResponseItem = zod.object({
 }).nullish(),
   "longTermGoalWeight": zod.number().nullish(),
   "shortTermGoalWeight": zod.number().nullish(),
-  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
   "cardioIntensity": zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
@@ -310,7 +316,10 @@ export const UpdateProgramResponse = zod.object({
 }).nullish(),
   "longTermGoalWeight": zod.number().nullish(),
   "shortTermGoalWeight": zod.number().nullish(),
-  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
   "cardioIntensity": zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
@@ -368,7 +377,10 @@ export const SetProgramStartDateResponse = zod.object({
 }).nullish(),
   "longTermGoalWeight": zod.number().nullish(),
   "shortTermGoalWeight": zod.number().nullish(),
-  "dailyStepTarget": zod.union([zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
   "cardioIntensity": zod.object({
   "bpmMin": zod.number().optional(),
   "bpmMax": zod.number().optional(),
@@ -684,6 +696,76 @@ export const GetBodyweightProgressResponseItem = zod.object({
   "weight": zod.number()
 })
 export const GetBodyweightProgressResponse = zod.array(GetBodyweightProgressResponseItem)
+
+
+/**
+ * @summary Trend weight vs. goal weight, with a 14-day trailing-rate projected target date
+ */
+export const GetGoalProgressResponse = zod.object({
+  "startWeight": zod.number(),
+  "startDate": zod.string(),
+  "currentTrendWeight": zod.number(),
+  "goalWeight": zod.number().nullish(),
+  "percentToGoal": zod.number().nullish(),
+  "targetDate": zod.string().nullish()
+})
+
+
+/**
+ * @summary Log (upsert) today's calories/steps/cardio, and optionally bodyweight, in one call
+ */
+export const SubmitDailyCheckinBody = zod.object({
+  "date": zod.string(),
+  "weight": zod.number().nullish(),
+  "calories": zod.number().nullish(),
+  "steps": zod.number().nullish(),
+  "cardioType": zod.string().nullish(),
+  "cardioMinutes": zod.number().nullish()
+})
+
+export const SubmitDailyCheckinResponse = zod.object({
+  "dailyLog": zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "date": zod.string(),
+  "calories": zod.number().nullish(),
+  "steps": zod.number().nullish(),
+  "cardioType": zod.string().nullish(),
+  "cardioMinutes": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}),
+  "bodyweightLog": zod.union([zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "date": zod.string(),
+  "weight": zod.number(),
+  "weightUnit": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Get a 7-day window of daily logs (calories/steps/cardio/weight) plus this week's phase
+ */
+export const GetDailyLogsWeekQueryParams = zod.object({
+  "startDate": zod.coerce.string()
+})
+
+export const GetDailyLogsWeekResponse = zod.object({
+  "days": zod.array(zod.object({
+  "date": zod.string(),
+  "calories": zod.number().nullish(),
+  "steps": zod.number().nullish(),
+  "cardioType": zod.string().nullish(),
+  "cardioMinutes": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "weightUnit": zod.string().nullish()
+})),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish()
+})
 
 
 /**

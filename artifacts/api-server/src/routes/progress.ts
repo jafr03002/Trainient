@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
+import { db, workoutLogsTable, bodyweightLogsTable, userProfilesTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { GetStrengthProgressQueryParams } from "@workspace/api-zod";
 
@@ -197,6 +197,85 @@ router.get("/progress/bodyweight", requireAuth, async (req, res) => {
   const points = logs.map((log) => ({ date: log.date, weight: log.weight }));
   res.json(points.sort((a, b) => a.date.localeCompare(b.date)));
 });
+
+function addDaysToDateString(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y!, m! - 1, d! + days);
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+
+// Average of whichever logged weights fall in the `windowDays`-day window
+// ending on `endDate` (inclusive) - null if nothing was logged in that span,
+// since logging isn't guaranteed to be daily.
+function averageInWindow(
+  logs: { date: string; weight: number }[],
+  endDate: string,
+  windowDays: number,
+): number | null {
+  const end = new Date(endDate).getTime();
+  const start = end - (windowDays - 1) * 24 * 60 * 60 * 1000;
+  const inWindow = logs.filter((l) => {
+    const t = new Date(l.date).getTime();
+    return t >= start && t <= end;
+  });
+  if (!inWindow.length) return null;
+  return inWindow.reduce((sum, l) => sum + l.weight, 0) / inWindow.length;
+}
+
+router.get("/progress/goal", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const [logs, profile] = await Promise.all([
+    db.query.bodyweightLogsTable.findMany({ where: eq(bodyweightLogsTable.userId, userId) }),
+    db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
+  ]);
+  if (!logs.length) {
+    res.status(404).json({ error: "No bodyweight logged yet" });
+    return;
+  }
+
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  const startWeight = sorted[0]!.weight;
+  const startDate = sorted[0]!.date;
+  const lastDate = sorted[sorted.length - 1]!.date;
+  const currentTrendWeight = averageInWindow(sorted, lastDate, 7) ?? sorted[sorted.length - 1]!.weight;
+
+  const goalWeight = profile?.goalWeight ?? null;
+
+  let percentToGoal: number | null = null;
+  if (goalWeight != null && goalWeight !== startWeight) {
+    const raw = ((currentTrendWeight - startWeight) / (goalWeight - startWeight)) * 100;
+    percentToGoal = Math.max(0, Math.min(100, raw));
+  }
+
+  // 14-day trailing rate: two 7-day rolling averages 14 days apart, so the
+  // projection reacts to the client's actual recent rate rather than the
+  // full-journey average - see the "ETA calc" design discussion. Needs at
+  // least 14 days between the first and most recent log to mean anything.
+  let targetDate: string | null = null;
+  if (goalWeight != null && daysBetween(startDate, lastDate) >= 14) {
+    const priorWindowEnd = addDaysToDateString(lastDate, -14);
+    const priorTrendWeight = averageInWindow(sorted, priorWindowEnd, 7);
+    if (priorTrendWeight != null) {
+      const ratePerDay = (priorTrendWeight - currentTrendWeight) / 14; // positive = losing, negative = gaining
+      const remaining = currentTrendWeight - goalWeight; // positive = needs to lose more, negative = needs to gain more
+      const movingTowardGoal = remaining !== 0 && ratePerDay !== 0 && Math.sign(remaining) === Math.sign(ratePerDay);
+      if (movingTowardGoal) {
+        const daysNeeded = Math.abs(remaining / ratePerDay);
+        if (Number.isFinite(daysNeeded)) {
+          targetDate = addDaysToDateString(lastDate, Math.round(daysNeeded));
+        }
+      }
+    }
+  }
+
+  res.json({ startWeight, startDate, currentTrendWeight, goalWeight, percentToGoal, targetDate });
+});
+
+function daysBetween(a: string, b: string): number {
+  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (24 * 60 * 60 * 1000));
+}
 
 router.get("/progress/exercises", requireAuth, async (req, res) => {
   const userId = getUserId(req);

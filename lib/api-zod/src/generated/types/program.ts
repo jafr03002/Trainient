@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProgramCardioIntensity } from './programCardioIntensity';
-import type { ProgramDailyStepTarget } from './programDailyStepTarget';
 import type { ProgramDay } from './programDay';
 import type { ProgramEnergyBalance } from './programEnergyBalance';
 import type { ProgramHighlight } from './programHighlight';
@@ -37,7 +36,13 @@ export interface Program {
   /** @nullable */
   shortTermGoalWeight?: number | null;
   /** @nullable */
-  dailyStepTarget?: ProgramDailyStepTarget;
+  dailyStepTarget?: number | null;
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  weekInPhase?: number | null;
+  /** @nullable */
+  phaseTotalWeeks?: number | null;
   /** @nullable */
   cardioIntensity?: ProgramCardioIntensity;
   /** @nullable */

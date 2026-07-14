@@ -7,7 +7,7 @@ import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
 import { programGenerationKnowledge } from "../lib/knowledge";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
-import { PHASE_TEMPLATES, INITIAL_PHASE_STATE, energyBalanceForPhase } from "../lib/phaseTemplate";
+import { PHASE_TEMPLATES, INITIAL_PHASE_STATE, energyBalanceForPhase, type LongTermPhase } from "../lib/phaseTemplate";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 
 const router = Router();
@@ -15,13 +15,20 @@ const router = Router();
 // `weekNumber` in the API response is always the live calendar week since
 // onboarding - not the stored column, which is just an insert-order ordinal
 // (used internally for "find the latest program" / check-in versioning).
-// `phaseSegmentIndex`/`weeksInPhaseSegment` are server-internal phase-template
-// bookkeeping (see lib/phaseTemplate.ts) and never leave this server.
+// `phaseSegmentIndex`/`weeksInPhaseSegment` themselves are server-internal
+// phase-template bookkeeping (see lib/phaseTemplate.ts) and never leave this
+// server as-is, but the "week N of M within this phase" framing they encode
+// is legitimate product info - `weekInPhase`/`phaseTotalWeeks` below expose
+// that derived value without leaking the raw segment index.
 function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
   const { phaseSegmentIndex, weeksInPhaseSegment, ...rest } = p;
+  const template = p.longTermPhase ? PHASE_TEMPLATES[p.longTermPhase as LongTermPhase] : null;
+  const segment = template && phaseSegmentIndex != null ? template[phaseSegmentIndex] : null;
   return {
     ...rest,
     weekNumber: trainingWeekNumber(onboardingCompletedAt),
+    weekInPhase: weeksInPhaseSegment,
+    phaseTotalWeeks: segment?.maxWeeks ?? null,
     days: rest.days as object[],
     generatedAt: p.generatedAt.toISOString(),
   };
@@ -191,8 +198,13 @@ Apply these rules:
 - Always respect injuries - avoid or regress exercises that stress injured areas
 - Add extra sets to priority muscle groups (15–20% more volume)
 - Use progressive overload logic: rep ranges are designed to be beaten week over week
-- Recommend a daily step target (low, moderate, or high) per the activity-evaluation guidance
-  above - bump it for clients with low/moderate activity and a weight-loss or general-fitness goal
+- Recommend a concrete daily step count target (e.g. 6000-12000) per the activity-evaluation
+  guidance above - bump it for clients with low/moderate activity and a weight-loss or
+  general-fitness goal
+- Estimate the client's TDEE from their weight, sex, age, and activity level, then prescribe a
+  concrete daily calorie target (kcal) consistent with their goal: a deficit for weight loss, a
+  surplus for muscle gain, roughly maintenance otherwise. Use sound, conservative rate-of-change
+  assumptions (e.g. a 500 kcal/day deficit for a ~0.5 kg/week loss rate) rather than an aggressive number
 - Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
   your own judgement of what's appropriate for this client's sex, weight, and experience level,
   per the guidance above
@@ -216,7 +228,8 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
     "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
-  "daily_step_target": "moderate",
+  "daily_step_target": 8000,
+  "daily_calorie_target": 1900,
   "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "moderate" } }`;
 
   const userPrompt = `User profile:
@@ -306,6 +319,7 @@ For each day, provide 5–7 exercises. For each exercise provide:
       longTermGoalWeight: profile.goalWeight,
       shortTermGoalWeight: null,
       dailyStepTarget: raw.daily_step_target,
+      dailyCalorieTarget: raw.daily_calorie_target,
       cardioIntensity: cardioIntensityFrom(raw.cardio_intensity),
       phaseSegmentIndex: INITIAL_PHASE_STATE.segmentIndex,
       weeksInPhaseSegment: INITIAL_PHASE_STATE.weeksInSegment,

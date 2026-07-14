@@ -5,3 +5,4 @@ export * from "./checkins";
 export * from "./subscriptions";
 export * from "./calendarColors";
 export * from "./bodyweightLogs";
+export * from "./dailyLogs";
