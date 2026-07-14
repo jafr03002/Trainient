@@ -3,7 +3,8 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
@@ -133,6 +134,7 @@ export default function Onboarding() {
   // can't tell them apart.
   const [finishAction, setFinishAction] = useState<"generate" | "later" | null>(null);
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const createProfile = useCreateProfile();
   const generateProgram = useGenerateProgram();
   const setProgramStartDate = useSetProgramStartDate();
@@ -257,7 +259,7 @@ export default function Onboarding() {
   // from /program's own empty state.
   async function handleFinish(generateNow: boolean) {
     try {
-      await createProfile.mutateAsync({
+      const profile = await createProfile.mutateAsync({
         data: {
           mode: form.mode,
           name: form.name || undefined,
@@ -277,6 +279,13 @@ export default function Onboarding() {
           priorityMuscles: form.priorityMuscles,
         },
       });
+
+      // Seed the profile cache with the just-created profile. useGetProfile
+      // cached a 404 error on first load (no profile row existed yet), and the
+      // Layout that guards every authenticated route never remounts as we
+      // navigate to /dashboard - so without this it would still see the stale
+      // 404 and bounce the user right back to /onboarding.
+      queryClient.setQueryData(getGetProfileQueryKey(), profile);
 
       if (form.mode === "ai" && generateNow) {
         setPhase("generating");
