@@ -1,15 +1,18 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useClerk } from "@clerk/react";
-import { 
-  LayoutDashboard, 
-  Dumbbell, 
-  Activity, 
-  ClipboardCheck, 
-  LineChart, 
+import {
+  LayoutDashboard,
+  Dumbbell,
+  Activity,
+  ClipboardCheck,
+  LineChart,
   Settings,
   Calendar,
-  LogOut 
+  LogOut,
+  Loader2
 } from "lucide-react";
+import { useGetProfile } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -22,11 +25,38 @@ const navItems = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { signOut } = useClerk();
+  const profileQuery = useGetProfile();
+
+  // No profile row means onboarding (mode selection + the rest of the
+  // wizard) was never completed - the row is only created at the end of
+  // onboarding.tsx's handleFinish. Bounce back there instead of letting a
+  // signed-in-but-not-onboarded user land on the dashboard or any other
+  // authenticated page. Hold off rendering the page itself (not just the
+  // redirect) until that's known, otherwise a not-yet-onboarded user sees a
+  // flash of the destination page while the profile fetch is still in
+  // flight - this query resolves once per session (cached after), so the
+  // wait is a one-time thing on first load, not on every navigation.
+  const profileSettled = !profileQuery.isLoading;
+  const needsOnboarding = profileQuery.error?.status === 404;
+
+  useEffect(() => {
+    if (profileSettled && needsOnboarding && location !== "/onboarding") {
+      setLocation("/onboarding", { replace: true });
+    }
+  }, [profileSettled, needsOnboarding, location, setLocation]);
 
   if (location === "/onboarding") {
     return <main className="min-h-screen bg-background">{children}</main>;
+  }
+
+  if (!profileSettled || needsOnboarding) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </main>
+    );
   }
 
   return (
