@@ -739,7 +739,7 @@ export default function Onboarding() {
                     </p>
                   ) : form.preferredRestDays.length === maxPreferredRestDays ? (
                     <p className="text-xs font-medium text-amber-500" data-testid="text-rest-warning">
-                      That's the most rest days you can keep free with {form.trainingDays} training days.
+                      You've picked the most rest days we can plan around your {form.trainingDays} training days.
                     </p>
                   ) : form.preferredRestDays.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
