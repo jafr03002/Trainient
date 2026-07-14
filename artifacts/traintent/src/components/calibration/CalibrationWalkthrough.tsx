@@ -29,6 +29,9 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
   const total = steps.length;
   const isLast = step === total - 1;
 
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
   async function finish() {
     await updateProfile.mutateAsync({ data: { calibrationWalkthroughSeenAt: new Date().toISOString() } });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
@@ -86,7 +89,7 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
           )}
 
           {steps[step] === "review" && (
-            <CalibrationReviewStep calibrationStart={calibrationStart} today={new Date()} />
+            <CalibrationReviewStep calibrationStart={calibrationStart} today={todayMidnight} />
           )}
         </div>
 

@@ -73,14 +73,6 @@ export function CalibrationReviewStep({ calibrationStart, today }: { calibration
           </div>
         </div>
       </div>
-
-      <div className="p-3 rounded-lg bg-primary/5 border border-primary/15">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1">What happens next</div>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          You're just getting started. From day 8, you can request your review whenever you feel
-          ready - and if you haven't by day 21, it happens automatically.
-        </p>
-      </div>
     </>
   );
 }
