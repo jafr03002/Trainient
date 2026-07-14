@@ -1,5 +1,12 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
 
+// A single coachmark step, anchored to a real element via `target`.
+// - "info" (the default): an explanatory bubble the user advances with Next.
+// - "navClick": the user must tap the highlighted element - a real nav link -
+//   to advance. These steps hide the Next button and skip the auto
+//   scrollIntoView, so the tour ends by handing the user off to the app's nav
+//   instead of navigating for them (see useNavTourTarget/useNavTourClick in
+//   components/layout.tsx).
 export type CoachmarkStep =
   | { kind?: "info"; target: RefObject<HTMLElement | null>; text: string }
   | { kind: "navClick"; target: RefObject<HTMLElement | null>; text: string };
@@ -15,8 +22,11 @@ const BUBBLE_WIDTH = 320;
 
 // Numbered, anchored coachmark sequence - points directly at a real element on
 // the page rather than explaining it in a separate full-screen deck. Shared by
-// the Program page and Log page first-time tours (see lib/calibration.ts's
-// *TourSeenAt gating convention for how each caller decides whether to render this).
+// the Dashboard, Program, and Log page first-time tours (see the *TourSeenAt
+// profile fields for how each caller decides whether to render this).
+// Optionally opens with a full-screen `intro` card (Skip / Let's go) before the
+// anchored steps, and a `navClick` final step can end the tour by directing the
+// user to tap a real nav link rather than auto-navigating for them.
 export function CoachmarkTour({
   steps,
   onDone,
