@@ -184,7 +184,11 @@ export default function Onboarding() {
   const steps = stepsFor(form.mode);
   const currentStep = steps[step];
   const totalSteps = steps.length;
-  const progress = ((step + 1) / totalSteps) * 100;
+  // Until a mode is picked on the first step, the flow length is unknown (AI
+  // and Independent have different step counts), so keep the progress bar empty
+  // rather than implying the user is already a quarter of the way through.
+  const hasStarted = form.mode !== "";
+  const progress = hasStarted ? ((step + 1) / totalSteps) * 100 : 0;
 
   // A user may keep at most (7 - trainingDays + 1) days free: the strict number
   // of off-days plus one day of scheduling slack. More than that can't be
@@ -447,7 +451,9 @@ export default function Onboarding() {
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
-          <div className="text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase">
+          {/* Hidden (but space reserved to avoid a layout jump) until a mode is
+              chosen - "Step 1 of 4" before any interaction is misleading. */}
+          <div className={`text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase ${hasStarted ? "" : "invisible"}`}>
             Step {step + 1} of {totalSteps}
           </div>
 
