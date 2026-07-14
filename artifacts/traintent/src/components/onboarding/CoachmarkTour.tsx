@@ -53,7 +53,8 @@ export function CoachmarkTour({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [current, phase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, current?.kind, phase]);
 
   if (phase === "intro" && intro) {
     return (

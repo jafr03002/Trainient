@@ -646,6 +646,10 @@ export default function Program() {
     );
   }
 
+  const showProgramTour =
+    !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !isPreCalibrationLocked(program, new Date());
+  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
+
   const isIndependent = profileQuery.data?.mode === "independent";
   // AI onboarding is the only place goal/experience get set - Independent
   // mode's shorter flow skips them, so a mode switch can land here with a
@@ -829,15 +833,12 @@ export default function Program() {
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
-  const showProgramTour = !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !locked;
   const programTourSteps: CoachmarkStep[] = [
     { target: tourHeaderRef, text: "Here you can find your programs." },
     { target: tourDayTabsRef, text: "Here is your program." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
-
-  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">

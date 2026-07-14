@@ -107,6 +107,9 @@ export default function Dashboard() {
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
 
+  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !!program.data?.days?.[0];
+  useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
+
   const todayStr = todayDateString();
   const weekStartStr = startOfWeekDateString();
   const weekLogs = useGetDailyLogsWeek({ startDate: weekStartStr });
@@ -250,15 +253,12 @@ export default function Dashboard() {
     : "No new PRs yet this week";
 
   const nextDay = program.data?.days?.[0] as any;
-  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !!nextDay;
   const dashboardTourSteps: CoachmarkStep[] = [
     { target: tourDailyTaskRef, text: "This is where you'll see what you need to do each day." },
     { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
     { target: tourProgressRef, text: "And down here you can track your progress." },
     { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
   ];
-
-  useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
 
   // No program has been generated yet (e.g. "Generate program later" during
   // onboarding) - daily targets don't exist yet, so today's check-in is
