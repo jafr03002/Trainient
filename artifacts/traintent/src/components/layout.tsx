@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from "react";
 import { Link, useLocation } from "wouter";
 import { useClerk } from "@clerk/react";
 import {
@@ -24,10 +24,65 @@ const navItems = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+type NavTourCtx = {
+  registerEl: (href: string, variant: "desktop" | "mobile", el: HTMLAnchorElement | null) => void;
+  getEl: (href: string) => HTMLElement | null;
+  registerClickHandler: (href: string, handler: (() => void) | null) => void;
+};
+const NavTourContext = createContext<NavTourCtx | null>(null);
+
+function isVisible(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+
+// Lets a page point a CoachmarkTour step at a real nav link (e.g. "Program"),
+// even though Layout - not the page - owns that DOM node. Resolves to
+// whichever of the desktop sidebar / mobile bottom-nav copy is currently
+// visible, since both are always mounted simultaneously.
+export function useNavTourTarget(href: string): RefObject<HTMLElement | null> {
+  const ctx = useContext(NavTourContext);
+  return useMemo(
+    () => ({ get current() { return ctx?.getEl(href) ?? null; } }),
+    [ctx, href],
+  ) as RefObject<HTMLElement | null>;
+}
+
+// Fires `handler` when the real nav link for `href` is clicked, in addition
+// to the normal navigation. Pass `null` when the tour step shouldn't be
+// intercepting that link (e.g. once the tour isn't showing).
+export function useNavTourClick(href: string, handler: (() => void) | null): void {
+  const ctx = useContext(NavTourContext);
+  useEffect(() => {
+    ctx?.registerClickHandler(href, handler);
+    return () => ctx?.registerClickHandler(href, null);
+  }, [ctx, href, handler]);
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { signOut } = useClerk();
   const profileQuery = useGetProfile();
+
+  const navElsRef = useRef<Record<string, { desktop?: HTMLAnchorElement | null; mobile?: HTMLAnchorElement | null }>>({});
+  const clickHandlersRef = useRef<Record<string, (() => void) | null>>({});
+  const navTourCtx = useMemo<NavTourCtx>(
+    () => ({
+      registerEl: (href, variant, el) => {
+        navElsRef.current[href] = { ...navElsRef.current[href], [variant]: el };
+      },
+      getEl: (href) => {
+        const els = navElsRef.current[href];
+        if (els?.desktop && isVisible(els.desktop)) return els.desktop;
+        if (els?.mobile && isVisible(els.mobile)) return els.mobile;
+        return null;
+      },
+      registerClickHandler: (href, handler) => {
+        clickHandlersRef.current[href] = handler;
+      },
+    }),
+    [],
+  );
 
   // No profile row means onboarding (mode selection + the rest of the
   // wizard) was never completed - the row is only created at the end of
@@ -63,6 +118,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <NavTourContext.Provider value={navTourCtx}>
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-border bg-card hidden md:flex flex-col">
@@ -84,9 +140,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                ref={(el) => navTourCtx.registerEl(item.href, "desktop", el)}
+                onClick={() => clickHandlersRef.current[item.href]?.()}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors ${
-                  isActive 
-                    ? "bg-primary/10 text-primary font-medium" 
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
@@ -125,6 +183,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                ref={(el) => navTourCtx.registerEl(item.href, "mobile", el)}
+                onClick={() => clickHandlersRef.current[item.href]?.()}
                 className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
@@ -137,5 +197,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
     </div>
+    </NavTourContext.Provider>
   );
 }

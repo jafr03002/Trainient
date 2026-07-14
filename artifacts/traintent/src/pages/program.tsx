@@ -11,6 +11,7 @@ import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
@@ -636,6 +637,7 @@ export default function Program() {
   const tourHeaderRef = useRef<HTMLDivElement>(null);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
+  const logNavTarget = useNavTourTarget("/log");
 
   function finishProgramTour() {
     updateProfile.mutate(
@@ -832,7 +834,10 @@ export default function Program() {
     { target: tourHeaderRef, text: "Here you can find your programs." },
     { target: tourDayTabsRef, text: "Here is your program." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
+    { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
+
+  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">

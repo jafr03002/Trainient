@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Check, Loader2 } from "lucide-react";
@@ -26,6 +26,7 @@ import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { toast } from "@/hooks/use-toast";
 
 // Local calendar date, not UTC - so logging just after midnight lands on the
@@ -83,7 +84,6 @@ const CARDIO_TYPES = ["Run", "Bike", "Row", "Swim", "Walk", "Other"];
 
 export default function Dashboard() {
   const { user } = useUser();
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const stats = useGetWorkoutStats();
   const program = useGetCurrentProgram();
@@ -95,13 +95,13 @@ export default function Dashboard() {
   const tourDailyTaskRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const tourProgressRef = useRef<HTMLDivElement>(null);
+  const programNavTarget = useNavTourTarget("/program");
 
   function finishDashboardTour() {
     updateProfile.mutate(
       { data: { dashboardTourSeenAt: new Date().toISOString() } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
     );
-    setLocation("/program");
   }
 
   const profile = profileQuery.data;
@@ -255,7 +255,10 @@ export default function Dashboard() {
     { target: tourDailyTaskRef, text: "This is where you'll see what you need to do each day." },
     { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
     { target: tourProgressRef, text: "And down here you can track your progress." },
+    { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
   ];
+
+  useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
 
   // No program has been generated yet (e.g. "Generate program later" during
   // onboarding) - daily targets don't exist yet, so today's check-in is
@@ -637,7 +640,12 @@ export default function Dashboard() {
       </motion.div>
 
       {showDashboardTour && (
-        <CoachmarkTour steps={dashboardTourSteps} onDone={finishDashboardTour} testIdPrefix="dashboard-tour" />
+        <CoachmarkTour
+          steps={dashboardTourSteps}
+          onDone={finishDashboardTour}
+          testIdPrefix="dashboard-tour"
+          intro={{ text: "We're starting a quick tour to show you how the app works." }}
+        />
       )}
     </div>
   );
