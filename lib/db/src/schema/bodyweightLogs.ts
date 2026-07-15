@@ -10,8 +10,8 @@ export const bodyweightLogsTable = pgTable(
     date: text("date").notNull(),
     weight: real("weight").notNull(),
     weightUnit: text("weight_unit").notNull().default("kg"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("bodyweight_logs_user_date_idx").on(table.userId, table.date)],
 );

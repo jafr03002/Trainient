@@ -8,8 +8,8 @@ export const subscriptionsTable = pgTable("subscriptions", {
   status: text("status").notNull().default("active"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
-  currentPeriodEnd: timestamp("current_period_end"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptionsTable).omit({ updatedAt: true });

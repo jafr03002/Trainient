@@ -21,12 +21,12 @@ export const userProfilesTable = pgTable("user_profiles", {
   injurySeverity: text("injury_severity"),
   priorityMuscles: text("priority_muscles").array().notNull().default([]),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
-  onboardingCompletedAt: timestamp("onboarding_completed_at"),
-  calibrationWalkthroughSeenAt: timestamp("calibration_walkthrough_seen_at"),
-  programPageTourSeenAt: timestamp("program_page_tour_seen_at"),
-  weightLoggingTourSeenAt: timestamp("weight_logging_tour_seen_at"),
-  dashboardTourSeenAt: timestamp("dashboard_tour_seen_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+  calibrationWalkthroughSeenAt: timestamp("calibration_walkthrough_seen_at", { withTimezone: true }),
+  programPageTourSeenAt: timestamp("program_page_tour_seen_at", { withTimezone: true }),
+  weightLoggingTourSeenAt: timestamp("weight_logging_tour_seen_at", { withTimezone: true }),
+  dashboardTourSeenAt: timestamp("dashboard_tour_seen_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertUserProfileSchema = createInsertSchema(userProfilesTable).omit({ createdAt: true });

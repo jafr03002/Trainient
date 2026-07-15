@@ -12,8 +12,8 @@ export const dailyLogsTable = pgTable(
     steps: integer("steps"),
     cardioType: text("cardio_type"),
     cardioMinutes: integer("cardio_minutes"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("daily_logs_user_date_idx").on(table.userId, table.date)],
 );
