@@ -9,5 +9,6 @@ import type { ProgramFeedbackCategoriesItem } from './programFeedbackCategoriesI
 
 export interface ProgramFeedback {
   categories: ProgramFeedbackCategoriesItem[];
+  /** @maxLength 1000 */
   note: string;
 }

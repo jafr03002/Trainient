@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, userProfilesTable, programsTable } from "@workspace/db";
-import { SetProgramStartDateBody } from "@workspace/api-zod";
+import {
+  SetProgramStartDateBody,
+  CreateManualProgramBody,
+  UpdateProgramBody,
+  GenerateProgramBody,
+} from "@workspace/api-zod";
 import { requireAuth, getUserId } from "../lib/auth";
 import { anthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
@@ -67,11 +72,12 @@ router.get("/programs", requireAuth, async (req, res) => {
 // Manual program creation (independent mode)
 router.post("/programs", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const { programName, splitType, days } = req.body;
-  if (!programName || !splitType || !days) {
-    res.status(400).json({ error: "programName, splitType, and days are required" });
+  const parsed = CreateManualProgramBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const { programName, splitType, days } = parsed.data;
 
   const [latestProgram, profile] = await Promise.all([
     db.query.programsTable.findFirst({
@@ -102,11 +108,12 @@ router.post("/programs", requireAuth, async (req, res) => {
 router.put("/programs/:id", requireAuth, async (req, res) => {
   const userId = getUserId(req);
   const id = parseInt(String(req.params["id"] ?? "0"));
-  const { programName, splitType, days } = req.body;
-  if (!programName || !splitType || !days) {
-    res.status(400).json({ error: "programName, splitType, and days are required" });
+  const parsed = UpdateProgramBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const { programName, splitType, days } = parsed.data;
 
   // Scoped to userId + aiGenerated=false in the WHERE itself (not checked
   // after the fact) so this can never touch another user's row, and an
@@ -156,7 +163,14 @@ router.patch("/programs/:id", requireAuth, async (req, res) => {
 
 router.post("/programs/generate", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const feedback: { categories?: string[]; note?: string } | undefined = req.body?.feedback;
+  const parsed = GenerateProgramBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  // Validated (enum-constrained categories, string note) before it is
+  // interpolated into the LLM prompt below.
+  const feedback = parsed.data.feedback;
 
   const profile = await db.query.userProfilesTable.findFirst({
     where: eq(userProfilesTable.userId, userId),

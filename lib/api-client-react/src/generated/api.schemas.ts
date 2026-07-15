@@ -264,7 +264,9 @@ export interface ProgramStartDateUpdate {
 }
 
 export interface ManualProgramInput {
+  /** @maxLength 120 */
   programName: string;
+  /** @maxLength 80 */
   splitType: string;
   days: ProgramDay[];
 }
@@ -286,6 +288,7 @@ export const ProgramFeedbackCategoriesItem = {
 
 export interface ProgramFeedback {
   categories: ProgramFeedbackCategoriesItem[];
+  /** @maxLength 1000 */
   note: string;
 }
 
@@ -539,7 +542,9 @@ export interface CalendarColor {
 }
 
 export interface CalendarColorInput {
+  /** @maxLength 64 */
   dayLabel: string;
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
   hexColor: string;
 }
 

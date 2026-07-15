@@ -803,8 +803,8 @@ components:
       type: object
       required: [programName, splitType, days]
       properties:
-        programName:  { type: string }
-        splitType:    { type: string }
+        programName:  { type: string, maxLength: 120 }
+        splitType:    { type: string, maxLength: 80 }
         days:
           type: array
           items:
@@ -828,7 +828,7 @@ components:
               - equipment
               - priority_muscles
               - overall_volume
-        note: { type: string }
+        note: { type: string, maxLength: 1000 }
 
     GenerateProgramInput:
       type: object
@@ -1092,8 +1092,8 @@ components:
       type: object
       required: [dayLabel, hexColor]
       properties:
-        dayLabel:   { type: string }
-        hexColor:   { type: string }
+        dayLabel:   { type: string, maxLength: 64 }
+        hexColor:   { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
 
     # ── Subscriptions ─────────────────────────────────────────────────────────
     Subscription:
