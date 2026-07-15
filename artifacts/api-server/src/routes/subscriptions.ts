@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { db, subscriptionsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateCheckoutSessionBody } from "@workspace/api-zod";
+import { logger } from "../lib/logger";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-05-27.dahlia",
@@ -102,13 +103,24 @@ router.post("/subscriptions/webhook", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  // Fail closed: never trust an unverified body. A missing secret is a
+  // deployment misconfiguration, and a missing signature means the sender is not
+  // Stripe - in both cases we refuse rather than processing a forgeable event.
+  if (!webhookSecret) {
+    logger.error("STRIPE_WEBHOOK_SECRET is not configured; rejecting webhook");
+    res.status(500).json({ error: "Webhook not configured" });
+    return;
+  }
+  if (!sig) {
+    res.status(400).json({ error: "Missing signature" });
+    return;
+  }
+
   let event: Stripe.Event;
   try {
-    if (webhookSecret && sig) {
-      event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
-    } else {
-      event = req.body as Stripe.Event;
-    }
+    // The only path that builds an event: verify the signature against the raw
+    // request body. An invalid or forged signature throws and is rejected below.
+    event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
   } catch (err) {
     res.status(400).json({ error: "Webhook error" });
     return;
