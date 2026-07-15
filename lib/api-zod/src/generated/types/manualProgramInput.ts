@@ -8,7 +8,9 @@
 import type { ProgramDay } from './programDay';
 
 export interface ManualProgramInput {
+  /** @maxLength 120 */
   programName: string;
+  /** @maxLength 80 */
   splitType: string;
   days: ProgramDay[];
 }

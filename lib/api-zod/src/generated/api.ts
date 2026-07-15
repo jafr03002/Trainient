@@ -225,9 +225,15 @@ export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
 /**
  * @summary Create a manual (non-AI) program
  */
+export const createManualProgramBodyProgramNameMax = 120;
+
+export const createManualProgramBodySplitTypeMax = 80;
+
+
+
 export const CreateManualProgramBody = zod.object({
-  "programName": zod.string(),
-  "splitType": zod.string(),
+  "programName": zod.string().max(createManualProgramBodyProgramNameMax),
+  "splitType": zod.string().max(createManualProgramBodySplitTypeMax),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
   "label": zod.string(),
@@ -250,10 +256,14 @@ export const CreateManualProgramBody = zod.object({
 /**
  * @summary Trigger AI generation of a new program based on user profile
  */
+export const generateProgramBodyFeedbackNoteMax = 1000;
+
+
+
 export const GenerateProgramBody = zod.object({
   "feedback": zod.object({
   "categories": zod.array(zod.enum(['training_days', 'exercises', 'sets', 'split', 'order', 'session_length', 'equipment', 'priority_muscles', 'overall_volume'])),
-  "note": zod.string()
+  "note": zod.string().max(generateProgramBodyFeedbackNoteMax)
 }).optional()
 })
 
@@ -261,9 +271,15 @@ export const GenerateProgramBody = zod.object({
 /**
  * @summary Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
  */
+export const updateProgramBodyProgramNameMax = 120;
+
+export const updateProgramBodySplitTypeMax = 80;
+
+
+
 export const UpdateProgramBody = zod.object({
-  "programName": zod.string(),
-  "splitType": zod.string(),
+  "programName": zod.string().max(updateProgramBodyProgramNameMax),
+  "splitType": zod.string().max(updateProgramBodySplitTypeMax),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
   "label": zod.string(),
@@ -786,9 +802,14 @@ export const GetCalendarColorsResponse = zod.array(GetCalendarColorsResponseItem
 /**
  * @summary Save or update a colour for a day label
  */
+export const upsertCalendarColorBodyDayLabelMax = 64;
+
+export const upsertCalendarColorBodyHexColorRegExp = new RegExp('^#[0-9a-fA-F]{6}$');
+
+
 export const UpsertCalendarColorBody = zod.object({
-  "dayLabel": zod.string(),
-  "hexColor": zod.string()
+  "dayLabel": zod.string().max(upsertCalendarColorBodyDayLabelMax),
+  "hexColor": zod.string().regex(upsertCalendarColorBodyHexColorRegExp)
 })
 
 export const UpsertCalendarColorResponse = zod.object({

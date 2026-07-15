@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and } from "drizzle-orm";
 import { db, calendarColorsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
+import { UpsertCalendarColorBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -15,11 +16,12 @@ router.get("/calendar/colors", requireAuth, async (req, res) => {
 
 router.post("/calendar/colors", requireAuth, async (req, res) => {
   const userId = getUserId(req);
-  const { dayLabel, hexColor } = req.body;
-  if (!dayLabel || !hexColor) {
-    res.status(400).json({ error: "dayLabel and hexColor required" });
+  const parsed = UpsertCalendarColorBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const { dayLabel, hexColor } = parsed.data;
 
   const existing = await db.query.calendarColorsTable.findFirst({
     where: and(

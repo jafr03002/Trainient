@@ -7,6 +7,8 @@
  */
 
 export interface CalendarColorInput {
+  /** @maxLength 64 */
   dayLabel: string;
+  /** @pattern ^#[0-9a-fA-F]{6}$ */
   hexColor: string;
 }
