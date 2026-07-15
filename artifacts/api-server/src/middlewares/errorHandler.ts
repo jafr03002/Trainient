@@ -18,7 +18,13 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
         ? err.status
         : 500;
 
-  req.log.error({ err }, "Unhandled request error");
+  // Client-caused 4xx (e.g. malformed JSON) is noise at error level and can
+  // trip error-rate alerting; reserve error for genuine server faults.
+  if (status >= 500) {
+    req.log.error({ err }, "Unhandled request error");
+  } else {
+    req.log.warn({ err }, "Request error");
+  }
 
   // `expose` is set by http-errors-style middleware (e.g. body-parser) on
   // client errors whose messages are safe to return.

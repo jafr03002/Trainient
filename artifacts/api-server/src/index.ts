@@ -10,9 +10,16 @@ process.on("unhandledRejection", (reason) => {
 
 // After an uncaught exception the process state can't be trusted, so log it
 // and exit; the process manager restarts the server with a clean slate.
+// The log destination can be async (pino-pretty worker thread in dev), so
+// flush before exiting or the fatal entry is lost. The timeout is a failsafe
+// in case the flush callback never fires.
 process.on("uncaughtException", (err) => {
   logger.fatal({ err }, "Uncaught exception, shutting down");
-  process.exit(1);
+  const failsafe = setTimeout(() => process.exit(1), 2000);
+  logger.flush(() => {
+    clearTimeout(failsafe);
+    process.exit(1);
+  });
 });
 
 const rawPort = process.env["PORT"];
