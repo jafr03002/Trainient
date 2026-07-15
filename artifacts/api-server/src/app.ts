@@ -34,30 +34,38 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 // `credentials: true` would let any website read authenticated responses on a
 // logged-in user's behalf, so only known deployment origins are permitted.
 // CORS_ALLOWED_ORIGINS is a comma-separated env var for adding custom domains
-// without a code change; localhost is allowed only outside production.
+// without a code change.
 const allowedOrigins = new Set(
   [
     "https://traintent.replit.app",
     ...(process.env.CORS_ALLOWED_ORIGINS?.split(",") ?? []),
-    ...(process.env.NODE_ENV !== "production"
-      ? ["http://localhost:8080", "http://localhost:5173"]
-      : []),
   ]
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
+
+// Matches any localhost / 127.0.0.1 origin on any port. Only honored outside
+// production, so it can never widen the live deployment's surface.
+const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use(
   cors({
     credentials: true,
     origin(origin, callback) {
       // `origin` is undefined for same-origin and non-browser (server-to-server)
-      // requests; allow those. Otherwise the origin must be on the allowlist.
-      if (!origin || allowedOrigins.has(origin)) {
+      // requests; allow those.
+      if (!origin) {
         callback(null, true);
         return;
       }
-      callback(null, false);
+      // Outside production, allow any local dev-server port (24301, 24302, ...)
+      // without having to enumerate them here.
+      if (process.env.NODE_ENV !== "production" && LOCALHOST_ORIGIN.test(origin)) {
+        callback(null, true);
+        return;
+      }
+      // Production (and any non-localhost origin): explicit allowlist only.
+      callback(null, allowedOrigins.has(origin));
     },
   }),
 );
