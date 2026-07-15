@@ -130,11 +130,13 @@ router.get("/progress/prs", requireAuth, async (req, res) => {
     where: eq(workoutLogsTable.userId, userId),
   });
 
-  const prMap: Record<string, { maxWeight: number; reps: number; date: string; score: number }> = {};
+  // Best performed set per exercise for each session, judged by estimated
+  // one-rep max rather than raw weight (keeps its reps), tagged with when it
+  // was logged so we can order sessions chronologically below.
+  type SessionBest = { maxWeight: number; reps: number; date: string; createdAt: number; score: number };
+  const perExercise: Record<string, SessionBest[]> = {};
   for (const log of logs) {
     for (const ex of log.exercisesLogged as LoggedExercise[]) {
-      // Best performed set for this exercise in this session, judged by
-      // estimated one-rep max rather than raw weight (keeps its reps).
       let best: LoggedSet | null = null;
       let bestScore = 0;
       for (const s of ex.sets) {
@@ -145,15 +147,39 @@ router.get("/progress/prs", requireAuth, async (req, res) => {
           bestScore = score;
         }
       }
-      if (best && bestScore > 0 && (!prMap[ex.name] || bestScore > prMap[ex.name].score)) {
-        prMap[ex.name] = { maxWeight: best.weight || 0, reps: setReps(best), date: log.date, score: bestScore };
+      if (best && bestScore > 0) {
+        (perExercise[ex.name] ??= []).push({
+          maxWeight: best.weight || 0,
+          reps: setReps(best),
+          date: log.date,
+          createdAt: log.createdAt.getTime(),
+          score: bestScore,
+        });
       }
     }
   }
 
-  res.json(
-    Object.entries(prMap).map(([exercise, { maxWeight, reps, date }]) => ({ exercise, maxWeight, reps, date }))
-  );
+  // A set is only a PR once it beats a set from an earlier session - the first
+  // time an exercise is ever logged just establishes a baseline, it is not a
+  // PR. Walk each exercise's sessions oldest-first, tracking the running best;
+  // the current PR is the most recent session whose best beat everything
+  // before it (also the all-time best). Exercises that never beat their opening
+  // session are omitted entirely.
+  const prs: { exercise: string; maxWeight: number; reps: number; date: string }[] = [];
+  for (const [exercise, sessions] of Object.entries(perExercise)) {
+    sessions.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+    let runningBest = 0;
+    let current: SessionBest | null = null;
+    for (const s of sessions) {
+      if (runningBest > 0 && s.score > runningBest) current = s;
+      if (s.score > runningBest) runningBest = s.score;
+    }
+    if (current) {
+      prs.push({ exercise, maxWeight: current.maxWeight, reps: current.reps, date: current.date });
+    }
+  }
+
+  res.json(prs);
 });
 
 router.get("/progress/muscle-volume", requireAuth, async (req, res) => {

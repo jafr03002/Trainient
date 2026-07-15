@@ -230,7 +230,7 @@ export default function Progress() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Personal records</h2>
         {!personalRecords.data?.length ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
-            Log some workouts to see your personal records
+            Beat a set from an earlier session to earn your first personal record
           </div>
         ) : (
           <div className="overflow-x-auto">

@@ -199,16 +199,42 @@ export default function Log() {
   const currentDraftKeyRef = useRef<string | null>(null);
   const activeSessionRef = useRef<ActiveSessionPointer | null>(null);
 
+  // Prior all-time best score per exercise, plus the set of exercises that have
+  // ever been logged before - both drawn from saved history (previous sessions
+  // only; the in-progress session isn't saved yet). A set can only be a PR if
+  // it beats a set from an earlier session, so an exercise the user has never
+  // logged has no baseline to beat and its first sets are never PRs.
   const prBaselineRef = useRef<Record<string, number>>({});
+  const priorLoggedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (personalRecords) {
-      const map: Record<string, number> = {};
-      for (const pr of personalRecords) {
-        map[pr.exercise.toLowerCase()] = estimatedOneRepMax(pr.maxWeight, pr.reps ?? 0);
+    const best: Record<string, number> = {};
+    const seen = new Set<string>();
+    for (const log of (history ?? []) as any[]) {
+      for (const ex of (log.exercisesLogged as any[]) ?? []) {
+        const key = ex.name?.toLowerCase();
+        if (!key || !Array.isArray(ex.sets)) continue;
+        for (const s of ex.sets) {
+          if (isEmptySet(s)) continue;
+          seen.add(key);
+          const reps = s.repsLeft != null || s.repsRight != null
+            ? Math.min(s.repsLeft ?? 0, s.repsRight ?? 0)
+            : (s.reps ?? 0);
+          const score = estimatedOneRepMax(s.weight ?? 0, reps);
+          if (score > (best[key] ?? 0)) best[key] = score;
+        }
       }
-      prBaselineRef.current = map;
     }
-  }, [personalRecords]);
+    // Genuine PRs from the server may reach back past history's 200-log window;
+    // fold them in so the baseline never regresses for very active users.
+    for (const pr of personalRecords ?? []) {
+      const key = pr.exercise.toLowerCase();
+      seen.add(key);
+      const score = estimatedOneRepMax(pr.maxWeight, pr.reps ?? 0);
+      if (score > (best[key] ?? 0)) best[key] = score;
+    }
+    prBaselineRef.current = best;
+    priorLoggedRef.current = seen;
+  }, [history, personalRecords]);
 
   // Build "last time" lookup from workout history - keep the full set list of the
   // most recent prior log per exercise, so each set row can show its own match.
@@ -326,7 +352,10 @@ export default function Log() {
       const baseline = prBaselineRef.current[nameKey] ?? 0;
       const sessionBest = sessionBestRef.current[nameKey] ?? 0;
       const currentBest = Math.max(baseline, sessionBest);
-      isNewPr = score > currentBest;
+      // Only a PR when it beats a set from an earlier session. The first time an
+      // exercise is ever logged there is nothing to beat, so it is not a PR.
+      const hasPrior = priorLoggedRef.current.has(nameKey);
+      isNewPr = hasPrior && score > currentBest;
 
       if (isNewPr && !set.isNewPr) {
         sessionBestRef.current[nameKey] = score;
