@@ -20,16 +20,17 @@
  */
 
 import { createProxyMiddleware } from "http-proxy-middleware";
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import type { IncomingHttpHeaders } from "http";
+import { ALLOWED_HOSTS } from "../lib/domains";
 
 const CLERK_FAPI = "https://frontend-api.clerk.dev";
 export const CLERK_PROXY_PATH = "/api/__clerk";
 
 /**
- * Returns the first effective public hostname for the given request,
- * preferring x-forwarded-host over the Host header so callers behind a
- * proxy see the original client-facing host.
+ * Returns the effective public hostname for the given request, preferring
+ * x-forwarded-host over the Host header so callers behind a proxy see the
+ * original client-facing host.
  *
  * x-forwarded-host can take three shapes:
  *   - undefined (no proxy involved)
@@ -38,10 +39,20 @@ export const CLERK_PROXY_PATH = "/api/__clerk";
  *     replaced the header (Node folds duplicate headers this way), or a
  *     string[] in some Express typings
  * In the multi-value case, the leftmost value is the original client-
- * facing host. Take that one in all forms. Exported so that app.ts
- * (clerkMiddleware callback) and this proxy middleware agree on which
- * hostname is canonical - otherwise multi-domain/custom-domain flows
- * break.
+ * facing host. Take that one in all forms.
+ *
+ * SECURITY: x-forwarded-host (and Host) are client-controllable when a request
+ * reaches us directly instead of through Replit's edge proxy. Trusting a forged
+ * value would let a caller pick which Clerk instance we select
+ * (publishableKeyFromHost) and which Clerk-Proxy-Url we report upstream. In
+ * production we therefore only return a candidate host that matches an ALLOWED_HOSTS
+ * entry (canonical Replit host + CORS_ALLOWED_ORIGINS custom domains) and return
+ * undefined otherwise, so both call sites fall back to safe defaults. Outside
+ * production the observed host is returned unchanged for local dev / tests.
+ *
+ * Exported so that app.ts (clerkMiddleware callback) and this proxy middleware
+ * agree on which hostname is canonical - otherwise multi-domain/custom-domain
+ * flows break.
  */
 export function getClerkProxyHost(req: {
   headers: IncomingHttpHeaders;
@@ -49,7 +60,16 @@ export function getClerkProxyHost(req: {
   const forwarded = req.headers["x-forwarded-host"];
   const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
   const firstHop = raw?.split(",")[0]?.trim();
-  return firstHop || req.headers.host?.trim() || undefined;
+  const candidate = firstHop || req.headers.host?.trim() || undefined;
+
+  // Outside production the proxy is bypassed anyway; trust the observed host so
+  // local dev servers and tests keep working.
+  if (process.env.NODE_ENV !== "production") {
+    return candidate;
+  }
+
+  // Production: only trust a host we actually deploy on; ignore anything else.
+  return candidate && ALLOWED_HOSTS.has(candidate) ? candidate : undefined;
 }
 
 export function clerkProxyMiddleware(): RequestHandler {
@@ -77,11 +97,11 @@ export function clerkProxyMiddleware(): RequestHandler {
         proxyReq.setHeader("Clerk-Proxy-Url", proxyUrl);
         proxyReq.setHeader("Clerk-Secret-Key", secretKey);
 
-        const xff = req.headers["x-forwarded-for"];
-        const clientIp =
-          (Array.isArray(xff) ? xff[0] : xff)?.split(",")[0]?.trim() ||
-          req.socket?.remoteAddress ||
-          "";
+        // Forward the framework-derived client IP rather than the raw
+        // x-forwarded-for the caller sent. With `trust proxy` set in app.ts,
+        // Express strips the trusted hop and computes a de-spoofed req.ip, so a
+        // caller can't frame another IP or dodge Clerk's IP-based rate limiting.
+        const clientIp = (req as Request).ip || req.socket?.remoteAddress || "";
         if (clientIp) {
           proxyReq.setHeader("X-Forwarded-For", clientIp);
         }
