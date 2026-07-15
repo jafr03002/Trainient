@@ -13,7 +13,7 @@ export const workoutLogsTable = pgTable("workout_logs", {
   exercisesLogged: jsonb("exercises_logged").notNull().default([]),
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertWorkoutLogSchema = createInsertSchema(workoutLogsTable).omit({ id: true, createdAt: true });

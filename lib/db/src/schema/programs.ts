@@ -30,7 +30,7 @@ export const programsTable = pgTable("programs", {
   phaseSegmentIndex: integer("phase_segment_index"),
   weeksInPhaseSegment: integer("weeks_in_phase_segment"),
   aiGenerated: boolean("ai_generated").notNull().default(true),
-  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertProgramSchema = createInsertSchema(programsTable).omit({ id: true, generatedAt: true });

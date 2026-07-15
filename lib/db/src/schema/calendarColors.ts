@@ -7,7 +7,7 @@ export const calendarColorsTable = pgTable("calendar_colors", {
   userId: text("user_id").notNull(),
   dayLabel: text("day_label").notNull(),
   hexColor: text("hex_color").notNull(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertCalendarColorSchema = createInsertSchema(calendarColorsTable).omit({ id: true, updatedAt: true });

@@ -11,7 +11,7 @@ export const checkinsTable = pgTable("checkins", {
   soreness: text("soreness").notNull(),
   completion: text("completion").notNull(),
   notes: text("notes"),
-  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertCheckinSchema = createInsertSchema(checkinsTable).omit({ id: true, submittedAt: true });
