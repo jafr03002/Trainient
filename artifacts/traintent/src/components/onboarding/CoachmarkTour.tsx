@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
+import { CoachRobot } from "@/components/CoachRobot";
 
 // A single coachmark step.
 // - "info" (the default): an explanatory bubble anchored to a real element via
@@ -78,15 +79,27 @@ export function CoachmarkTour({
   // links a `navClick` step needs the user to tap.
   const scrim = <div className="fixed inset-0 z-[60] bg-black/60 pointer-events-none" aria-hidden />;
 
+  // Coach, the AI coach mascot, perches in the top-left corner of every tour
+  // box. He's a child of the box element (never the scrim), so he always paints
+  // on top of the dimming backdrop and keeps his bright blue - he never darkens
+  // with the page behind it.
+  const coach = (
+    <CoachRobot
+      size={30}
+      className="pointer-events-none absolute -top-9 left-3 drop-shadow-[0_5px_9px_rgba(23,55,110,0.35)]"
+    />
+  );
+
   if (phase === "intro" && intro) {
     return (
       <>
         {scrim}
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
-            className="w-full max-w-sm p-5 rounded-xl bg-primary text-primary-foreground shadow-xl"
+            className="relative w-full max-w-sm p-5 rounded-xl bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-intro`}
           >
+            {coach}
             <div className="text-xs font-semibold uppercase tracking-wider opacity-80">Quick tour</div>
             <p className="text-sm font-medium mt-1 leading-relaxed">{intro.text}</p>
             <div className="flex items-center gap-2 mt-3">
@@ -152,9 +165,10 @@ export function CoachmarkTour({
         {scrim}
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
-            className="w-full max-w-sm p-4 rounded-xl bg-primary text-primary-foreground shadow-xl"
+            className="relative w-full max-w-sm p-4 rounded-xl bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-bubble`}
           >
+            {coach}
             {bubbleBody}
           </div>
         </div>
@@ -184,6 +198,7 @@ export function CoachmarkTour({
         }}
         data-testid={`${testIdPrefix}-bubble`}
       >
+        {coach}
         {bubbleBody}
       </div>
     </>
