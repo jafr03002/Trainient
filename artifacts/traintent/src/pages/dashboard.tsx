@@ -335,7 +335,7 @@ export default function Dashboard() {
             </div>
             <div data-testid="card-progression">
               <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
-                <Trophy className="w-4 h-4 text-amber-400" />
+                <Trophy className="w-4 h-4 text-chart-3" />
                 {personalRecords.isLoading ? "-" : recentPrCount}
               </div>
               <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">PRs this week</div>
