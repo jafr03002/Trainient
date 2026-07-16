@@ -634,7 +634,6 @@ export default function Program() {
   const [, setLocation] = useLocation();
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const updateProfile = useUpdateProfile();
-  const tourHeaderRef = useRef<HTMLDivElement>(null);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const logNavTarget = useNavTourTarget("/log");
@@ -834,7 +833,7 @@ export default function Program() {
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
   const programTourSteps: CoachmarkStep[] = [
-    { target: tourHeaderRef, text: "Here you can find your programs." },
+    { kind: "center", text: "Here is your program page where you will find your programs." },
     { target: tourDayTabsRef, text: "Here is your program." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
@@ -843,7 +842,7 @@ export default function Program() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <div ref={tourHeaderRef} className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
             <p className="text-muted-foreground mt-1">

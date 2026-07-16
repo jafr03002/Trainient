@@ -180,7 +180,7 @@ export default function Log() {
   const flashIdRef = useRef(0);
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
-  const tourWeightRef = useRef<HTMLInputElement>(null);
+  const tourSetRowRef = useRef<HTMLDivElement>(null);
   const tourHelpRef = useRef<HTMLButtonElement>(null);
   const tourFinishRef = useRef<HTMLButtonElement>(null);
 
@@ -456,7 +456,7 @@ export default function Log() {
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
   const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
   const logTourSteps: CoachmarkStep[] = [
-    { target: tourWeightRef, text: "Here you track your weight and reps." },
+    { target: tourSetRowRef, text: "Here you can track your weight and reps." },
     ...(!isIndependent ? [{ target: tourHelpRef, text: "Not sure how to perform this exercise? Tap the ? whenever you need it." }] : []),
     { target: tourFinishRef, text: "This is where you save your workout - and that's the end of the walkthrough." },
   ];
@@ -582,6 +582,7 @@ export default function Log() {
                   return (
                   <div key={set.setNumber}>
                   <motion.div
+                    ref={exIdx === 0 && setIdx === 0 ? tourSetRowRef : undefined}
                     layout
                     className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
@@ -597,7 +598,6 @@ export default function Log() {
                       )}
                     </div>
                     <input
-                      ref={exIdx === 0 && setIdx === 0 ? tourWeightRef : undefined}
                       type="number"
                       value={set.weight || ""}
                       onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
