@@ -92,7 +92,7 @@ export default function Dashboard() {
   const profileQuery = useGetProfile();
   const programsQuery = useListPrograms();
   const updateProfile = useUpdateProfile();
-  const tourDailyTaskRef = useRef<HTMLDivElement>(null);
+  const tourDailyCheckinRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const tourProgressRef = useRef<HTMLDivElement>(null);
   const programNavTarget = useNavTourTarget("/program");
@@ -254,7 +254,7 @@ export default function Dashboard() {
 
   const nextDay = program.data?.days?.[0] as any;
   const dashboardTourSteps: CoachmarkStep[] = [
-    { target: tourDailyTaskRef, text: "This is where you'll see what you need to do each day." },
+    { target: tourDailyCheckinRef, text: "This is your daily check-in that you need to do every day." },
     { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
     { target: tourProgressRef, text: "And down here you can track your progress." },
     { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
@@ -332,7 +332,6 @@ export default function Dashboard() {
 
       {/* This week's program */}
       <motion.div
-        ref={tourDailyTaskRef}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.09 }}
@@ -476,6 +475,7 @@ export default function Dashboard() {
 
       {/* Daily check-in */}
       <motion.div
+        ref={tourDailyCheckinRef}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.18 }}
