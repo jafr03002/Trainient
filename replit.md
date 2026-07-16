@@ -43,6 +43,7 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - Stripe API version: `2026-05-27.dahlia` (Stripe v22.x)
 - Clerk ClerkProvider redirect props: `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` (not `afterSignInUrl`)
 - Raw body middleware for Stripe webhook must be registered before `express.json()` for the `/api/subscriptions/webhook` path
+- Error handling: a global Express error handler (`artifacts/api-server/src/middlewares/errorHandler.ts`, registered last in `app.ts`) logs the full error server-side and returns only a generic `{ error }` body - 500 `Internal server error` for unexpected faults, and the original message/status (clamped to 400-599) only for http-errors-style client errors with `expose === true` (e.g. body-parser's 400 on malformed JSON); 5xx logs at error level, client 4xx at warn. Express 5 forwards rejected async handlers here automatically, so route handlers need no try/catch or async wrappers. `index.ts` adds process guards: `unhandledRejection` is logged and the server keeps serving; `uncaughtException` is logged at fatal, the logger flushed, then the process exits 1 for the process manager to restart
 - Deleting a workout (`DELETE /workouts/:id`) needs no cascade cleanup - sets/exercises/notes live as embedded JSON on the row, and PRs/stats/progress charts are all computed from `workout_logs` at read time, so callers just invalidate the relevant queries after the mutation
 
 ## Product
