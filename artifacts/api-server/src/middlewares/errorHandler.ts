@@ -11,12 +11,18 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
     return;
   }
 
-  const status: number =
-    typeof err?.statusCode === "number"
-      ? err.statusCode
-      : typeof err?.status === "number"
-        ? err.status
-        : 500;
+  const rawStatus: unknown = err?.statusCode ?? err?.status;
+
+  // Only trust real HTTP error codes. Anything else — a stray 200 that would
+  // mislabel a fault as success, or an out-of-range value that would make
+  // res.status() itself throw — becomes a 500.
+  const status =
+    typeof rawStatus === "number" &&
+    Number.isInteger(rawStatus) &&
+    rawStatus >= 400 &&
+    rawStatus <= 599
+      ? rawStatus
+      : 500;
 
   // Client-caused 4xx (e.g. malformed JSON) is noise at error level and can
   // trip error-rate alerting; reserve error for genuine server faults.
