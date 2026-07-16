@@ -11,8 +11,15 @@ import {
 import router from "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
 import { logger } from "./lib/logger";
+import { ALLOWED_ORIGINS } from "./lib/domains";
 
 const app: Express = express();
+
+// Behind Replit's edge proxy. Trust one hop so Express derives req.ip / protocol
+// from the proxy-set X-Forwarded-* headers instead of leaving them client-
+// spoofable. A single numeric hop means an over-count (should Replit add more
+// hops) yields a non-spoofable internal IP rather than a client-controlled one.
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
@@ -34,16 +41,9 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 // Explicit CORS allowlist. Reflecting any origin (`origin: true`) together with
 // `credentials: true` would let any website read authenticated responses on a
 // logged-in user's behalf, so only known deployment origins are permitted.
-// CORS_ALLOWED_ORIGINS is a comma-separated env var for adding custom domains
-// without a code change.
-const allowedOrigins = new Set(
-  [
-    "https://traintent.replit.app",
-    ...(process.env.CORS_ALLOWED_ORIGINS?.split(",") ?? []),
-  ]
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-);
+// The allowlist (canonical Replit host + CORS_ALLOWED_ORIGINS custom domains)
+// lives in ./lib/domains so the Clerk proxy validates hosts against the same
+// source of truth.
 
 // Matches any localhost / 127.0.0.1 origin on any port. Only honored outside
 // production, so it can never widen the live deployment's surface.
@@ -66,7 +66,7 @@ app.use(
         return;
       }
       // Production (and any non-localhost origin): explicit allowlist only.
-      callback(null, allowedOrigins.has(origin));
+      callback(null, ALLOWED_ORIGINS.has(origin));
     },
   }),
 );
