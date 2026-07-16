@@ -248,9 +248,6 @@ export default function Dashboard() {
   })();
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => daysSince(pr.date) <= 7).length;
-  const progressionMessage = recentPrCount > 0
-    ? `New PR${recentPrCount > 1 ? "s" : ""} this week - keep it up!`
-    : "No new PRs yet this week";
 
   const nextDay = program.data?.days?.[0] as any;
   const dashboardTourSteps: CoachmarkStep[] = [
@@ -271,15 +268,80 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1 className="text-2xl font-bold text-foreground">
-          {greet()}, {profile?.name || user?.firstName || "Coach"}.
-        </h1>
-        {stats.data && (
-          <p className="text-muted-foreground mt-1">
-            Week {stats.data.currentWeek} of your program.
-          </p>
-        )}
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="p-6 rounded-xl border border-primary/25 glow-primary"
+        style={{ background: "radial-gradient(120% 140% at 0% 0%, hsl(var(--primary) / 0.18), transparent 55%), hsl(var(--card))" }}
+        data-testid="card-todays-session"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">{greet()}</p>
+            <h1 className="text-2xl font-bold text-foreground mt-1 font-display" data-testid="text-greeting">
+              {profile?.name || user?.firstName || "Coach"}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              {program.data && nextDay
+                ? startWorkoutLine()
+                : stats.data
+                ? `Week ${stats.data.currentWeek} of your program.`
+                : "Start logging your workouts here and get to work."}
+            </p>
+          </div>
+          {program.data?.shortTermPhase && (
+            <span
+              className="text-[10px] px-2.5 py-1 rounded-full whitespace-nowrap capitalize shrink-0 font-medium"
+              style={{ background: phaseSoft(program.data.shortTermPhase), color: phaseSolid(program.data.shortTermPhase) }}
+            >
+              {program.data.shortTermPhase.replace(/_/g, " ")}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mt-6">
+          {program.isLoading ? (
+            <div className="h-11 flex items-center text-muted-foreground text-sm">Loading...</div>
+          ) : !program.data ? (
+            <Link
+              href="/program"
+              className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
+            >
+              {isIndependent ? "Build your program" : "Generate a program"}
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          ) : nextDay ? (
+            <Link href="/log">
+              <button
+                ref={tourStartWorkoutRef}
+                className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
+                data-testid="button-start-workout"
+              >
+                Start workout
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </Link>
+          ) : null}
+
+          <div className="flex items-center gap-6">
+            <div data-testid="stat-current-week">
+              <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
+                <CalendarCheck className="w-4 h-4 text-primary" />
+                {stats.isLoading ? "-" : stats.data?.currentWeek ?? "-"}
+              </div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">Current week</div>
+            </div>
+            <div data-testid="card-progression">
+              <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
+                <Trophy className="w-4 h-4 text-chart-3" />
+                {personalRecords.isLoading ? "-" : recentPrCount}
+              </div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">PRs this week</div>
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       {/* Check-in banner - AI mode only, after day 6 */}
@@ -303,69 +365,6 @@ export default function Dashboard() {
           </Link>
         </motion.div>
       )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-card border border-border"
-          data-testid="stat-current-week"
-        >
-          <CalendarCheck className="w-5 h-5 mb-3 text-primary" />
-          <div className="text-2xl font-bold text-foreground">{stats.isLoading ? "-" : stats.data?.currentWeek ?? "-"}</div>
-          <div className="text-xs text-muted-foreground mt-1">Current week</div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.06 }}
-          className="p-4 rounded-xl bg-card border border-border"
-          data-testid="card-progression"
-        >
-          <Trophy className="w-5 h-5 mb-3 text-amber-400" />
-          <div className="text-2xl font-bold text-foreground">{personalRecords.isLoading ? "-" : recentPrCount}</div>
-          <div className="text-xs text-muted-foreground mt-1">{progressionMessage}</div>
-        </motion.div>
-      </div>
-
-      {/* This week's program */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.09 }}
-        className="p-5 rounded-xl bg-card border border-border"
-        data-testid="card-todays-session"
-      >
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">This week's program</h2>
-        {program.isLoading ? (
-          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
-        ) : !program.data ? (
-          <div className="text-center py-6">
-            <p className="text-muted-foreground text-sm mb-3">
-              {isIndependent ? "No program built yet" : "No program yet"}
-            </p>
-            <Link href="/program" className="text-primary text-sm font-semibold hover:underline">
-              {isIndependent ? "Build your program" : "Generate one"}
-            </Link>
-          </div>
-        ) : nextDay ? (
-          <div>
-            <p className="text-lg font-bold text-foreground mb-4">{startWorkoutLine()}</p>
-            <Link href="/log">
-              <button
-                ref={tourStartWorkoutRef}
-                className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-                data-testid="button-start-workout"
-              >
-                Start workout
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </Link>
-          </div>
-        ) : null}
-      </motion.div>
 
       {/* Weekly table */}
       <motion.div
