@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Sparkles, Info } from "lucide-react";
 import { useUser } from "@clerk/react";
@@ -42,59 +42,88 @@ export type ProgramDay = {
 // Soft translucent background to pair with a muscle's solid accent color -
 // falls back to the app's default primary-blue badge for anything unrecognized
 // (blank/legacy muscle values).
-function muscleAccent(muscle: string): { solid: string; soft: string } | null {
+function muscleAccent(muscle: string): { solid: string; soft: string; glow: string } | null {
   const solid = MUSCLE_COLORS[muscle];
   if (!solid) return null;
-  return { solid, soft: `hsla(${solid.slice(4, -1)}, 0.14)` };
+  return {
+    solid,
+    soft: `hsla(${solid.slice(4, -1)}, 0.14)`,
+    glow: `hsla(${solid.slice(4, -1)}, 0.55)`,
+  };
 }
 
-function ExerciseCard({ ex }: { ex: Exercise }) {
-  const primaryAccent = muscleAccent(ex.muscle);
-  const secondaryAccent = ex.secondaryMuscle ? muscleAccent(ex.secondaryMuscle) : null;
+// Hero-card tint per training day: each muscle maps onto one of the Voltage
+// chart tokens so a Pull day washes violet, Legs green, Push stays electric
+// blue. Token *references* (not raw colors) so the wash always tracks the
+// theme palette.
+const MUSCLE_HERO_TOKEN: Record<string, string> = {
+  Chest: "var(--primary)",
+  Shoulders: "var(--chart-3)",
+  Biceps: "var(--chart-5)",
+  Triceps: "var(--chart-5)",
+  "Upper Back": "var(--chart-4)",
+  Lats: "var(--chart-4)",
+  Quads: "var(--chart-2)",
+  Hamstrings: "var(--chart-2)",
+  Glutes: "var(--chart-2)",
+  Calves: "var(--chart-2)",
+  Core: "var(--chart-2)",
+};
+
+// The day's dominant color = the token most of its primary muscles map to;
+// ties break toward the earliest exercise so the tint feels stable.
+function dayHeroToken(day: ProgramDay): string {
+  const counts = new Map<string, number>();
+  for (const ex of day.exercises) {
+    const token = MUSCLE_HERO_TOKEN[ex.muscle];
+    if (token) counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+  let best = "var(--primary)";
+  let bestCount = 0;
+  for (const ex of day.exercises) {
+    const token = MUSCLE_HERO_TOKEN[ex.muscle];
+    if (!token) continue;
+    const count = counts.get(token) ?? 0;
+    if (count > bestCount) {
+      best = token;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
+  const accent = muscleAccent(ex.muscle);
+  const barColor = accent?.solid ?? "hsl(var(--primary))";
+  const barGlow = accent?.glow ?? "hsl(var(--primary) / 0.55)";
 
   return (
-    <motion.div
-      layout
-      className="bg-secondary/20 border border-border rounded-xl overflow-hidden"
-    >
-      <div className="p-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span
-              style={primaryAccent ? { backgroundColor: primaryAccent.soft, color: primaryAccent.solid, borderColor: primaryAccent.soft } : undefined}
-              className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                primaryAccent ? "" : "bg-primary/10 text-primary border-primary/20"
-              }`}
-            >
-              {ex.muscle}
+    <div className="flex items-center gap-3 py-3 pl-2.5 pr-4 min-w-0">
+      <div
+        className="w-1 self-stretch rounded-full shrink-0"
+        style={{ backgroundColor: barColor, boxShadow: `0 0 8px ${barGlow}` }}
+      />
+      <span className="font-display text-xs text-muted-foreground w-4 text-center shrink-0">
+        {index + 1}
+      </span>
+      <div className="flex-1 min-w-0">
+        <h3 className="font-semibold text-sm text-foreground truncate">{ex.name}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+          <span className="font-medium" style={accent ? { color: accent.solid } : undefined}>
+            {ex.muscle || "—"}
+          </span>
+          {ex.secondaryMuscle && <> · {ex.secondaryMuscle}</>}
+          {ex.isUnilateral && (
+            <span className="ml-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+              Unilateral
             </span>
-            {ex.secondaryMuscle && (
-              <span
-                style={secondaryAccent ? { backgroundColor: secondaryAccent.soft, color: secondaryAccent.solid, borderColor: secondaryAccent.soft } : undefined}
-                className={`text-xs px-2 py-0.5 rounded-full border ${
-                  secondaryAccent ? "" : "bg-secondary/40 text-muted-foreground border-border"
-                }`}
-              >
-                {ex.secondaryMuscle}
-              </span>
-            )}
-            {ex.isUnilateral && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                Unilateral
-              </span>
-            )}
-          </div>
-          <h3 className="font-semibold text-foreground">{ex.name}</h3>
-        </div>
-
-        <div className="flex items-center gap-4 mt-3">
-          <div className="flex items-center gap-1.5 text-sm">
-            <Dumbbell className="w-4 h-4 text-muted-foreground" />
-            <span className="font-semibold text-foreground">{ex.sets} × {ex.reps}</span>
-          </div>
-        </div>
+          )}
+        </p>
       </div>
-    </motion.div>
+      <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
+        {ex.sets} × {ex.reps}
+      </span>
+    </div>
   );
 }
 
@@ -728,13 +757,36 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
+  const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
+  const heroToken = day ? dayHeroToken(day) : "var(--primary)";
+
+  const startWorkoutButton = locked ? (
+    <button
+      onClick={() => setLockDialogOpen(true)}
+      className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
+      data-testid="button-start-workout-program"
+    >
+      Start workout
+    </button>
+  ) : (
+    <Link href={`/log?day=${day?.dayNumber}`} className="block">
+      <button
+        ref={tourStartWorkoutRef}
+        className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
+        data-testid="button-start-workout-program"
+      >
+        Start workout
+      </button>
+    </Link>
+  );
+
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-xl font-bold text-foreground">{program.programName}</h1>
+            <p className="text-muted-foreground mt-0.5 text-sm">
               {formatSplitType(program.splitType)} · Week {program.weekNumber}
               {badge}
             </p>
@@ -752,61 +804,69 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </div>
       </motion.div>
 
-      {/* Day tabs */}
-      <div ref={tourDayTabsRef} className="flex gap-2 overflow-x-auto pb-1" data-testid="program-day-tabs">
+      {/* Day hero - gradient wash + border tinted by the day's dominant muscle color */}
+      {day && (
+        <motion.div
+          key={`hero-${activeDay}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ "--hero": heroToken } as CSSProperties}
+          className="relative overflow-hidden rounded-2xl border border-[hsl(var(--hero)/0.3)] bg-[radial-gradient(120%_140%_at_0%_0%,hsl(var(--hero)/0.20),transparent_55%),linear-gradient(135deg,hsl(var(--hero)/0.07),transparent_45%)] bg-card p-5"
+          data-testid="program-day-hero"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--hero))]">
+            Day {day.dayNumber}
+          </p>
+          <h2 className="font-display text-2xl font-bold text-foreground mt-1">{day.focus}</h2>
+          <div className="flex mt-4 pt-3 border-t border-border">
+            <div className="flex-1 min-w-0">
+              <p className="font-display text-xl font-bold text-foreground">{day.exercises.length}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Exercises</p>
+            </div>
+            <div className="flex-1 min-w-0 border-l border-border pl-4">
+              <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
+            </div>
+          </div>
+          {startWorkoutButton}
+        </motion.div>
+      )}
+
+      {/* Day switcher */}
+      <div
+        ref={tourDayTabsRef}
+        className="flex gap-1.5 rounded-xl border border-border bg-secondary/60 p-1 overflow-x-auto"
+        data-testid="program-day-tabs"
+      >
         {days.map((d, i) => (
           <button
             key={d.dayNumber}
             onClick={() => setActiveDay(i)}
             data-testid={`tab-day-${d.dayNumber}`}
-            className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`flex-1 min-w-0 truncate rounded-lg px-2 py-1.5 text-sm transition-colors ${
               activeDay === i
-                ? "bg-primary text-primary-foreground"
-                : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+                ? "bg-primary text-primary-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground font-medium"
             }`}
           >
-            <span className={`text-xs ${activeDay === i ? "opacity-80" : "opacity-60"}`}>{i + 1}</span>
+            <span className={`text-xs mr-1 ${activeDay === i ? "opacity-80" : "opacity-60"}`}>{i + 1} ·</span>
             {d.label}
           </button>
         ))}
       </div>
 
+      {/* Exercise roster */}
       {day && (
         <motion.div
           key={activeDay}
           initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.2 }}
-          className="space-y-3"
+          className="rounded-2xl border border-border bg-card divide-y divide-border/60 overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="font-semibold text-foreground">{day.focus}</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{day.exercises.length} exercises</p>
-            </div>
-            {canStartWorkout && (locked ? (
-              <button
-                onClick={() => setLockDialogOpen(true)}
-                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-                data-testid="button-start-workout-program"
-              >
-                Start workout
-              </button>
-            ) : (
-              <Link href={`/log?day=${day.dayNumber}`}>
-                <button
-                  ref={tourStartWorkoutRef}
-                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-                  data-testid="button-start-workout-program"
-                >
-                  Start workout
-                </button>
-              </Link>
-            ))}
-          </div>
-
-          {day.exercises.map((ex) => (
-            <ExerciseCard key={ex.name} ex={ex} />
+          {day.exercises.map((ex, i) => (
+            <RosterRow key={ex.name} ex={ex} index={i} />
           ))}
         </motion.div>
       )}
