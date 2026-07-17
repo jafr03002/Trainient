@@ -39,15 +39,14 @@ export type ProgramDay = {
   exercises: Exercise[];
 };
 
-// Soft translucent background to pair with a muscle's solid accent color -
-// falls back to the app's default primary-blue badge for anything unrecognized
-// (blank/legacy muscle values).
-function muscleAccent(muscle: string): { solid: string; soft: string; glow: string } | null {
+// A muscle's accent for a roster row: `solid` colors the edge bar, `glow` is
+// the same hue at low alpha for the bar's outer glow. Falls back to null for
+// unrecognized (blank/legacy) muscle values, where the row uses primary blue.
+function muscleAccent(muscle: string): { solid: string; glow: string } | null {
   const solid = MUSCLE_COLORS[muscle];
   if (!solid) return null;
   return {
     solid,
-    soft: `hsla(${solid.slice(4, -1)}, 0.14)`,
     glow: `hsla(${solid.slice(4, -1)}, 0.55)`,
   };
 }
@@ -844,7 +843,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
             key={d.dayNumber}
             onClick={() => setActiveDay(i)}
             data-testid={`tab-day-${d.dayNumber}`}
-            className={`flex-1 min-w-0 truncate rounded-lg px-2 py-1.5 text-sm transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
               activeDay === i
                 ? "bg-primary text-primary-foreground font-semibold"
                 : "text-muted-foreground hover:text-foreground font-medium"
@@ -857,7 +856,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       </div>
 
       {/* Exercise roster */}
-      {day && (
+      {day && day.exercises.length > 0 && (
         <motion.div
           key={activeDay}
           initial={{ opacity: 0, x: 10 }}
