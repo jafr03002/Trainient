@@ -134,7 +134,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 px-4 space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.href;
+            // Prefix match keeps a tab lit on its sub-routes (e.g. Program on
+            // /program/ai and /program/my).
+            const isActive = location === item.href || location.startsWith(`${item.href}/`);
             
             return (
               <Link
@@ -177,7 +179,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex items-center justify-around px-2 py-2">
           {navItems.slice(0, 6).map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.href;
+            // Prefix match keeps a tab lit on its sub-routes (e.g. Program on
+            // /program/ai and /program/my).
+            const isActive = location === item.href || location.startsWith(`${item.href}/`);
             
             return (
               <Link

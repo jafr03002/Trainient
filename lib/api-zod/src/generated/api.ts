@@ -118,6 +118,10 @@ export const UpdateProfileResponse = zod.object({
 /**
  * @summary Get the user's current active program within their active mode's program lineage (Independent vs. AI)
  */
+export const GetCurrentProgramQueryParams = zod.object({
+  "lineage": zod.enum(['ai', 'manual']).optional().describe('Resolve \"current\" within this explicit lineage instead of the caller\'s active mode - lets either mode\'s program page view its own lineage without switching modes.')
+})
+
 export const GetCurrentProgramResponse = zod.object({
   "id": zod.number(),
   "userId": zod.string(),

@@ -24,6 +24,8 @@ export * from './dailyLogsWeekResultShortTermPhase';
 export * from './dailyLogWeekEntry';
 export * from './exercise';
 export * from './generateProgramInput';
+export * from './getCurrentProgramLineage';
+export * from './getCurrentProgramParams';
 export * from './getDailyLogsWeekParams';
 export * from './getStrengthProgressParams';
 export * from './getTodaysBodyweightParams';

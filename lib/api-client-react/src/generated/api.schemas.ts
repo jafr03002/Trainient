@@ -574,6 +574,21 @@ export interface PortalSession {
   url: string;
 }
 
+export type GetCurrentProgramParams = {
+/**
+ * Resolve "current" within this explicit lineage instead of the caller's active mode - lets either mode's program page view its own lineage without switching modes.
+ */
+lineage?: GetCurrentProgramLineage;
+};
+
+export type GetCurrentProgramLineage = typeof GetCurrentProgramLineage[keyof typeof GetCurrentProgramLineage];
+
+
+export const GetCurrentProgramLineage = {
+  ai: 'ai',
+  manual: 'manual',
+} as const;
+
 export type ListWorkoutsParams = {
 limit?: number;
 offset?: number;

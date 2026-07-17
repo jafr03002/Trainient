@@ -12,7 +12,9 @@ import { Layout } from "@/components/layout";
 import Landing from "@/pages/landing";
 import Onboarding from "@/pages/onboarding";
 import Dashboard from "@/pages/dashboard";
-import Program from "@/pages/program";
+import ProgramRedirect from "@/pages/program";
+import AiProgram from "@/pages/program/ai";
+import MyProgram from "@/pages/program/my";
 import Log from "@/pages/log";
 import Checkin from "@/pages/checkin";
 import Progress from "@/pages/progress";
@@ -189,7 +191,9 @@ function App() {
                         <Switch>
                           <Route path="/onboarding" component={Onboarding} />
                           <Route path="/dashboard" component={Dashboard} />
-                          <Route path="/program" component={Program} />
+                          <Route path="/program" component={ProgramRedirect} />
+                          <Route path="/program/ai" component={AiProgram} />
+                          <Route path="/program/my" component={MyProgram} />
                           <Route path="/log" component={Log} />
                           <Route path="/checkin" component={Checkin} />
                           <Route path="/calendar" component={Calendar} />

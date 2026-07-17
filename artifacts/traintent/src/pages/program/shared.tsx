@@ -1,22 +1,26 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical } from "lucide-react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
+import { motion } from "framer-motion";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Sparkles, Info } from "lucide-react";
 import { useUser } from "@clerk/react";
-import { useGetCurrentProgram, useGetProfile, useCreateManualProgram, useGenerateProgram, useUpdateProfile, customFetch, type Program } from "@workspace/api-client-react";
-import { Link, useLocation } from "wouter";
+import {
+  useGetProfile,
+  useCreateManualProgram,
+  useUpdateProfile,
+  customFetch,
+  getGetCurrentProgramQueryKey,
+  getGetProfileQueryKey,
+  type Program,
+} from "@workspace/api-client-react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetCurrentProgramQueryKey, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
-import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
-import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
-import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 
-type Exercise = {
+export type Exercise = {
   name: string;
   sets: number;
   reps: string;
@@ -28,7 +32,7 @@ type Exercise = {
   isUnilateral?: boolean;
 };
 
-type ProgramDay = {
+export type ProgramDay = {
   dayNumber: number;
   label: string;
   focus: string;
@@ -163,13 +167,13 @@ type ProgramDraft = { programName: string; days: EditDay[]; savedAt: number };
 
 const PROGRAM_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
 
-// "new" covers the not-yet-created program in Independent mode - there's only
-// ever one program per user, so a single draft slot for it is enough.
-function programDraftKey(userId: string, programId: number | "new"): string {
+// "new" covers the not-yet-created manual program - there's only ever one
+// manual program per user, so a single draft slot for it is enough.
+export function programDraftKey(userId: string, programId: number | "new"): string {
   return `traintent:program-draft:${userId}:${programId}`;
 }
 
-function loadProgramDraft(key: string): ProgramDraft | null {
+export function loadProgramDraft(key: string): ProgramDraft | null {
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
@@ -205,7 +209,7 @@ type BuilderProps = {
   editProgram?: { id: number; programName: string; splitType: string; days: unknown } | null;
 };
 
-function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) {
+export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) {
   const createManualProgram = useCreateManualProgram();
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -619,21 +623,84 @@ function ManualProgramBuilder({ onSaved, onCancel, editProgram }: BuilderProps) 
   );
 }
 
-export default function Program() {
-  const { data: program, isLoading } = useGetCurrentProgram();
+// The two program lineages are completely separate: the AI Coach page only
+// ever reads/writes AI-generated programs, the My Program page only manual
+// ones. This switcher makes both reachable from either page regardless of
+// which training mode is active - the inactive lineage is view-only, never
+// hidden, never overwritten, never deleted.
+export function LineageSwitcher({ active }: { active: "ai" | "my" }) {
+  const { data: profile } = useGetProfile();
+  const activeMode: "ai" | "my" = profile?.mode === "independent" ? "my" : "ai";
+
+  const tabs = [
+    { key: "ai" as const, href: "/program/ai", label: "AI Coach", Icon: Sparkles },
+    { key: "my" as const, href: "/program/my", label: "My own", Icon: Pencil },
+  ];
+
+  return (
+    <div className="flex gap-2" data-testid="program-lineage-switcher">
+      {tabs.map(({ key, href, label, Icon }) => (
+        <Link key={key} href={href}>
+          <button
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              active === key
+                ? "bg-primary text-primary-foreground"
+                : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+            }`}
+            data-testid={`lineage-tab-${key}`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+            {activeMode === key && (
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                  active === key ? "bg-primary-foreground/15" : "bg-primary/10 text-primary"
+                }`}
+              >
+                Active
+              </span>
+            )}
+          </button>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// Shown on a program page whose lineage is NOT the active training mode -
+// explains why workout logging isn't offered there.
+export function InactiveLineageNotice({ children }: { children: ReactNode }) {
+  return (
+    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-3" data-testid="inactive-lineage-notice">
+      <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {children}{" "}
+        <Link href="/settings" className="text-primary hover:underline">Switch mode in Settings</Link>
+      </p>
+    </div>
+  );
+}
+
+type ProgramWeekViewProps = {
+  program: Program;
+  // Only the lineage matching the active training mode can start a workout -
+  // workout logging always targets the active mode's current program, so a
+  // "Start workout" on the other lineage's page would log against the wrong one.
+  canStartWorkout: boolean;
+  badge?: ReactNode;
+  // Renders an Edit button in the header when provided (manual programs only).
+  onEdit?: () => void;
+  // The program-page coachmark tour ends by navigating into workout logging,
+  // so it only runs on the active mode's page.
+  tourEnabled?: boolean;
+};
+
+export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
-  const { user } = useUser();
-  const queryClient = useQueryClient();
-  const generateProgram = useGenerateProgram();
-  const [activeDay, setActiveDay] = useState(0);
-  const [building, setBuilding] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "generating" | "presentation">("idle");
-  const [freshProgram, setFreshProgram] = useState<Program | null>(null);
-  const [regenerateCount, setRegenerateCount] = useState(0);
-  const [, setLocation] = useLocation();
-  const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
+  const [activeDay, setActiveDay] = useState(0);
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const logNavTarget = useNavTourTarget("/log");
@@ -646,188 +713,10 @@ export default function Program() {
   }
 
   const showProgramTour =
-    !!profileQuery.data && !profileQuery.data.programPageTourSeenAt && !isPreCalibrationLocked(program, new Date());
+    tourEnabled &&
+    !!profileQuery.data && !profileQuery.data.programPageTourSeenAt &&
+    !isPreCalibrationLocked(program, new Date());
   useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
-
-  const isIndependent = profileQuery.data?.mode === "independent";
-  // AI onboarding is the only place goal/experience get set - Independent
-  // mode's shorter flow skips them, so a mode switch can land here with a
-  // profile that exists but isn't ready for the AI to generate from yet.
-  const aiProfileReady = !!profileQuery.data?.goal && !!profileQuery.data?.experience;
-
-  // Drop the user back into the builder, mid-edit, if a reload or crash
-  // interrupted them before they saved - a draft existing is exactly that
-  // signal. Only checked once: after this, Cancel (which intentionally
-  // leaves the draft in place) must not immediately snap back into it.
-  // Editing only exists in Independent mode, so AI mode never resumes into it.
-  const autoResumedRef = useRef(false);
-  useEffect(() => {
-    if (autoResumedRef.current || isLoading || profileQuery.isLoading || !user?.id || !isIndependent) return;
-    autoResumedRef.current = true;
-
-    if (program) {
-      if (loadProgramDraft(programDraftKey(user.id, program.id))) setEditing(true);
-    } else {
-      if (loadProgramDraft(programDraftKey(user.id, "new"))) setBuilding(true);
-    }
-  }, [isLoading, profileQuery.isLoading, user?.id, program, isIndependent]);
-
-  async function handleGenerate() {
-    setPhase("generating");
-    try {
-      const result = await generateProgram.mutateAsync({});
-      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-      setFreshProgram(result);
-      setPhase("presentation");
-    } catch {
-      setPhase("idle");
-    }
-  }
-
-  async function handleRegenerateFeedback(feedback: ProgramFeedback) {
-    setPhase("generating");
-    setRegenerateCount((c) => c + 1);
-    try {
-      const result = await generateProgram.mutateAsync({ data: { feedback } });
-      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-      setFreshProgram(result);
-    } catch {
-      // keep the previous program on screen; the error banner in the deck reports it
-    }
-    setPhase("presentation");
-  }
-
-  if (phase === "generating") {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-lg">
-          <GeneratingScreen />
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "presentation" && freshProgram) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex-1 flex flex-col items-center px-4 py-12">
-          <PresentationDeck
-            program={freshProgram}
-            goal={profileQuery.data?.goal ?? ""}
-            weightUnit={profileQuery.data?.weightUnit ?? undefined}
-            onSatisfied={() => setLocation("/dashboard")}
-            onSubmitFeedback={handleRegenerateFeedback}
-            isSubmitting={generateProgram.isPending}
-            showRegenerateNudge={regenerateCount >= 3}
-            error={generateProgram.isError}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading || profileQuery.isLoading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-64">
-        <div className="text-muted-foreground text-sm">Loading your program...</div>
-      </div>
-    );
-  }
-
-  if (!program) {
-    if (isIndependent) {
-      return (
-        <div className="p-6 max-w-3xl mx-auto space-y-6">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-2xl font-bold text-foreground">My Program</h1>
-            <p className="text-muted-foreground mt-1">Build your own training program.</p>
-          </motion.div>
-
-          <AnimatePresence>
-            {!building ? (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-center py-20"
-              >
-                <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-foreground mb-2">No program yet</h2>
-                <p className="text-muted-foreground mb-8">Create your first training program with your own days and exercises.</p>
-                <button
-                  onClick={() => setBuilding(true)}
-                  className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-                >
-                  Create your program
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                <ManualProgramBuilder onSaved={() => setBuilding(false)} onCancel={() => setBuilding(false)} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      );
-    }
-
-    if (!aiProfileReady) {
-      return (
-        <div className="p-6 max-w-2xl mx-auto">
-          <div className="text-center py-16">
-            <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-foreground mb-2">A few things to set before AI can build your program</h2>
-            <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-              We don't have your goal, experience, or equipment yet - the AI coach needs those to write a program.
-            </p>
-            <Link href="/onboarding">
-              <button className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
-                Set up AI coaching
-              </button>
-            </Link>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <div className="text-center py-16">
-          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">No program yet</h2>
-          <p className="text-muted-foreground mb-8">Your AI coach has what it needs - generate your first program to get started.</p>
-          <button
-            onClick={handleGenerate}
-            className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
-          >
-            Generate my program
-          </button>
-          {generateProgram.isError && (
-            <p className="text-sm text-destructive mt-4">Something went wrong generating your program. Try again.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Edit mode - reuse the builder, prefilled with this program. Past logged
-  // sessions are snapshots, so editing the program never changes them.
-  // Independent-only: AI mode has no path to set `editing` true, but this
-  // guard keeps it that way even if that ever changes.
-  if (editing && isIndependent) {
-    return (
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold text-foreground">Edit program</h1>
-          <p className="text-muted-foreground mt-1">Change days, exercises, sets and muscles. Past sessions stay as they were.</p>
-        </motion.div>
-        <ManualProgramBuilder
-          editProgram={{ id: program.id, programName: program.programName, splitType: program.splitType, days: program.days }}
-          onSaved={() => { setEditing(false); setActiveDay(0); }}
-          onCancel={() => setEditing(false)}
-        />
-      </div>
-    );
-  }
 
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
@@ -840,19 +729,19 @@ export default function Program() {
   ];
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{program.programName}</h1>
             <p className="text-muted-foreground mt-1">
               {formatSplitType(program.splitType)} · Week {program.weekNumber}
-              {!program.aiGenerated && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">Custom</span>}
+              {badge}
             </p>
           </div>
-          {isIndependent && (
+          {onEdit && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={onEdit}
               className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
               data-testid="button-edit-program"
             >
@@ -895,7 +784,7 @@ export default function Program() {
               <h2 className="font-semibold text-foreground">{day.focus}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{day.exercises.length} exercises</p>
             </div>
-            {locked ? (
+            {canStartWorkout && (locked ? (
               <button
                 onClick={() => setLockDialogOpen(true)}
                 className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
@@ -913,7 +802,7 @@ export default function Program() {
                   Start workout
                 </button>
               </Link>
-            )}
+            ))}
           </div>
 
           {day.exercises.map((ex) => (
