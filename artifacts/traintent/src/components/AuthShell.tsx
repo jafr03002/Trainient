@@ -49,10 +49,6 @@ export function AuthShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex flex-1 items-center justify-center py-8">{children}</div>
-
-        <p className="text-center text-[11px] text-muted-foreground/70">
-          By continuing you agree to the Terms &amp; Privacy Policy.
-        </p>
       </div>
 
       {/* Brand panel (desktop only) */}
