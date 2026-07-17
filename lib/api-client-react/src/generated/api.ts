@@ -34,6 +34,7 @@ import type {
   DailyCheckinResult,
   DailyLogsWeekResult,
   GenerateProgramInput,
+  GetCurrentProgramParams,
   GetDailyLogsWeekParams,
   GetStrengthProgressParams,
   GetTodaysBodyweightParams,
@@ -366,20 +367,27 @@ export const useUpdateProfile = <TError = ErrorType<unknown>,
       return useMutation(getUpdateProfileMutationOptions(options));
     }
 
-export const getGetCurrentProgramUrl = () => {
+export const getGetCurrentProgramUrl = (params?: GetCurrentProgramParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/programs/current`
+  return stringifiedParams.length > 0 ? `/api/programs/current?${stringifiedParams}` : `/api/programs/current`
 }
 
 /**
  * @summary Get the user's current active program within their active mode's program lineage (Independent vs. AI)
  */
-export const getCurrentProgram = async ( options?: RequestInit): Promise<Program> => {
+export const getCurrentProgram = async (params?: GetCurrentProgramParams, options?: RequestInit): Promise<Program> => {
 
-  return customFetch<Program>(getGetCurrentProgramUrl(),
+  return customFetch<Program>(getGetCurrentProgramUrl(params),
   {
     ...options,
     method: 'GET'
@@ -392,23 +400,23 @@ export const getCurrentProgram = async ( options?: RequestInit): Promise<Program
 
 
 
-export const getGetCurrentProgramQueryKey = () => {
+export const getGetCurrentProgramQueryKey = (params?: GetCurrentProgramParams,) => {
     return [
-    `/api/programs/current`
+    `/api/programs/current`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCurrentProgramQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentProgram>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentProgram>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCurrentProgramQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentProgram>>, TError = ErrorType<void>>(params?: GetCurrentProgramParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentProgram>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCurrentProgramQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentProgramQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentProgram>>> = ({ signal }) => getCurrentProgram({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentProgram>>> = ({ signal }) => getCurrentProgram(params, { signal, ...requestOptions });
 
 
 
@@ -426,11 +434,11 @@ export type GetCurrentProgramQueryError = ErrorType<void>
  */
 
 export function useGetCurrentProgram<TData = Awaited<ReturnType<typeof getCurrentProgram>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentProgram>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetCurrentProgramParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentProgram>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCurrentProgramQueryOptions(options)
+  const queryOptions = getGetCurrentProgramQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -44,8 +44,15 @@ router.get("/programs/current", requireAuth, async (req, res) => {
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
   // Independent and AI mode each own a separate program lineage (aiGenerated
   // false/true) so switching modes never surfaces or edits the other mode's
-  // program - "current" resolves within the active mode's lineage only.
-  const wantAiGenerated = profile?.mode !== "independent";
+  // program - "current" resolves within the active mode's lineage by default.
+  // An explicit ?lineage= lets a client view a specific lineage (e.g. the
+  // read-only view of the other mode's program page) without switching modes.
+  const lineage = req.query["lineage"];
+  if (lineage !== undefined && lineage !== "ai" && lineage !== "manual") {
+    res.status(400).json({ error: "lineage must be 'ai' or 'manual'" });
+    return;
+  }
+  const wantAiGenerated = lineage ? lineage === "ai" : profile?.mode !== "independent";
   const program = await db.query.programsTable.findFirst({
     where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, wantAiGenerated)),
     orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],

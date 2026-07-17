@@ -144,7 +144,7 @@ export default function Onboarding() {
   // commitment screen using whatever program already exists, skipping the
   // form/generation/presentation steps. Not a real product flow.
   const debugStep = new URLSearchParams(useSearch()).get("step");
-  const debugProgramQuery = useGetCurrentProgram({
+  const debugProgramQuery = useGetCurrentProgram(undefined, {
     query: { enabled: debugStep === "commitment", queryKey: getGetCurrentProgramQueryKey() },
   });
   useEffect(() => {

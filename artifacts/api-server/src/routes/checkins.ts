@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
@@ -90,9 +90,14 @@ router.post("/checkins", requireAuth, async (req, res) => {
 
   const [profile, currentProgram, recentLogs, recentBodyweightLogs] = await Promise.all([
     db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) }),
+    // The weekly check-in is an AI-coach feature: it must read from and write
+    // to the AI lineage only (aiGenerated=true). Without this scoping it could
+    // pick up a manual (Independent-mode) program - whichever lineage happens
+    // to hold the higher weekNumber - adjust it, and save the result into the
+    // AI lineage, cross-contaminating the two.
     db.query.programsTable.findFirst({
-      where: eq(programsTable.userId, userId),
-      orderBy: [desc(programsTable.weekNumber)],
+      where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
+      orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
     }),
     db.query.workoutLogsTable.findMany({
       where: eq(workoutLogsTable.userId, userId),
@@ -246,6 +251,9 @@ Return ONLY valid JSON (no markdown):
       splitType: raw.updated_program.split_type,
       programHighlights: updatedHighlights,
       days: updatedDays,
+      // Explicit rather than relying on the column default: check-in output
+      // always belongs to the AI lineage, never the manual one.
+      aiGenerated: true,
     })
     .returning();
 

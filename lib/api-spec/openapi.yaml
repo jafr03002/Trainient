@@ -97,6 +97,14 @@ paths:
       operationId: getCurrentProgram
       tags: [programs]
       summary: Get the user's current active program within their active mode's program lineage (Independent vs. AI)
+      parameters:
+        - name: lineage
+          in: query
+          required: false
+          description: Resolve "current" within this explicit lineage instead of the caller's active mode - lets either mode's program page view its own lineage without switching modes.
+          schema:
+            type: string
+            enum: [ai, manual]
       responses:
         "200":
           description: Current program
