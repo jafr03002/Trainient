@@ -8,6 +8,7 @@ import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
+import { AuthShell } from "@/components/AuthShell";
 
 import Landing from "@/pages/landing";
 import Onboarding from "@/pages/onboarding";
@@ -40,31 +41,32 @@ if (!clerkPubKey) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
 }
 
+// Voltage palette (docs/design/voltage-style.md). Clerk's appearance variables
+// can't read CSS custom properties, so the token HSL values are inlined here —
+// keep them in sync with the `.dark` block in src/index.css.
 const clerkAppearance = {
   cssLayerName: "clerk",
   options: {
-    logoPlacement: "inside" as const,
-    logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/favicon.svg`,
+    logoPlacement: "none" as const,
   },
   variables: {
-    colorPrimary: "hsl(217, 91%, 60%)",
-    colorForeground: "hsl(0, 0%, 98%)",
-    colorMutedForeground: "hsl(240, 5%, 65%)",
-    colorDanger: "hsl(0, 62.8%, 30.6%)",
-    colorBackground: "hsl(240, 10%, 6%)",
-    colorInput: "hsl(240, 10%, 16%)",
-    colorInputForeground: "hsl(0, 0%, 98%)",
-    colorNeutral: "hsl(240, 10%, 12%)",
+    colorPrimary: "hsl(212, 96%, 62%)",
+    colorForeground: "hsl(210, 40%, 98%)",
+    colorMutedForeground: "hsl(214, 22%, 64%)",
+    colorDanger: "hsl(0, 72%, 51%)",
+    colorBackground: "hsl(224, 42%, 7%)",
+    colorInput: "hsl(222, 32%, 18%)",
+    colorInputForeground: "hsl(210, 40%, 98%)",
+    colorNeutral: "hsl(222, 32%, 14%)",
     fontFamily: "'Inter', sans-serif",
-    borderRadius: "0.5rem",
+    borderRadius: "0.75rem",
   },
   elements: {
-    rootBox: "w-full flex justify-center",
-    cardBox: "bg-[#0f0f12] rounded-2xl w-[440px] max-w-full overflow-hidden border border-[#1a1a1f]",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-foreground",
+    rootBox: "w-full min-w-0 flex justify-center",
+    cardBox: "!bg-transparent !shadow-none !border-0 !w-full !min-w-0 !max-w-[400px] overflow-hidden",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none !w-full !min-w-0",
+    footer: "!shadow-none !border-0 !bg-transparent !bg-none !rounded-none",
+    headerTitle: "text-foreground font-display",
     headerSubtitle: "text-muted-foreground",
     socialButtonsBlockButtonText: "text-foreground",
     formFieldLabel: "text-foreground",
@@ -74,10 +76,8 @@ const clerkAppearance = {
     identityPreviewEditButton: "text-primary hover:text-primary/90",
     formFieldSuccessText: "text-chart-2",
     alertText: "text-destructive-foreground",
-    logoBox: "h-8 mb-6",
-    logoImage: "h-8 w-auto",
-    socialButtonsBlockButton: "border-border hover:bg-secondary",
-    formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90",
+    socialButtonsBlockButton: "bg-card border-border hover:bg-secondary",
+    formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 glow-primary",
     formFieldInput: "bg-input border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary",
     footerAction: "border-t border-border pt-4 mt-4",
     dividerLine: "bg-border",
@@ -90,17 +90,17 @@ const clerkAppearance = {
 
 function SignInPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <AuthShell>
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-    </div>
+    </AuthShell>
   );
 }
 
 function SignUpPage() {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4">
+    <AuthShell>
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
-    </div>
+    </AuthShell>
   );
 }
 
