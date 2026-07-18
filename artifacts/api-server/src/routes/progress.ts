@@ -3,74 +3,17 @@ import { eq } from "drizzle-orm";
 import { db, workoutLogsTable, bodyweightLogsTable, userProfilesTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { GetStrengthProgressQueryParams } from "@workspace/api-zod";
+import {
+  type LoggedExercise,
+  type LoggedSet,
+  isPerformed,
+  setReps,
+  maxWeight,
+  estimatedOneRepMax,
+  muscleKeyOf,
+} from "../lib/workoutAnalysis";
 
 const router = Router();
-
-type LoggedSet = {
-  weight: number;
-  reps?: number | null;
-  repsLeft?: number | null;
-  repsRight?: number | null;
-  completed?: boolean;
-};
-type LoggedExercise = { name: string; muscle: string; sets: LoggedSet[] };
-
-// A set counts once it has any logged data - we do NOT require the user to have
-// pressed the "complete" check, since most sets are logged without it.
-function isPerformed(s: LoggedSet): boolean {
-  return (s.weight || 0) > 0 || (s.reps || 0) > 0 || (s.repsLeft || 0) > 0 || (s.repsRight || 0) > 0;
-}
-
-function setReps(s: LoggedSet): number {
-  if (s.reps != null) return s.reps || 0;
-  // Unilateral: use the lower side for a conservative rep count.
-  if (s.repsLeft != null || s.repsRight != null) return Math.min(s.repsLeft || 0, s.repsRight || 0);
-  return 0;
-}
-
-function maxWeight(sets: LoggedSet[]): number {
-  const ws = sets.filter(isPerformed).map((s) => s.weight || 0);
-  return ws.length ? Math.max(0, ...ws) : 0;
-}
-
-// Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
-// weight, so a heavier low-rep set and a lighter high-rep set can be compared.
-function estimatedOneRepMax(weight: number, reps: number): number {
-  return weight * (1 + reps / 30);
-}
-
-// Maps the program's muscle options to the MuscleVolumeWeek keys.
-const MUSCLE_KEY: Record<string, string> = {
-  chest: "chest",
-  shoulders: "shoulders",
-  biceps: "biceps",
-  triceps: "triceps",
-  "upper back": "upperBack",
-  lats: "lats",
-  quads: "quads",
-  hamstrings: "hamstrings",
-  glutes: "glutes",
-  calves: "calves",
-  core: "core",
-};
-
-// Loose fallback for legacy/free-text muscle values from older logs.
-function muscleKeyOf(muscle: string): string | null {
-  const m = (muscle || "").toLowerCase().trim();
-  if (MUSCLE_KEY[m]) return MUSCLE_KEY[m];
-  if (m.includes("chest") || m.includes("pec")) return "chest";
-  if (m.includes("shoulder") || m.includes("delt")) return "shoulders";
-  if (m.includes("bicep")) return "biceps";
-  if (m.includes("tricep")) return "triceps";
-  if (m.includes("lat")) return "lats";
-  if (m.includes("back") || m.includes("trap") || m.includes("rhomboid")) return "upperBack";
-  if (m.includes("quad")) return "quads";
-  if (m.includes("ham")) return "hamstrings";
-  if (m.includes("glute")) return "glutes";
-  if (m.includes("calf") || m.includes("calve")) return "calves";
-  if (m.includes("core") || m.includes("abs") || m.includes("abdom") || m.includes("oblique")) return "core";
-  return null;
-}
 
 router.get("/progress/volume", requireAuth, async (req, res) => {
   const userId = getUserId(req);

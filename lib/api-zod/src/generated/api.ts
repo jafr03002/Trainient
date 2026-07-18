@@ -574,6 +574,13 @@ export const ListCheckinsResponseItem = zod.object({
   "sleep": zod.number(),
   "soreness": zod.string(),
   "completion": zod.string(),
+  "hungerAppetite": zod.number().nullish(),
+  "offDayDeviation": zod.boolean().nullish(),
+  "exerciseIssues": zod.string().nullish(),
+  "wentWell": zod.string().nullish(),
+  "didntGoWell": zod.string().nullish(),
+  "sleepDecline": zod.string().nullish(),
+  "digestionIssues": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "submittedAt": zod.string()
 })
@@ -589,6 +596,13 @@ export const SubmitCheckinBody = zod.object({
   "sleep": zod.number(),
   "soreness": zod.string(),
   "completion": zod.string(),
+  "hungerAppetite": zod.number(),
+  "offDayDeviation": zod.boolean(),
+  "exerciseIssues": zod.string().nullish(),
+  "wentWell": zod.string().nullish(),
+  "didntGoWell": zod.string().nullish(),
+  "sleepDecline": zod.string().nullish(),
+  "digestionIssues": zod.string().nullish(),
   "notes": zod.string().nullish()
 })
 
@@ -604,6 +618,13 @@ export const GetLatestCheckinResponse = zod.object({
   "sleep": zod.number(),
   "soreness": zod.string(),
   "completion": zod.string(),
+  "hungerAppetite": zod.number().nullish(),
+  "offDayDeviation": zod.boolean().nullish(),
+  "exerciseIssues": zod.string().nullish(),
+  "wentWell": zod.string().nullish(),
+  "didntGoWell": zod.string().nullish(),
+  "sleepDecline": zod.string().nullish(),
+  "digestionIssues": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "submittedAt": zod.string()
 })

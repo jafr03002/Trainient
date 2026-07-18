@@ -915,26 +915,40 @@ components:
       type: object
       required: [id, userId, weekNumber, energy, sleep, soreness, completion, submittedAt]
       properties:
-        id:          { type: integer }
-        userId:      { type: string }
-        weekNumber:  { type: integer }
-        energy:      { type: integer }
-        sleep:       { type: integer }
-        soreness:    { type: string }
-        completion:  { type: string }
-        notes:       { type: ["string", "null"] }
-        submittedAt: { type: string }
+        id:              { type: integer }
+        userId:          { type: string }
+        weekNumber:      { type: integer }
+        energy:          { type: integer }
+        sleep:           { type: integer }
+        soreness:        { type: string }
+        completion:      { type: string }
+        hungerAppetite:  { type: ["integer", "null"] }
+        offDayDeviation: { type: ["boolean", "null"] }
+        exerciseIssues:  { type: ["string", "null"] }
+        wentWell:        { type: ["string", "null"] }
+        didntGoWell:     { type: ["string", "null"] }
+        sleepDecline:    { type: ["string", "null"] }
+        digestionIssues: { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
+        submittedAt:     { type: string }
 
     CheckinInput:
       type: object
-      required: [weekNumber, energy, sleep, soreness, completion]
+      required: [weekNumber, energy, sleep, soreness, completion, hungerAppetite, offDayDeviation]
       properties:
-        weekNumber:  { type: integer }
-        energy:      { type: integer }
-        sleep:       { type: integer }
-        soreness:    { type: string }
-        completion:  { type: string }
-        notes:       { type: ["string", "null"] }
+        weekNumber:      { type: integer }
+        energy:          { type: integer }
+        sleep:           { type: integer }
+        soreness:        { type: string }
+        completion:      { type: string }
+        hungerAppetite:  { type: integer }
+        offDayDeviation: { type: boolean }
+        exerciseIssues:  { type: ["string", "null"] }
+        wentWell:        { type: ["string", "null"] }
+        didntGoWell:     { type: ["string", "null"] }
+        sleepDecline:    { type: ["string", "null"] }
+        digestionIssues: { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
 
     CheckinResult:
       type: object

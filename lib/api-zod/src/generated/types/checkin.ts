@@ -15,6 +15,20 @@ export interface Checkin {
   soreness: string;
   completion: string;
   /** @nullable */
+  hungerAppetite?: number | null;
+  /** @nullable */
+  offDayDeviation?: boolean | null;
+  /** @nullable */
+  exerciseIssues?: string | null;
+  /** @nullable */
+  wentWell?: string | null;
+  /** @nullable */
+  didntGoWell?: string | null;
+  /** @nullable */
+  sleepDecline?: string | null;
+  /** @nullable */
+  digestionIssues?: string | null;
+  /** @nullable */
   notes?: string | null;
   submittedAt: string;
 }
