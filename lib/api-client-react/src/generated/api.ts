@@ -48,6 +48,7 @@ import type {
   PortalSession,
   Program,
   ProgramStartDateUpdate,
+  SessionAdherence,
   StrengthPoint,
   Subscription,
   UserProfile,
@@ -1561,6 +1562,83 @@ export function useGetLatestCheckin<TData = Awaited<ReturnType<typeof getLatestC
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLatestCheckinQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCheckinAdherenceUrl = () => {
+
+
+
+
+  return `/api/checkins/adherence`
+}
+
+/**
+ * @summary Sessions logged vs planned this week, for the check-in form
+ */
+export const getCheckinAdherence = async ( options?: RequestInit): Promise<SessionAdherence> => {
+
+  return customFetch<SessionAdherence>(getGetCheckinAdherenceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCheckinAdherenceQueryKey = () => {
+    return [
+    `/api/checkins/adherence`
+    ] as const;
+    }
+
+
+export const getGetCheckinAdherenceQueryOptions = <TData = Awaited<ReturnType<typeof getCheckinAdherence>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinAdherence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCheckinAdherenceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckinAdherence>>> = ({ signal }) => getCheckinAdherence({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCheckinAdherence>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCheckinAdherenceQueryResult = NonNullable<Awaited<ReturnType<typeof getCheckinAdherence>>>
+export type GetCheckinAdherenceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Sessions logged vs planned this week, for the check-in form
+ */
+
+export function useGetCheckinAdherence<TData = Awaited<ReturnType<typeof getCheckinAdherence>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinAdherence>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCheckinAdherenceQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

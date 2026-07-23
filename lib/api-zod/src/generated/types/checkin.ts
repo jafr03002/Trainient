@@ -13,7 +13,30 @@ export interface Checkin {
   energy: number;
   sleep: number;
   soreness: string;
-  completion: string;
+  /** @nullable */
+  completion?: string | null;
+  /** @nullable */
+  sessionsPlanned?: number | null;
+  /** @nullable */
+  sessionsLogged?: number | null;
+  /** @nullable */
+  missedSessionReason?: string | null;
+  /** @nullable */
+  ratingScaleMax?: number | null;
+  /** @nullable */
+  hungerAppetite?: number | null;
+  /** @nullable */
+  offDayDeviation?: boolean | null;
+  /** @nullable */
+  exerciseIssues?: string | null;
+  /** @nullable */
+  wentWell?: string | null;
+  /** @nullable */
+  didntGoWell?: string | null;
+  /** @nullable */
+  sleepDecline?: string | null;
+  /** @nullable */
+  digestionIssues?: string | null;
   /** @nullable */
   notes?: string | null;
   submittedAt: string;
