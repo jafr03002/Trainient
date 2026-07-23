@@ -5,15 +5,28 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { CheckinInputMissedSessionReason } from './checkinInputMissedSessionReason';
 
 export interface CheckinInput {
-  weekNumber: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
   energy: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
   sleep: number;
   soreness: string;
-  completion: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
   hungerAppetite: number;
   offDayDeviation: boolean;
+  /** @nullable */
+  missedSessionReason?: CheckinInputMissedSessionReason;
   /** @nullable */
   exerciseIssues?: string | null;
   /** @nullable */

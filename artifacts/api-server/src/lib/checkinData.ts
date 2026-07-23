@@ -1,8 +1,8 @@
 // Builds the "everything logged the past week" evidence block the weekly
 // check-in feeds to the AI, expressed in the exact variables the reprogramming
 // reference (lib/knowledge/ti-check-in-engine.md) reasons about: averageWeight
-// (vs last week), caloriesPerDay, stepCounts, cardioCompleted, sessionsCompleted,
-// progressionAcrossSets, sessionComments. Everything is condensed to compact
+// (vs last week), caloriesPerDay, stepCounts, cardioCompleted, sessions logged
+// vs planned, progressionAcrossSets, sessionComments. Everything is condensed to compact
 // lines rather than raw arrays - the same signal a coach glances at, cheap to
 // interpolate into the prompt.
 
@@ -12,6 +12,8 @@ import {
   exerciseProgressions,
   muscleVolumeLatestWeek,
 } from "./workoutAnalysis";
+import { daysAgoStr, inWindow } from "./dateWindow";
+import { formatAdherence, type SessionAdherence } from "./sessionAdherence";
 
 type BodyweightLog = { date: string; weight: number; weightUnit: string };
 type DailyLog = {
@@ -21,19 +23,6 @@ type DailyLog = {
   cardioType: string | null;
   cardioMinutes: number | null;
 };
-
-function daysAgoStr(today: string, n: number): string {
-  const [y, m, d] = today.split("-").map(Number);
-  const dt = new Date(y!, m! - 1, d! - n);
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${dt.getFullYear()}-${mm}-${dd}`;
-}
-
-// [start, end] inclusive date-string window; text dates compare lexicographically.
-function inWindow(date: string, start: string, end: string): boolean {
-  return date >= start && date <= end;
-}
 
 function avg(nums: number[]): number | null {
   if (nums.length === 0) return null;
@@ -54,8 +43,12 @@ export function buildCheckinEvidence(args: {
   bodyweightLogs: BodyweightLog[];
   dailyLogs: DailyLog[];
   workoutLogs: WorkoutLogRow[];
+  // Precomputed by lib/sessionAdherence.ts and reused verbatim so the client and
+  // the model are shown the same numbers.
+  adherence: SessionAdherence;
+  missedSessionReason: string | null;
 }): CheckinEvidence {
-  const { today, bodyweightLogs, dailyLogs, workoutLogs } = args;
+  const { today, bodyweightLogs, dailyLogs, workoutLogs, adherence, missedSessionReason } = args;
   const weightUnit = bodyweightLogs[0]?.weightUnit ?? "kg";
 
   const thisStart = daysAgoStr(today, 6); // inclusive 7-day window ending today
@@ -74,7 +67,6 @@ export function buildCheckinEvidence(args: {
   const cardioMinutesTotal = cardioDays.reduce((s, l) => s + (l.cardioMinutes ?? 0), 0);
 
   const thisWeekSessions = workoutLogs.filter((l) => inWindow(l.date, thisStart, today));
-  const sessionsCompleted = thisWeekSessions.length;
 
   const progressions = exerciseProgressions(workoutLogs);
   const { volume: muscleVolume } = muscleVolumeLatestWeek(workoutLogs);
@@ -124,7 +116,7 @@ export function buildCheckinEvidence(args: {
 - caloriesPerDay (avg over ${thisWeekDaily.filter((l) => l.calories != null).length} logged days): ${fmt(caloriesPerDay)} kcal
 - stepCounts (avg over ${thisWeekDaily.filter((l) => l.steps != null).length} logged days): ${fmt(stepCounts)} steps
 - cardioCompleted: ${cardioDays.length} session(s), ${cardioMinutesTotal} min total
-- sessionsCompleted (training sessions logged this week): ${sessionsCompleted}
+${formatAdherence(adherence, missedSessionReason)}
 - progressionAcrossSets (per-exercise e1RM = weight × (1 + reps/30), oldest→newest sessions):
 ${progressionLines}
 - muscle volume this week (Σ weight × reps of working sets): ${muscleVolumeLine}

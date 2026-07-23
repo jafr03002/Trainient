@@ -573,7 +573,11 @@ export const ListCheckinsResponseItem = zod.object({
   "energy": zod.number(),
   "sleep": zod.number(),
   "soreness": zod.string(),
-  "completion": zod.string(),
+  "completion": zod.string().nullish(),
+  "sessionsPlanned": zod.number().nullish(),
+  "sessionsLogged": zod.number().nullish(),
+  "missedSessionReason": zod.string().nullish(),
+  "ratingScaleMax": zod.number().nullish(),
   "hungerAppetite": zod.number().nullish(),
   "offDayDeviation": zod.boolean().nullish(),
   "exerciseIssues": zod.string().nullish(),
@@ -590,14 +594,21 @@ export const ListCheckinsResponse = zod.array(ListCheckinsResponseItem)
 /**
  * @summary Submit weekly check-in and trigger AI program adjustment
  */
+export const submitCheckinBodyEnergyMax = 5;
+
+export const submitCheckinBodySleepMax = 5;
+
+export const submitCheckinBodyHungerAppetiteMax = 5;
+
+
+
 export const SubmitCheckinBody = zod.object({
-  "weekNumber": zod.number(),
-  "energy": zod.number(),
-  "sleep": zod.number(),
+  "energy": zod.number().min(1).max(submitCheckinBodyEnergyMax),
+  "sleep": zod.number().min(1).max(submitCheckinBodySleepMax),
   "soreness": zod.string(),
-  "completion": zod.string(),
-  "hungerAppetite": zod.number(),
+  "hungerAppetite": zod.number().min(1).max(submitCheckinBodyHungerAppetiteMax),
   "offDayDeviation": zod.boolean(),
+  "missedSessionReason": zod.union([zod.literal('forgot_to_log'),zod.literal('time'),zod.literal('fatigue'),zod.literal('injury'),zod.literal('other'),zod.literal(null)]).nullish(),
   "exerciseIssues": zod.string().nullish(),
   "wentWell": zod.string().nullish(),
   "didntGoWell": zod.string().nullish(),
@@ -617,7 +628,11 @@ export const GetLatestCheckinResponse = zod.object({
   "energy": zod.number(),
   "sleep": zod.number(),
   "soreness": zod.string(),
-  "completion": zod.string(),
+  "completion": zod.string().nullish(),
+  "sessionsPlanned": zod.number().nullish(),
+  "sessionsLogged": zod.number().nullish(),
+  "missedSessionReason": zod.string().nullish(),
+  "ratingScaleMax": zod.number().nullish(),
   "hungerAppetite": zod.number().nullish(),
   "offDayDeviation": zod.boolean().nullish(),
   "exerciseIssues": zod.string().nullish(),
@@ -627,6 +642,28 @@ export const GetLatestCheckinResponse = zod.object({
   "digestionIssues": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "submittedAt": zod.string()
+})
+
+
+/**
+ * @summary Sessions logged vs planned this week, for the check-in form
+ */
+export const GetCheckinAdherenceResponse = zod.object({
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "plannedSessions": zod.number(),
+  "loggedSessions": zod.number(),
+  "loggedDays": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string(),
+  "date": zod.string().nullable()
+})),
+  "missingDays": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string(),
+  "date": zod.string().nullable()
+})),
+  "extraSessions": zod.number()
 })
 
 

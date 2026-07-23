@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adherenceDay';
 export * from './bodyweightLog';
 export * from './bodyweightLogInput';
 export * from './bodyweightPoint';
@@ -13,6 +14,7 @@ export * from './calendarColor';
 export * from './calendarColorInput';
 export * from './checkin';
 export * from './checkinInput';
+export * from './checkinInputMissedSessionReason';
 export * from './checkinResult';
 export * from './checkoutInput';
 export * from './checkoutSession';
@@ -50,6 +52,7 @@ export * from './programLongTermPhase';
 export * from './programShortTermPhase';
 export * from './programStartDateUpdate';
 export * from './programTrainingWorkload';
+export * from './sessionAdherence';
 export * from './strengthPoint';
 export * from './subscription';
 export * from './userProfile';
