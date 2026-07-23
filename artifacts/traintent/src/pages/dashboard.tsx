@@ -291,7 +291,10 @@ export default function Dashboard() {
                 : "Start logging your workouts here and get to work."}
             </p>
           </div>
-          {program.data?.shortTermPhase && (
+          {/* Phases (calibration, bulk, ...) only exist in the AI lineage - never
+              label an independent-mode dashboard with one, even if a stale AI
+              program is still resolvable for this user. */}
+          {!isIndependent && program.data?.shortTermPhase && (
             <span
               className="text-[10px] px-2.5 py-1 rounded-full whitespace-nowrap capitalize shrink-0 font-medium"
               style={{ background: phaseSoft(program.data.shortTermPhase), color: phaseSolid(program.data.shortTermPhase) }}
@@ -386,7 +389,7 @@ export default function Dashboard() {
                   <th className="text-right font-semibold py-2">Calories</th>
                   <th className="text-right font-semibold py-2">Steps</th>
                   <th className="text-center font-semibold py-2">Cardio</th>
-                  <th className="text-right font-semibold py-2 pr-1">Phase</th>
+                  {!isIndependent && <th className="text-right font-semibold py-2 pr-1">Phase</th>}
                 </tr>
               </thead>
               <tbody>
@@ -416,16 +419,18 @@ export default function Dashboard() {
                           <span className="text-muted-foreground">-</span>
                         )}
                       </td>
-                      <td className="py-2 pr-1 text-right">
-                        {shortTermPhase && (
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap capitalize"
-                            style={{ background: phaseSoft(shortTermPhase), color: phaseSolid(shortTermPhase) }}
-                          >
-                            {shortTermPhase.replace(/_/g, " ")}
-                          </span>
-                        )}
-                      </td>
+                      {!isIndependent && (
+                        <td className="py-2 pr-1 text-right">
+                          {shortTermPhase && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap capitalize"
+                              style={{ background: phaseSoft(shortTermPhase), color: phaseSolid(shortTermPhase) }}
+                            >
+                              {shortTermPhase.replace(/_/g, " ")}
+                            </span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -436,7 +441,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* This week narrative */}
-      {program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.dailyCalorieTarget != null || program.data?.dailyStepTarget != null) && (
+      {!isIndependent && program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.dailyCalorieTarget != null || program.data?.dailyStepTarget != null) && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
