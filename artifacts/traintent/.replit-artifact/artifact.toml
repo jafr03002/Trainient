@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Traintent"
+title = "Trainient"
 version = "1.0.0"
 id = "artifacts/traintent"
 router = "path"

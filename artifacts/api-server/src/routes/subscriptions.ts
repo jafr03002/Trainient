@@ -81,7 +81,7 @@ router.post("/subscriptions/checkout", requireAuth, async (req, res) => {
       {
         price_data: {
           currency: "gbp",
-          product_data: { name: "Traintent Pro" },
+          product_data: { name: "Trainient Pro" },
           unit_amount: 999,
           recurring: { interval: "month" },
         },

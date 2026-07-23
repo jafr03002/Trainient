@@ -1,4 +1,4 @@
-# Traintent
+# Trainient
 
 AI-powered gym coaching SaaS that generates personalised training programs and adjusts them weekly based on check-in data.
 
