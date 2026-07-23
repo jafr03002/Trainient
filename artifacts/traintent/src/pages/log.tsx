@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
@@ -164,7 +164,7 @@ function formatPrevSet(s: any, weightUnit: string): string | null {
 export default function Log() {
   const [, setLocation] = useLocation();
   const { user } = useUser();
-  const { data: program } = useGetCurrentProgram();
+  const { data: program, isLoading: isProgramLoading } = useGetCurrentProgram();
   const { data: profile } = useGetProfile();
   const isIndependent = profile?.mode === "independent";
   const weightUnit = profile?.weightUnit ?? "kg";
@@ -440,6 +440,35 @@ export default function Log() {
           programId={program.id}
           onCancel={() => setLocation("/dashboard")}
         />
+      </div>
+    );
+  }
+
+  // The active mode's lineage has no program to log against - the manual
+  // lineage in Independent mode, the AI lineage in AI mode. Once the query has
+  // settled (and the profile is known, so the copy/CTA match the mode), send
+  // the user to their program page to create/generate one instead of spinning
+  // on "Loading..." forever.
+  if (!isProgramLoading && !program && profile) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="text-center py-20">
+          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">No program to log yet</h2>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+            {isIndependent
+              ? "You haven't built a program yet. Create one to start logging your workouts."
+              : "You don't have a program yet. Generate one with your AI coach to start logging your workouts."}
+          </p>
+          <Link href={isIndependent ? "/program/my" : "/program/ai"}>
+            <button
+              className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+              data-testid="button-log-no-program-cta"
+            >
+              {isIndependent ? "Create your program" : "Generate my program"}
+            </button>
+          </Link>
+        </div>
       </div>
     );
   }
