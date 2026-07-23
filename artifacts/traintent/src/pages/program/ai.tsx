@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
-import { LineageSwitcher, InactiveLineageNotice, ProgramWeekView } from "./shared";
+import { InactiveLineageNotice, ProgramWeekView } from "./shared";
 
 // The AI Coach program page. Reads and writes the AI lineage (aiGenerated=true)
 // exclusively - the explicit lineage param means this page shows the same
@@ -101,7 +101,6 @@ export default function AiProgram() {
   if (!program) {
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-6">
-        <LineageSwitcher active="ai" />
         <div className="text-center py-16">
           <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           {!aiProfileReady ? (
@@ -147,8 +146,6 @@ export default function AiProgram() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <LineageSwitcher active="ai" />
-
       {!isAiModeActive && (
         <InactiveLineageNotice>
           This is your AI Coach program, kept exactly as it was. You're training in Independent

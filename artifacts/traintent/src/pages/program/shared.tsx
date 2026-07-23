@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Sparkles, Info } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
@@ -647,50 +647,6 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-// The two program lineages are completely separate: the AI Coach page only
-// ever reads/writes AI-generated programs, the My Program page only manual
-// ones. This switcher makes both reachable from either page regardless of
-// which training mode is active - the inactive lineage is view-only, never
-// hidden, never overwritten, never deleted.
-export function LineageSwitcher({ active }: { active: "ai" | "my" }) {
-  const { data: profile } = useGetProfile();
-  const activeMode: "ai" | "my" = profile?.mode === "independent" ? "my" : "ai";
-
-  const tabs = [
-    { key: "ai" as const, href: "/program/ai", label: "AI Coach", Icon: Sparkles },
-    { key: "my" as const, href: "/program/my", label: "My own", Icon: Pencil },
-  ];
-
-  return (
-    <div className="flex gap-2" data-testid="program-lineage-switcher">
-      {tabs.map(({ key, href, label, Icon }) => (
-        <Link key={key} href={href}>
-          <button
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              active === key
-                ? "bg-primary text-primary-foreground"
-                : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-border/80"
-            }`}
-            data-testid={`lineage-tab-${key}`}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-            {activeMode === key && (
-              <span
-                className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
-                  active === key ? "bg-primary-foreground/15" : "bg-primary/10 text-primary"
-                }`}
-              >
-                Active
-              </span>
-            )}
-          </button>
-        </Link>
-      ))}
     </div>
   );
 }

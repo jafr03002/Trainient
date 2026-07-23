@@ -4,7 +4,6 @@ import { Dumbbell } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useGetProfile } from "@workspace/api-client-react";
 import {
-  LineageSwitcher,
   InactiveLineageNotice,
   ProgramWeekView,
   ManualProgramBuilder,
@@ -53,7 +52,6 @@ export default function MyProgram() {
   if (!program) {
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-6">
-        <LineageSwitcher active="my" />
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-2xl font-bold text-foreground">My Program</h1>
           <p className="text-muted-foreground mt-1">Build your own training program.</p>
@@ -108,8 +106,6 @@ export default function MyProgram() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <LineageSwitcher active="my" />
-
       {!isIndependent && (
         <InactiveLineageNotice>
           This is your own program, kept exactly as you built it. You're training in AI Coach
