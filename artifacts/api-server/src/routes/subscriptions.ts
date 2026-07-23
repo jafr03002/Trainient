@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import { eq } from "drizzle-orm";
 import Stripe from "stripe";
 import { db, subscriptionsTable } from "@workspace/db";
@@ -6,9 +6,23 @@ import { requireAuth, getUserId } from "../lib/auth";
 import { CreateCheckoutSessionBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-05-27.dahlia",
-});
+// Constructed lazily, for the same reason as lib/anthropic.ts: this router is
+// always mounted, and the Stripe SDK throws on an undefined key, so building
+// the client at import time would stop the whole server booting on a
+// deployment with billing turned off.
+let stripeClient: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (stripeClient) return stripeClient;
+
+  const apiKey = process.env.STRIPE_SECRET_KEY;
+  if (!apiKey) {
+    throw new Error("STRIPE_SECRET_KEY must be set to use billing features");
+  }
+
+  stripeClient = new Stripe(apiKey, { apiVersion: "2026-05-27.dahlia" });
+  return stripeClient;
+}
 
 const router = Router();
 
@@ -49,7 +63,7 @@ router.post("/subscriptions/checkout", requireAuth, async (req, res) => {
 
   let customerId = sub?.stripeCustomerId ?? undefined;
   if (!customerId) {
-    const customer = await stripe.customers.create({ metadata: { userId } });
+    const customer = await getStripe().customers.create({ metadata: { userId } });
     customerId = customer.id;
     await db
       .insert(subscriptionsTable)
@@ -60,7 +74,7 @@ router.post("/subscriptions/checkout", requireAuth, async (req, res) => {
       });
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     line_items: [
@@ -91,7 +105,7 @@ router.post("/subscriptions/portal", requireAuth, async (req, res) => {
     res.status(400).json({ error: "No Stripe customer found" });
     return;
   }
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
     return_url: req.headers.origin ?? "https://traintent.replit.app",
   });
@@ -120,7 +134,7 @@ router.post("/subscriptions/webhook", async (req, res) => {
   try {
     // The only path that builds an event: verify the signature against the raw
     // request body. An invalid or forged signature throws and is rejected below.
-    event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
+    event = getStripe().webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
   } catch (err) {
     res.status(400).json({ error: "Webhook error" });
     return;
@@ -130,7 +144,7 @@ router.post("/subscriptions/webhook", async (req, res) => {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
     if (userId && session.subscription) {
-      const stripeSub = await stripe.subscriptions.retrieve(session.subscription as string);
+      const stripeSub = await getStripe().subscriptions.retrieve(session.subscription as string);
       const periodEnd = (stripeSub as any).current_period_end
         ? new Date((stripeSub as any).current_period_end * 1000)
         : null;

@@ -10,7 +10,18 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - `pnpm run build` - typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` - regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` - push DB schema changes (dev only)
-- Required env: `DATABASE_URL`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `SESSION_SECRET`
+- Required env: `DATABASE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `PORT`
+- Optional env:
+  - `CORS_ALLOWED_ORIGINS` - comma-separated extra origins. **Required** if the
+    deployment is served from anything other than `https://traintent.replit.app`;
+    without it every API call is CORS-blocked *and* Clerk sign-in fails, since
+    `lib/domains.ts` gates both. The server logs a warning at boot if it's unset in
+    production.
+  - `AI_MODE_ENABLED=true` + `ANTHROPIC_API_KEY` - turns AI Coach mode back on. Off by
+    default; `POST /programs/generate` and `POST /checkins` return 403 without it.
+  - `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` - billing. Only needed if the
+    Subscription UI is restored; the Stripe client is constructed lazily, so the
+    server boots fine without them.
 
 ## Stack
 
@@ -19,7 +30,7 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 - API: Express 5 + Clerk Express middleware
 - DB: PostgreSQL + Drizzle ORM
 - Auth: Clerk (managed Replit tenant)
-- AI: OpenAI GPT-4o (direct, OPENAI_API_KEY)
+- AI: Anthropic `claude-opus-4-8` via `@anthropic-ai/sdk` (ANTHROPIC_API_KEY)
 - Payments: Stripe (£9.99/month Pro plan)
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
@@ -39,7 +50,8 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 
 - Contract-first: OpenAPI spec → Orval codegen → typed hooks + Zod validation used end-to-end
 - Clerk auth: JWT bearer token wired in `App.tsx` via `setAuthTokenGetter` + `useAuth().getToken()`; backend uses `@clerk/express` middleware
-- AI programs: GPT-4o with `response_format: json_object`, structured prompt enforcing RPE/sets/reps schema
+- AI programs: `claude-opus-4-8` with a JSON-schema `output_config` and a prompt-cached static system block (`lib/programSchema.ts`, `routes/programs.ts`)
+- AI clients are constructed **lazily** (`lib/anthropic.ts`, the `getStripe()` helper in `routes/subscriptions.ts`) - their routers are always mounted, so building them at import time meant a missing key stopped the whole server booting
 - Stripe API version: `2026-05-27.dahlia` (Stripe v22.x)
 - Clerk ClerkProvider redirect props: `signInFallbackRedirectUrl` / `signUpFallbackRedirectUrl` (not `afterSignInUrl`)
 - Raw body middleware for Stripe webhook must be registered before `express.json()` for the `/api/subscriptions/webhook` path
@@ -50,14 +62,24 @@ AI-powered gym coaching SaaS that generates personalised training programs and a
 
 - **Landing** - marketing page with feature highlights
 - **Auth** - Clerk-hosted sign-in/sign-up with dark theme
-- **Onboarding (7 steps)** - goal, experience, training days, equipment, body stats, priority muscles, review + generate
-- **Dashboard** - stats (streak, week, sessions), next workout card, recent sessions, volume chart
-- **My Program** - tabbed view per training day, exercise cards with RPE/sets/cue/coaching tip
-- **Workout Logger** - live set tracking with weight/reps/RPE inputs, rest timer, finish + save
-- **Weekly Check-in** - 5 questions (energy, sleep, soreness, completion, notes) → GPT-4o adjusts next week's program
-- **Progress** - strength chart, muscle volume breakdown bar chart, personal records table
-- **Calendar** - logged-session history grid; tapping a day opens a session detail modal (exercises, "Last time" hints) with a delete-session action
-- **Settings** - profile edit, subscription status, Stripe checkout/portal, sign out
+- **Onboarding (3 steps)** - name, body stats, review. The AI-only steps (goal,
+  experience, training days, rest days, equipment, injuries, priority muscles) are
+  still in `onboarding.tsx` behind `stepsFor("ai")` but unreachable while the alpha is
+  Independent-only
+- **Dashboard** - greeting hero, current week + PRs, this-week table (calories/steps/cardio), daily check-in, goal progress
+- **Program** (`/program/my`) - build-your-own program: days, exercises, sets/reps, primary/secondary muscle, unilateral flag; drag to reorder days; drafts mirrored to localStorage
+- **Workout Logger** - live set tracking with weight/reps inputs (unilateral = separate L/R), inline PR detection, per-set "last time" hints, finish + save
+- **Progress** - strength chart, bodyweight chart, muscle volume breakdown, personal records table
+- **Calendar** - logged-session history grid; tapping a day opens a session detail modal (exercises, per-set deltas vs last session) with a delete-session action
+- **Settings** - profile edit, calendar colours, sign out, delete account (clears all app data server-side, then the Clerk user)
+
+### Not in the alpha
+
+AI Coach mode and billing are switched off, not removed:
+
+- `AI_MODE_ENABLED` (default false) makes `POST /programs/generate` and `POST /checkins` return 403 before any DB write
+- `/program/ai` and `/checkin` are not mounted in `App.tsx`; the page components still exist and still compile
+- The Subscription section is removed from Settings; the `/subscriptions/*` routes remain
 
 ## User preferences
 

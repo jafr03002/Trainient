@@ -11,7 +11,7 @@ import {
 import router from "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
 import { logger } from "./lib/logger";
-import { ALLOWED_ORIGINS } from "./lib/domains";
+import { ALLOWED_ORIGINS, warnIfOriginsLookUnconfigured } from "./lib/domains";
 
 const app: Express = express();
 
@@ -48,6 +48,8 @@ app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 // Matches any localhost / 127.0.0.1 origin on any port. Only honored outside
 // production, so it can never widen the live deployment's surface.
 const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+warnIfOriginsLookUnconfigured((msg) => logger.warn(msg));
 
 app.use(
   cors({

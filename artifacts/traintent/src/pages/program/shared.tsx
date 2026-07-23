@@ -715,7 +715,11 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
   const heroToken = day ? dayHeroToken(day) : "var(--primary)";
 
-  const startWorkoutButton = locked ? (
+  // Only the lineage matching the active training mode gets a Start button.
+  // /log always resolves the *active mode's* program, so offering this on the
+  // other lineage's page sent the user into a session logged against a
+  // different program's day list entirely.
+  const startWorkoutButton = !canStartWorkout ? null : locked ? (
     <button
       onClick={() => setLockDialogOpen(true)}
       className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"

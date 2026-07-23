@@ -35,3 +35,27 @@ export const ALLOWED_HOSTS = new Set(
     }
   }),
 );
+
+/**
+ * Deploying to any origin other than the hardcoded canonical one without
+ * setting CORS_ALLOWED_ORIGINS produces a confusing failure: the app loads
+ * (it's served statically) but every API call is CORS-blocked and sign-in
+ * breaks, because this same list gates the Clerk proxy's x-forwarded-host
+ * check. Neither symptom points at this env var, so say so loudly at boot.
+ *
+ * Deliberately a warning, not a throw: the canonical origin is a legitimate
+ * configuration, and refusing to start would be worse than a noisy log.
+ */
+export function warnIfOriginsLookUnconfigured(
+  log: (msg: string) => void,
+): void {
+  if (process.env.NODE_ENV !== "production") return;
+  if (process.env.CORS_ALLOWED_ORIGINS?.trim()) return;
+
+  log(
+    "CORS_ALLOWED_ORIGINS is not set - only " +
+      [...ALLOWED_ORIGINS].join(", ") +
+      " will be accepted. If this deployment is served from any other domain, " +
+      "API calls and Clerk sign-in will fail until that origin is added.",
+  );
+}

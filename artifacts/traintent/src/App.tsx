@@ -14,10 +14,8 @@ import Landing from "@/pages/landing";
 import Onboarding from "@/pages/onboarding";
 import Dashboard from "@/pages/dashboard";
 import ProgramRedirect from "@/pages/program";
-import AiProgram from "@/pages/program/ai";
 import MyProgram from "@/pages/program/my";
 import Log from "@/pages/log";
-import Checkin from "@/pages/checkin";
 import Progress from "@/pages/progress";
 import Settings from "@/pages/settings";
 import Calendar from "@/pages/calendar";
@@ -197,11 +195,14 @@ function App() {
                         <Switch>
                           <Route path="/onboarding" component={Onboarding} />
                           <Route path="/dashboard" component={Dashboard} />
+                          {/* AI Coach mode is switched off for the alpha, so
+                              /program/ai and /checkin are not mounted at all -
+                              they fall through to NotFound. The server refuses
+                              their endpoints independently (AI_MODE_ENABLED),
+                              so this is convenience, not the guard. */}
                           <Route path="/program" component={ProgramRedirect} />
-                          <Route path="/program/ai" component={AiProgram} />
                           <Route path="/program/my" component={MyProgram} />
                           <Route path="/log" component={Log} />
-                          <Route path="/checkin" component={Checkin} />
                           <Route path="/calendar" component={Calendar} />
                           <Route path="/progress" component={Progress} />
                           <Route path="/settings" component={Settings} />

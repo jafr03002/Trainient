@@ -8,7 +8,8 @@ import {
   GenerateProgramBody,
 } from "@workspace/api-zod";
 import { requireAuth, getUserId } from "../lib/auth";
-import { anthropic } from "../lib/anthropic";
+import { getAnthropic } from "../lib/anthropic";
+import { AI_MODE_ENABLED } from "../lib/featureFlags";
 import { generateProgramOutputSchema } from "../lib/programSchema";
 import { programGenerationKnowledge } from "../lib/knowledge";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
@@ -169,6 +170,14 @@ router.patch("/programs/:id", requireAuth, async (req, res) => {
 });
 
 router.post("/programs/generate", requireAuth, async (req, res) => {
+  // Refused before anything else runs, so a deployment with AI switched off
+  // can't be made to call a paid model by a stale client or a hand-rolled
+  // request - the UI hides this surface, but the UI isn't the security boundary.
+  if (!AI_MODE_ENABLED) {
+    res.status(403).json({ error: "AI coaching is not available" });
+    return;
+  }
+
   const userId = getUserId(req);
   const parsed = GenerateProgramBody.safeParse(req.body);
   if (!parsed.success) {
@@ -280,7 +289,7 @@ For each day, provide 5–7 exercises. For each exercise provide:
 - One coaching cue (one sentence)
 - Primary muscle group${feedbackBlock}`;
 
-  const completion = await anthropic.messages.create({
+  const completion = await getAnthropic().messages.create({
     model: "claude-opus-4-8",
     max_tokens: 4000,
     thinking: { type: "adaptive" },

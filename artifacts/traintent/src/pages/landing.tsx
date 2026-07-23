@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { Dumbbell, Target, LineChart, Brain, User } from "lucide-react";
+import { Dumbbell, Target, LineChart, User } from "lucide-react";
 
 export default function Landing() {
   return (
@@ -42,30 +42,19 @@ export default function Landing() {
           </motion.div>
         </section>
 
-        {/* Modes */}
+        {/* How it works. The AI Coach mode is not part of the alpha, so it is
+            not advertised here - promising a mode sign-ups can't reach is the
+            fastest way to make the whole page feel broken. */}
         <section className="px-6 lg:px-12 py-24 bg-card/30 border-y border-white/5">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-2xl font-bold text-white text-center mb-12">Choose how you train</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="p-8 rounded-2xl bg-card border border-white/5 flex flex-col">
-                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-6 text-primary">
-                  <Brain className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">AI Coach</h3>
-                <p className="text-white/60 leading-relaxed">
-                  AI builds your program, monitors progress, and adjusts weekly based on your check-ins.
-                </p>
-              </div>
-              <div className="p-8 rounded-2xl bg-card border border-white/5 flex flex-col">
-                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-6 text-primary">
-                  <User className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-3">Independent</h3>
-                <p className="text-white/60 leading-relaxed">
-                  You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved.
-                </p>
-              </div>
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-6 text-primary mx-auto">
+              <User className="w-6 h-6" />
             </div>
+            <h2 className="text-2xl font-bold text-white mb-4">You're in control</h2>
+            <p className="text-white/60 leading-relaxed">
+              Build your own program, log your sessions, and track your progression yourself.
+              No algorithm second-guessing your training.
+            </p>
           </div>
         </section>
 
@@ -79,7 +68,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">Structured Programs</h3>
                 <p className="text-white/60 leading-relaxed">
-                  AI-generated or hand-built - every program is structured around your goals and schedule.
+                  Build your split day by day - every program is structured around your goals and schedule.
                 </p>
               </div>
               <div className="p-8 rounded-2xl bg-card border border-white/5 flex flex-col items-start">
@@ -88,7 +77,7 @@ export default function Landing() {
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-3">Session Logging</h3>
                 <p className="text-white/60 leading-relaxed">
-                  Log weight, reps, and RPE for every set. Review sessions on a colour-coded calendar.
+                  Log weight and reps for every set. Review sessions on a colour-coded calendar.
                 </p>
               </div>
               <div className="p-8 rounded-2xl bg-card border border-white/5 flex flex-col items-start">

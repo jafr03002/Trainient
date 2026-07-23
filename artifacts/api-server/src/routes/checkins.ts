@@ -3,7 +3,8 @@ import { eq, desc, and } from "drizzle-orm";
 import { db, checkinsTable, programsTable, userProfilesTable, workoutLogsTable, bodyweightLogsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
-import { anthropic } from "../lib/anthropic";
+import { getAnthropic } from "../lib/anthropic";
+import { AI_MODE_ENABLED } from "../lib/featureFlags";
 import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
@@ -76,6 +77,14 @@ router.get("/checkins/latest", requireAuth, async (req, res) => {
 });
 
 router.post("/checkins", requireAuth, async (req, res) => {
+  // Refused before the insert below, not after: the "No program to adjust"
+  // guard further down used to sit *after* it, so a rejected check-in still
+  // left a row behind. Anything that can reject this request belongs up here.
+  if (!AI_MODE_ENABLED) {
+    res.status(403).json({ error: "AI coaching is not available" });
+    return;
+  }
+
   const userId = getUserId(req);
   const parsed = SubmitCheckinBody.safeParse(req.body);
   if (!parsed.success) {
@@ -185,7 +194,7 @@ Return ONLY valid JSON (no markdown):
   "daily_step_target": 8000, "daily_calorie_target": 1900,
   "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
 
-  const completion = await anthropic.messages.create({
+  const completion = await getAnthropic().messages.create({
     model: "claude-opus-4-8",
     max_tokens: 4000,
     thinking: { type: "adaptive" },

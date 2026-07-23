@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
@@ -67,17 +67,21 @@ const EQUIPMENT = [
 
 const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 
-// Everyone gets mode + the profile basics also editable later in Settings
-// (name, age, weight). Everything else is AI-coaching input - it's only
-// meaningful when the AI is the one building/adjusting your program, so
-// Independent mode skips straight to the review step.
+// Everyone gets the profile basics also editable later in Settings (name, age,
+// weight). Everything else is AI-coaching input - it's only meaningful when the
+// AI is the one building/adjusting your program, so Independent mode skips
+// straight to the review step.
+//
+// The alpha ships Independent-only, so the "mode" step is gone and mode is
+// seeded to "independent" below. The AI branch is left intact rather than
+// deleted: re-enabling it is putting "mode" back at the front of `base`.
 type StepKey =
   | "mode" | "name" | "bodyStats"
   | "goal" | "experience" | "activity" | "trainingDays" | "preferredRestDays" | "equipment" | "details" | "priorityMuscles"
   | "review";
 
 function stepsFor(mode: string): StepKey[] {
-  const base: StepKey[] = ["mode", "name", "bodyStats"];
+  const base: StepKey[] = ["name", "bodyStats"];
   if (mode === "ai") {
     return [...base, "goal", "experience", "activity", "trainingDays", "preferredRestDays", "equipment", "details", "priorityMuscles", "review"];
   }
@@ -104,7 +108,8 @@ type FormState = {
 };
 
 const INITIAL: FormState = {
-  mode: "",
+  // Alpha is Independent-only; there is no mode step left to set this.
+  mode: "independent",
   name: "",
   goal: "",
   goalWeight: "",
@@ -186,11 +191,7 @@ export default function Onboarding() {
   const steps = stepsFor(form.mode);
   const currentStep = steps[step];
   const totalSteps = steps.length;
-  // Until a mode is picked on the first step, the flow length is unknown (AI
-  // and Independent have different step counts), so keep the progress bar empty
-  // rather than implying the user is already a quarter of the way through.
-  const hasStarted = form.mode !== "";
-  const progress = hasStarted ? ((step + 1) / totalSteps) * 100 : 0;
+  const progress = ((step + 1) / totalSteps) * 100;
 
   // A user may keep at most (7 - trainingDays + 1) days free: the strict number
   // of off-days plus one day of scheduling slack. More than that can't be
@@ -200,7 +201,6 @@ export default function Onboarding() {
 
   function canAdvance() {
     switch (currentStep) {
-      case "mode": return !!form.mode;
       case "goal": return !!form.goal;
       case "experience": return !!form.experience;
       case "preferredRestDays": return !tooManyPreferredRestDays;
@@ -460,9 +460,7 @@ export default function Onboarding() {
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg">
-          {/* Hidden (but space reserved to avoid a layout jump) until a mode is
-              chosen - "Step 1 of 4" before any interaction is misleading. */}
-          <div className={`text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase ${hasStarted ? "" : "invisible"}`}>
+          <div className="text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase">
             Step {step + 1} of {totalSteps}
           </div>
 
@@ -475,55 +473,6 @@ export default function Onboarding() {
               exit="exit"
               transition={{ duration: 0.22 }}
             >
-              {/* Mode selection */}
-              {currentStep === "mode" && (
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">How do you want to train?</h2>
-                  <p className="text-muted-foreground mb-8">Choose your mode - you can switch later in Settings.</p>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button
-                      data-testid="mode-ai"
-                      onClick={() => setForm((f) => ({ ...f, mode: "ai" }))}
-                      className={`p-5 rounded-xl border text-left transition-all ${
-                        form.mode === "ai"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                          <Brain className="w-5 h-5" />
-                        </div>
-                        <span className="font-semibold text-foreground text-lg">AI Coach</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        AI builds your program, monitors progress, and adjusts weekly based on your check-ins
-                      </p>
-                    </button>
-
-                    <button
-                      data-testid="mode-independent"
-                      onClick={() => setForm((f) => ({ ...f, mode: "independent" }))}
-                      className={`p-5 rounded-xl border text-left transition-all ${
-                        form.mode === "independent"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                          <User className="w-5 h-5" />
-                        </div>
-                        <span className="font-semibold text-foreground text-lg">Independent</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved
-                      </p>
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Name */}
               {currentStep === "name" && (
                 <div>
@@ -904,11 +853,10 @@ export default function Onboarding() {
                   <p className="text-muted-foreground mb-8">
                     {form.mode === "ai"
                       ? "Here's what your AI coach will use."
-                      : "Your profile is ready. Head to My Program to build your first program."}
+                      : "Your profile is ready. Head to Program to build your first program."}
                   </p>
                   <div className="space-y-3 mb-8">
                     {[
-                      { label: "Mode", value: form.mode === "ai" ? "AI Coach" : "Independent" },
                       form.name && { label: "Name", value: form.name },
                       form.goal && { label: "Goal", value: goalLabel(form.goal) },
                       form.goalWeight && { label: "Goal weight", value: `${form.goalWeight} ${form.weightUnit}` },

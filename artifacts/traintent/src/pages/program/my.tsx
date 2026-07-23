@@ -53,7 +53,7 @@ export default function MyProgram() {
     return (
       <div className="p-6 max-w-3xl mx-auto space-y-6">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold text-foreground">My Program</h1>
+          <h1 className="text-2xl font-bold text-foreground">Program</h1>
           <p className="text-muted-foreground mt-1">Build your own training program.</p>
         </motion.div>
 

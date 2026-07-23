@@ -251,7 +251,7 @@ export default function Dashboard() {
 
   const nextDay = program.data?.days?.[0] as any;
   const dashboardTourSteps: CoachmarkStep[] = [
-    { target: tourDailyCheckinRef, text: "This is your daily check-in that you need to do every day." },
+    { target: tourDailyCheckinRef, text: "Log your bodyweight and daily activity here." },
     { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
     { target: tourProgressRef, text: "And down here you can track your progress." },
     { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
@@ -385,15 +385,13 @@ export default function Dashboard() {
                   <th className="text-left font-semibold py-2 pl-1">Day</th>
                   <th className="text-right font-semibold py-2">Calories</th>
                   <th className="text-right font-semibold py-2">Steps</th>
-                  <th className="text-center font-semibold py-2">Cardio</th>
-                  <th className="text-right font-semibold py-2 pr-1">Phase</th>
+                  <th className="text-center font-semibold py-2 pr-1">Cardio</th>
                 </tr>
               </thead>
               <tbody>
                 {weekLogs.data?.days.map((day) => {
                   const isToday = day.date === todayStr;
                   const parsed = parseLocalDateString(day.date);
-                  const shortTermPhase = weekLogs.data!.shortTermPhase;
                   return (
                     <tr
                       key={day.date}
@@ -409,21 +407,11 @@ export default function Dashboard() {
                       <td className="py-2 text-right tabular-nums">
                         {day.steps != null ? day.steps.toLocaleString() : <span className="text-muted-foreground">-</span>}
                       </td>
-                      <td className="py-2 text-center">
+                      <td className="py-2 pr-1 text-center">
                         {day.cardioType ? (
                           <Check className="w-3.5 h-3.5 inline text-chart-2" />
                         ) : (
                           <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-1 text-right">
-                        {shortTermPhase && (
-                          <span
-                            className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap capitalize"
-                            style={{ background: phaseSoft(shortTermPhase), color: phaseSolid(shortTermPhase) }}
-                          >
-                            {shortTermPhase.replace(/_/g, " ")}
-                          </span>
                         )}
                       </td>
                     </tr>
@@ -495,7 +483,7 @@ export default function Dashboard() {
         </div>
         {dailyCheckinLocked && (
           <p className="text-xs text-muted-foreground mt-1" data-testid="text-checkin-locked">
-            Generate a program to start logging your daily check-in.
+            Build a program to start logging your daily check-in.
           </p>
         )}
         <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 ${dailyCheckinLocked ? "opacity-50" : ""}`}>

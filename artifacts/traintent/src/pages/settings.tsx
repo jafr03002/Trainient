@@ -1,23 +1,18 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/react";
 import { motion } from "framer-motion";
-import { Loader2, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import {
   useGetProfile,
   useUpdateProfile,
-  useGetSubscription,
-  useCreateCheckoutSession,
-  useCreatePortalSession,
+  useDeleteAccount,
   useGetCalendarColors,
   useUpsertCalendarColor,
   getGetProfileQueryKey,
-  getGetSubscriptionQueryKey,
   getGetCalendarColorsQueryKey,
-  getGetCurrentProgramQueryKey,
-  getGetWorkoutStatsQueryKey,
-  getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const DEFAULT_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -29,10 +24,8 @@ export default function Settings() {
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const profile = useGetProfile();
-  const subscription = useGetSubscription();
   const updateProfile = useUpdateProfile();
-  const createCheckout = useCreateCheckoutSession();
-  const createPortal = useCreatePortalSession();
+  const deleteAccount = useDeleteAccount();
   const calendarColors = useGetCalendarColors();
   const upsertColor = useUpsertCalendarColor();
 
@@ -42,8 +35,6 @@ export default function Settings() {
   const [age, setAge] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showModeConfirm, setShowModeConfirm] = useState(false);
-  const [pendingMode, setPendingMode] = useState<string | null>(null);
   const [colorMap, setColorMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -77,38 +68,22 @@ export default function Settings() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  async function handleModeSwitch() {
-    if (!pendingMode) return;
-    await updateProfile.mutateAsync({ data: { mode: pendingMode } });
-    queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
-    // "Current program" and week-number stats are mode-scoped server-side,
-    // so a mode switch must force both to refetch - otherwise dashboard.tsx
-    // and program.tsx can keep serving stale data from the other mode.
-    queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-    queryClient.invalidateQueries({ queryKey: getGetWorkoutStatsQueryKey() });
-    // calendar.tsx derives phase/calibration bands from the full program
-    // list, which spans both mode lineages - stale cache here would keep
-    // showing the other mode's phases after switching.
-    queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
-    setShowModeConfirm(false);
-    setPendingMode(null);
-  }
-
-  async function handleUpgrade() {
-    const origin = window.location.origin;
-    const result = await createCheckout.mutateAsync({
-      data: {
-        plan: "pro",
-        successUrl: `${origin}/dashboard?upgraded=1`,
-        cancelUrl: `${origin}/settings`,
-      },
-    });
-    if (result.url) window.location.href = result.url;
-  }
-
-  async function handleManageBilling() {
-    const result = await createPortal.mutateAsync();
-    if (result.url) window.open(result.url, "_blank");
+  // Application data first, Clerk user second. If the server call fails we
+  // stop here: the account can still sign in and retry, whereas deleting the
+  // Clerk user first would strand rows nobody can ever reach again.
+  async function handleDeleteAccount() {
+    try {
+      await deleteAccount.mutateAsync();
+    } catch {
+      toast({
+        title: "Couldn't delete your data",
+        description: "Nothing was deleted. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await user?.delete();
+    await signOut({ redirectUrl: "/" });
   }
 
   async function handleColorChange(label: string, hex: string) {
@@ -204,79 +179,6 @@ export default function Settings() {
         </button>
       </motion.section>
 
-      {/* Training mode */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="p-5 rounded-xl bg-card border border-border space-y-4"
-      >
-        <h2 className="font-semibold text-foreground">Training mode</h2>
-        <div className="flex items-center gap-3">
-          <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-            currentMode === "ai"
-              ? "bg-primary/10 text-primary border-primary/20"
-              : "bg-secondary/50 text-muted-foreground border-border"
-          }`}>
-            {currentMode === "ai" ? "AI Coach" : "Independent"}
-          </div>
-        </div>
-
-        {currentMode === "ai" ? (
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Switch to Independent mode to build and manage your own program without AI.
-            </p>
-            <button
-              onClick={() => { setPendingMode("independent"); setShowModeConfirm(true); }}
-              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-            >
-              Switch to Independent
-            </button>
-          </div>
-        ) : (
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Switch to AI Coach mode to get AI-generated programs and weekly adjustments.
-            </p>
-            <button
-              onClick={() => { setPendingMode("ai"); setShowModeConfirm(true); }}
-              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-            >
-              Switch to AI Coach
-            </button>
-          </div>
-        )}
-
-        {showModeConfirm && (
-          <div className="p-4 rounded-xl bg-secondary/20 border border-border">
-            <p className="text-sm text-foreground font-medium mb-2">
-              Switch to {pendingMode === "ai" ? "AI Coach" : "Independent"} mode?
-            </p>
-            <p className="text-xs text-muted-foreground mb-4">
-              {pendingMode === "ai"
-                ? "Switching to AI Coach will trigger program regeneration on your next visit to My Program."
-                : "Your existing program will remain, but AI check-ins and adjustments will be disabled."}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setShowModeConfirm(false); setPendingMode(null); }}
-                className="flex-1 h-9 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleModeSwitch}
-                disabled={updateProfile.isPending}
-                className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        )}
-      </motion.section>
-
       {/* Calendar colours */}
       {knownLabels.length > 0 && (
         <motion.section
@@ -314,64 +216,6 @@ export default function Settings() {
           </div>
         </motion.section>
       )}
-
-      {/* Subscription */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
-        className="p-5 rounded-xl bg-card border border-border space-y-4"
-      >
-        <h2 className="font-semibold text-foreground">Subscription</h2>
-
-        {subscription.isLoading ? (
-          <div className="text-muted-foreground text-sm">Loading...</div>
-        ) : (
-          <>
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                subscription.data?.plan === "pro"
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "bg-secondary/50 text-muted-foreground border border-border"
-              }`}>
-                {subscription.data?.plan === "pro" ? "Pro" : "Free"}
-              </span>
-              {subscription.data?.currentPeriodEnd && (
-                <span className="text-xs text-muted-foreground">
-                  Renews {new Date(subscription.data.currentPeriodEnd).toLocaleDateString("en-GB")}
-                </span>
-              )}
-            </div>
-
-            {subscription.data?.plan !== "pro" ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upgrade to Pro for unlimited programs, weekly AI adjustments, and full progress tracking.
-                </p>
-                <button
-                  onClick={handleUpgrade}
-                  disabled={createCheckout.isPending}
-                  className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
-                  data-testid="button-upgrade-pro"
-                >
-                  {createCheckout.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Upgrade to Pro - £9.99/month
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleManageBilling}
-                disabled={createPortal.isPending}
-                className="h-11 px-6 rounded-xl border border-border text-foreground font-semibold text-sm hover:bg-secondary/30 transition-colors flex items-center gap-2 disabled:opacity-60"
-                data-testid="button-manage-billing"
-              >
-                {createPortal.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                Manage billing
-              </button>
-            )}
-          </>
-        )}
-      </motion.section>
 
       {/* Danger zone */}
       <motion.section
@@ -427,10 +271,12 @@ export default function Settings() {
                 Cancel
               </button>
               <button
-                onClick={() => user?.delete().then(() => signOut())}
-                className="flex-1 h-9 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors"
+                onClick={handleDeleteAccount}
+                disabled={deleteAccount.isPending}
+                className="flex-1 h-9 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 data-testid="button-confirm-delete"
               >
+                {deleteAccount.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Yes, delete everything
               </button>
             </div>
