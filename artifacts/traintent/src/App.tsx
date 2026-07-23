@@ -182,8 +182,14 @@ function App() {
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />
               
-              {/* Authenticated Routes wrapped in Layout */}
-              <Route path="/:rest*">
+              {/* Authenticated Routes wrapped in Layout.
+                  Must be `/*?`, not `/:rest*`: wouter compiles patterns with
+                  regexparam, where a `:param` segment is always a single
+                  segment (`/([^/]+?)`) and the trailing `*` is just part of
+                  the param name. `/:rest*` therefore never matches nested
+                  paths like /program/ai or /program/my - the Switch falls
+                  through and the whole authenticated app renders nothing. */}
+              <Route path="/*?">
                 {() => (
                   <>
                     <Show when="signed-in">
