@@ -369,6 +369,21 @@ paths:
         "404":
           description: No check-ins yet
 
+  /checkins/adherence:
+    get:
+      operationId: getCheckinAdherence
+      tags: [checkins]
+      summary: Sessions logged vs planned this week, for the check-in form
+      responses:
+        "200":
+          description: Session adherence for the current 7-day window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionAdherence"
+        "404":
+          description: No AI-generated program to measure against
+
   # ── Progress ──────────────────────────────────────────────────────────────────
   /progress/volume:
     get:
@@ -913,28 +928,77 @@ components:
     # ── Check-ins ─────────────────────────────────────────────────────────────
     Checkin:
       type: object
-      required: [id, userId, weekNumber, energy, sleep, soreness, completion, submittedAt]
+      required: [id, userId, weekNumber, energy, sleep, soreness, submittedAt]
       properties:
-        id:          { type: integer }
-        userId:      { type: string }
-        weekNumber:  { type: integer }
-        energy:      { type: integer }
-        sleep:       { type: integer }
-        soreness:    { type: string }
-        completion:  { type: string }
-        notes:       { type: ["string", "null"] }
-        submittedAt: { type: string }
+        id:              { type: integer }
+        userId:          { type: string }
+        weekNumber:      { type: integer }
+        energy:          { type: integer }
+        sleep:           { type: integer }
+        soreness:        { type: string }
+        # Legacy self-report, no longer collected - see sessionsLogged/sessionsPlanned.
+        completion:      { type: ["string", "null"] }
+        sessionsPlanned: { type: ["integer", "null"] }
+        sessionsLogged:  { type: ["integer", "null"] }
+        missedSessionReason: { type: ["string", "null"] }
+        # Null means the legacy 1-10 energy/sleep scale; new rows are 5.
+        ratingScaleMax:  { type: ["integer", "null"] }
+        hungerAppetite:  { type: ["integer", "null"] }
+        offDayDeviation: { type: ["boolean", "null"] }
+        exerciseIssues:  { type: ["string", "null"] }
+        wentWell:        { type: ["string", "null"] }
+        didntGoWell:     { type: ["string", "null"] }
+        sleepDecline:    { type: ["string", "null"] }
+        digestionIssues: { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
+        submittedAt:     { type: string }
 
     CheckinInput:
       type: object
-      required: [weekNumber, energy, sleep, soreness, completion]
+      # weekNumber and completion are deliberately absent: the server derives the
+      # training week from the profile and session adherence from workout_logs.
+      required: [energy, sleep, soreness, hungerAppetite, offDayDeviation]
       properties:
-        weekNumber:  { type: integer }
-        energy:      { type: integer }
-        sleep:       { type: integer }
-        soreness:    { type: string }
-        completion:  { type: string }
-        notes:       { type: ["string", "null"] }
+        energy:          { type: integer, minimum: 1, maximum: 5 }
+        sleep:           { type: integer, minimum: 1, maximum: 5 }
+        soreness:        { type: string }
+        hungerAppetite:  { type: integer, minimum: 1, maximum: 5 }
+        offDayDeviation: { type: boolean }
+        missedSessionReason:
+          type: ["string", "null"]
+          enum: [forgot_to_log, time, fatigue, injury, other, null]
+        exerciseIssues:  { type: ["string", "null"] }
+        wentWell:        { type: ["string", "null"] }
+        didntGoWell:     { type: ["string", "null"] }
+        sleepDecline:    { type: ["string", "null"] }
+        digestionIssues: { type: ["string", "null"] }
+        notes:           { type: ["string", "null"] }
+
+    AdherenceDay:
+      type: object
+      required: [dayNumber, label, date]
+      properties:
+        dayNumber: { type: integer }
+        label:     { type: string }
+        date:      { type: ["string", "null"] }
+
+    SessionAdherence:
+      type: object
+      required: [windowStart, windowEnd, plannedSessions, loggedSessions, loggedDays, missingDays, extraSessions]
+      properties:
+        windowStart:     { type: string }
+        windowEnd:       { type: string }
+        plannedSessions: { type: integer }
+        loggedSessions:  { type: integer }
+        loggedDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdherenceDay"
+        missingDays:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdherenceDay"
+        extraSessions:   { type: integer }
 
     CheckinResult:
       type: object

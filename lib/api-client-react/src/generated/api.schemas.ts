@@ -371,20 +371,98 @@ export interface Checkin {
   energy: number;
   sleep: number;
   soreness: string;
-  completion: string;
+  /** @nullable */
+  completion?: string | null;
+  /** @nullable */
+  sessionsPlanned?: number | null;
+  /** @nullable */
+  sessionsLogged?: number | null;
+  /** @nullable */
+  missedSessionReason?: string | null;
+  /** @nullable */
+  ratingScaleMax?: number | null;
+  /** @nullable */
+  hungerAppetite?: number | null;
+  /** @nullable */
+  offDayDeviation?: boolean | null;
+  /** @nullable */
+  exerciseIssues?: string | null;
+  /** @nullable */
+  wentWell?: string | null;
+  /** @nullable */
+  didntGoWell?: string | null;
+  /** @nullable */
+  sleepDecline?: string | null;
+  /** @nullable */
+  digestionIssues?: string | null;
   /** @nullable */
   notes?: string | null;
   submittedAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type CheckinInputMissedSessionReason = typeof CheckinInputMissedSessionReason[keyof typeof CheckinInputMissedSessionReason] | null;
+
+
+export const CheckinInputMissedSessionReason = {
+  forgot_to_log: 'forgot_to_log',
+  time: 'time',
+  fatigue: 'fatigue',
+  injury: 'injury',
+  other: 'other',
+} as const;
+
 export interface CheckinInput {
-  weekNumber: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
   energy: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
   sleep: number;
   soreness: string;
-  completion: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  hungerAppetite: number;
+  offDayDeviation: boolean;
+  /** @nullable */
+  missedSessionReason?: CheckinInputMissedSessionReason;
+  /** @nullable */
+  exerciseIssues?: string | null;
+  /** @nullable */
+  wentWell?: string | null;
+  /** @nullable */
+  didntGoWell?: string | null;
+  /** @nullable */
+  sleepDecline?: string | null;
+  /** @nullable */
+  digestionIssues?: string | null;
   /** @nullable */
   notes?: string | null;
+}
+
+export interface AdherenceDay {
+  dayNumber: number;
+  label: string;
+  /** @nullable */
+  date: string | null;
+}
+
+export interface SessionAdherence {
+  windowStart: string;
+  windowEnd: string;
+  plannedSessions: number;
+  loggedSessions: number;
+  loggedDays: AdherenceDay[];
+  missingDays: AdherenceDay[];
+  extraSessions: number;
 }
 
 export interface CheckinResult {
