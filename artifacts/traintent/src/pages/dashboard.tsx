@@ -27,6 +27,7 @@ import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldS
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
 
 // Local calendar date, not UTC - so logging just after midnight lands on the
@@ -223,7 +224,12 @@ export default function Dashboard() {
 
   // One-time, full-screen: shows in place of the dashboard the first time a
   // client is living in an active calibration window (see lib/calibration.ts).
+  // Calibration windows are derived from AI-generated phase data, and the
+  // walkthrough's copy talks about "your AI coach" - so it's flag-gated too,
+  // for the same reason as the check-in banner below. It replaces the whole
+  // dashboard, so a stray trigger would be the worst-looking bug of the set.
   if (
+    AI_MODE_ENABLED &&
     profile &&
     !isIndependent &&
     shouldShowCalibrationWalkthrough(programsQuery.data ?? [], profile.onboardingCompletedAt, profile.calibrationWalkthroughSeenAt, new Date())
@@ -234,6 +240,12 @@ export default function Dashboard() {
   }
 
   const showCheckinBanner = (() => {
+    // The weekly check-in banner is an AI-coach prompt: it links to /checkin,
+    // which the alpha neither routes nor serves. Disabled at the flag rather
+    // than deleted, and checked ahead of the mode test so it stays off even if
+    // an AI-mode profile somehow exists on this deployment - the banner would
+    // otherwise offer a dead link.
+    if (!AI_MODE_ENABLED) return false;
     if (isIndependent) return false;
     if (profileQuery.isLoading || latestCheckin.isLoading) return false;
     if (!profile?.onboardingCompletedAt) return false;

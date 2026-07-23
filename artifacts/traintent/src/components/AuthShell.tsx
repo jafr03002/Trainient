@@ -41,7 +41,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
             Trainient. Train with <span className="text-primary">intent</span>.
           </div>
           <p className="mt-1 max-w-56 text-xs text-muted-foreground">
-            AI-generated programs that adapt to you.
+            Build your program. Log every set. See the progress.
           </p>
           <span className="absolute bottom-2 right-3">
             <CoachRobot size={46} />
@@ -66,9 +66,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <p className="mt-4 max-w-md text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">AI-generated programs</span> built
-            around your goals, honest session logging, and progression you can actually see — with
-            Coach adjusting the plan every week.
+            <span className="font-semibold text-foreground">Programs you build yourself</span>,
+            honest session logging, and progression you can actually see — every set, every week,
+            tracked properly.
           </p>
           <div className="mt-6 flex flex-wrap gap-2.5">
             <StatPill>
