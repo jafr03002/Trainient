@@ -244,6 +244,10 @@ export default function Dashboard() {
   const showCheckinBanner = (() => {
     if (isIndependent) return false;
     if (profileQuery.isLoading || latestCheckin.isLoading) return false;
+    // No AI program means AI coaching was never set up (e.g. the user switched
+    // over from Independent mode without generating one). The weekly check-in
+    // has nothing to adjust and its submit would 400, so don't invite them in.
+    if (program.isLoading || !program.data) return false;
     if (!profile?.onboardingCompletedAt) return false;
 
     const daysSinceOnboarding = daysSince(profile.onboardingCompletedAt);

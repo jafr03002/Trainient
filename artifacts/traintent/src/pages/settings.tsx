@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { motion } from "framer-motion";
 import { Loader2, ExternalLink, AlertTriangle } from "lucide-react";
@@ -27,6 +28,7 @@ const DEFAULT_COLORS = [
 export default function Settings() {
   const { user } = useUser();
   const { signOut } = useClerk();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const profile = useGetProfile();
   const subscription = useGetSubscription();
@@ -79,7 +81,8 @@ export default function Settings() {
 
   async function handleModeSwitch() {
     if (!pendingMode) return;
-    await updateProfile.mutateAsync({ data: { mode: pendingMode } });
+    const target = pendingMode;
+    await updateProfile.mutateAsync({ data: { mode: target } });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     // "Current program" and week-number stats are mode-scoped server-side,
     // so a mode switch must force both to refetch - otherwise dashboard.tsx
@@ -92,6 +95,12 @@ export default function Settings() {
     queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
     setShowModeConfirm(false);
     setPendingMode(null);
+    // Take the user straight to the now-active mode's program page instead of
+    // stranding them on Settings. Switching to AI does NOT auto-generate a
+    // program - the AI page routes on to AI setup when the profile isn't ready
+    // yet (Independent onboarding skips the AI-only questions like experience),
+    // so this always lands somewhere actionable rather than a dead end.
+    setLocation(target === "ai" ? "/program/ai" : "/program/my");
   }
 
   async function handleUpgrade() {
@@ -255,7 +264,7 @@ export default function Settings() {
             </p>
             <p className="text-xs text-muted-foreground mb-4">
               {pendingMode === "ai"
-                ? "Switching to AI Coach will trigger program regeneration on your next visit to My Program."
+                ? "Your own program stays intact. We'll take you to AI Coach to set up and generate your program - it may ask a few quick questions first."
                 : "Your existing program will remain, but AI check-ins and adjustments will be disabled."}
             </p>
             <div className="flex gap-2">
