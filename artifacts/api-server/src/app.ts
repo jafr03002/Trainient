@@ -2,12 +2,6 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
 import { logger } from "./lib/logger";
@@ -15,10 +9,11 @@ import { ALLOWED_ORIGINS } from "./lib/domains";
 
 const app: Express = express();
 
-// Behind Replit's edge proxy. Trust one hop so Express derives req.ip / protocol
-// from the proxy-set X-Forwarded-* headers instead of leaving them client-
-// spoofable. A single numeric hop means an over-count (should Replit add more
-// hops) yields a non-spoofable internal IP rather than a client-controlled one.
+// Behind a platform edge proxy (Vercel in production, the Vite dev server
+// locally). Trust one hop so Express derives req.ip / protocol from the
+// proxy-set X-Forwarded-* headers instead of leaving them client-spoofable. A
+// single numeric hop means an over-count yields a non-spoofable internal IP
+// rather than a client-controlled one.
 app.set("trust proxy", 1);
 
 app.use(
@@ -35,15 +30,13 @@ app.use(
   }),
 );
 
-// Clerk proxy must come before body parsers (streams raw bytes)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-
 // Explicit CORS allowlist. Reflecting any origin (`origin: true`) together with
 // `credentials: true` would let any website read authenticated responses on a
 // logged-in user's behalf, so only known deployment origins are permitted.
-// The allowlist (canonical Replit host + CORS_ALLOWED_ORIGINS custom domains)
-// lives in ./lib/domains so the Clerk proxy validates hosts against the same
-// source of truth.
+// In the Vercel deployment the API is served same-origin with the frontend, so
+// browser requests aren't cross-origin and this allowlist only ever matters for
+// a genuine third-party origin. Extra origins come from CORS_ALLOWED_ORIGINS
+// (see ./lib/domains).
 
 // Matches any localhost / 127.0.0.1 origin on any port. Only honored outside
 // production, so it can never widen the live deployment's surface.
@@ -80,14 +73,11 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+// Standard Clerk middleware: reads CLERK_PUBLISHABLE_KEY + CLERK_SECRET_KEY
+// from the environment. (The old host-derived publishable-key selection only
+// existed to serve Replit's Clerk FAPI proxy across multiple hostnames; with a
+// single owned Clerk instance the env keys are all that's needed.)
+app.use(clerkMiddleware());
 
 app.use("/api", router);
 
