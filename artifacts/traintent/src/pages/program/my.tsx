@@ -9,7 +9,9 @@ import {
   ManualProgramBuilder,
   programDraftKey,
   loadProgramDraft,
+  useFinishProgramTour,
 } from "./shared";
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 
 // The build-your-own program page. Reads and writes the manual lineage
 // (aiGenerated=false) exclusively - creating or editing a program here can
@@ -22,8 +24,23 @@ export default function MyProgram() {
   const { user } = useUser();
   const [building, setBuilding] = useState(false);
   const [editing, setEditing] = useState(false);
+  const tourCreateRef = useRef<HTMLButtonElement>(null);
+  const finishProgramTour = useFinishProgramTour();
 
   const isIndependent = profileQuery.data?.mode === "independent";
+
+  // The first-run tour arrives here from the dashboard (see dashboard.tsx),
+  // and in Independent mode there is usually no program yet - so the empty
+  // state gets its own leg rather than the chain dead-ending on "No program
+  // yet". It deliberately does NOT mark the tour seen when the user taps
+  // through to the builder: once the program exists, ProgramWeekView's full
+  // program tour runs and carries the walkthrough on to Log Workout.
+  const showEmptyStateTour =
+    isIndependent && !building && !!profileQuery.data && !profileQuery.data.programPageTourSeenAt;
+  const emptyStateTourSteps: CoachmarkStep[] = [
+    { kind: "center", text: "This is your program page - every program you build lives here." },
+    { kind: "navClick", target: tourCreateRef, text: "You don't have a program yet. Tap here to build your first one." },
+  ];
 
   // Drop the user back into the builder, mid-edit, if a reload or crash
   // interrupted them before they saved - a draft existing is exactly that
@@ -68,8 +85,10 @@ export default function MyProgram() {
               <h2 className="text-xl font-bold text-foreground mb-2">No program yet</h2>
               <p className="text-muted-foreground mb-8">Create your first training program with your own days and exercises.</p>
               <button
+                ref={tourCreateRef}
                 onClick={() => setBuilding(true)}
                 className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+                data-testid="button-create-program"
               >
                 Create your program
               </button>
@@ -80,6 +99,14 @@ export default function MyProgram() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {showEmptyStateTour && (
+          <CoachmarkTour
+            steps={emptyStateTourSteps}
+            onDone={finishProgramTour}
+            testIdPrefix="program-empty-tour"
+          />
+        )}
       </div>
     );
   }
