@@ -7,11 +7,11 @@ import { CoachRobot } from "@/components/CoachRobot";
 // - "center": an unanchored bubble shown in the middle of the screen (no
 //   highlight ring) - for a general "you're on page X" intro that doesn't point
 //   at any one element. Still counted/numbered and advanced with Next.
-// - "navClick": the user must tap the highlighted element - a real nav link -
-//   to advance. These steps hide the Next button and skip the auto
-//   scrollIntoView, so the tour ends by handing the user off to the app's nav
-//   instead of navigating for them (see useNavTourTarget/useNavTourClick in
-//   components/layout.tsx).
+// - "navClick": the user must tap the highlighted element to advance - a real
+//   nav link, or a page's primary action (e.g. "Create your program"). These
+//   steps hide the Next button and skip the auto scrollIntoView, so the tour
+//   hands the user off to the real UI instead of driving it for them (see
+//   useNavTourTarget/useNavTourClick in components/layout.tsx).
 export type CoachmarkStep =
   | { kind?: "info"; target: RefObject<HTMLElement | null>; text: string }
   | { kind: "center"; text: string }

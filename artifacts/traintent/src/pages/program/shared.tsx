@@ -665,6 +665,20 @@ export function InactiveLineageNotice({ children }: { children: ReactNode }) {
   );
 }
 
+// Marks the program-page leg of the first-run tour as seen. Shared by the
+// "no program yet" empty state (my.tsx) and ProgramWeekView below so the flag
+// name lives in one place - either surface finishing it retires both.
+export function useFinishProgramTour(): () => void {
+  const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
+  return () => {
+    updateProfile.mutate(
+      { data: { programPageTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+  };
+}
+
 type ProgramWeekViewProps = {
   program: Program;
   // Only the lineage matching the active training mode can start a workout -
@@ -681,20 +695,12 @@ type ProgramWeekViewProps = {
 
 export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
-  const updateProfile = useUpdateProfile();
-  const queryClient = useQueryClient();
   const [activeDay, setActiveDay] = useState(0);
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const logNavTarget = useNavTourTarget("/log");
-
-  function finishProgramTour() {
-    updateProfile.mutate(
-      { data: { programPageTourSeenAt: new Date().toISOString() } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
-    );
-  }
+  const finishProgramTour = useFinishProgramTour();
 
   const showProgramTour =
     tourEnabled &&
