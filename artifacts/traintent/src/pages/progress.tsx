@@ -151,7 +151,7 @@ export default function Progress() {
                 ticks={strengthBounds?.ticks}
                 allowDecimals={false}
               />
-              <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} kg`, "Max weight"]} />
+              <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} ${weightUnit}`, "Max weight"]} />
               <Line type="monotone" dataKey="maxWeight" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -273,7 +273,7 @@ export default function Progress() {
                           </div>
                         </td>
                         <td className="py-3 text-sm text-right font-bold text-primary">
-                          {pr.maxWeight} kg{pr.reps ? <span className="text-muted-foreground font-medium"> × {pr.reps}</span> : null}
+                          {pr.maxWeight} {weightUnit}{pr.reps ? <span className="text-muted-foreground font-medium"> × {pr.reps}</span> : null}
                         </td>
                         <td className="py-3 text-sm text-right text-muted-foreground">
                           {new Date(pr.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}

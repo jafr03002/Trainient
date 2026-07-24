@@ -1,6 +1,16 @@
 import { Router } from "express";
 import { eq, sql } from "drizzle-orm";
-import { db, userProfilesTable } from "@workspace/db";
+import {
+  db,
+  userProfilesTable,
+  programsTable,
+  workoutLogsTable,
+  dailyLogsTable,
+  bodyweightLogsTable,
+  checkinsTable,
+  calendarColorsTable,
+  subscriptionsTable,
+} from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import {
   CreateProfileBody,
@@ -130,6 +140,39 @@ router.patch("/profile", requireAuth, async (req, res) => {
     return;
   }
   res.json(serializeProfile(profile));
+});
+
+// Every table that stores rows keyed by a Clerk user id. There are no foreign
+// keys between them (each carries its own `user_id`), so nothing cascades -
+// account deletion has to name them all, and any new user-owned table has to
+// be added here or its rows outlive the account.
+const USER_OWNED_TABLES = [
+  workoutLogsTable,
+  dailyLogsTable,
+  bodyweightLogsTable,
+  checkinsTable,
+  calendarColorsTable,
+  programsTable,
+  subscriptionsTable,
+  userProfilesTable,
+] as const;
+
+// Clears all application data for the caller. The client deletes the Clerk
+// user *after* this succeeds: doing it in that order means a failure here
+// leaves an account that can still sign in and retry, whereas the reverse
+// would strand rows no one can ever reach again.
+router.delete("/account", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+
+  // One transaction so a partial delete can't leave, say, workout logs behind
+  // after the profile row is already gone.
+  await db.transaction(async (tx) => {
+    for (const table of USER_OWNED_TABLES) {
+      await tx.delete(table).where(eq(table.userId, userId));
+    }
+  });
+
+  res.status(204).end();
 });
 
 export default router;

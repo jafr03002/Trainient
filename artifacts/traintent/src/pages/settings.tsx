@@ -5,6 +5,7 @@ import { Loader2, ExternalLink, AlertTriangle } from "lucide-react";
 import {
   useGetProfile,
   useUpdateProfile,
+  useDeleteAccount,
   useGetSubscription,
   useCreateCheckoutSession,
   useCreatePortalSession,
@@ -18,6 +19,7 @@ import {
   getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 const DEFAULT_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -31,6 +33,7 @@ export default function Settings() {
   const profile = useGetProfile();
   const subscription = useGetSubscription();
   const updateProfile = useUpdateProfile();
+  const deleteAccount = useDeleteAccount();
   const createCheckout = useCreateCheckoutSession();
   const createPortal = useCreatePortalSession();
   const calendarColors = useGetCalendarColors();
@@ -109,6 +112,24 @@ export default function Settings() {
   async function handleManageBilling() {
     const result = await createPortal.mutateAsync();
     if (result.url) window.open(result.url, "_blank");
+  }
+
+  // Application data first, Clerk user second. If the server call fails we stop
+  // here: the account can still sign in and retry, whereas deleting the Clerk
+  // user first would strand rows nobody can ever reach again.
+  async function handleDeleteAccount() {
+    try {
+      await deleteAccount.mutateAsync();
+    } catch {
+      toast({
+        title: "Couldn't delete your data",
+        description: "Nothing was deleted. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    await user?.delete();
+    await signOut({ redirectUrl: "/" });
   }
 
   async function handleColorChange(label: string, hex: string) {
@@ -427,10 +448,12 @@ export default function Settings() {
                 Cancel
               </button>
               <button
-                onClick={() => user?.delete().then(() => signOut())}
-                className="flex-1 h-9 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors"
+                onClick={handleDeleteAccount}
+                disabled={deleteAccount.isPending}
+                className="flex-1 h-9 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 data-testid="button-confirm-delete"
               >
+                {deleteAccount.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Yes, delete everything
               </button>
             </div>
