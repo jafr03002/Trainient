@@ -32,6 +32,33 @@ function goalLabel(value: string): string | undefined {
   return GOALS.find((g) => g.value === value)?.label ?? LEGACY_GOAL_LABELS[value];
 }
 
+// A target weight that points the opposite way to the chosen goal is a typo,
+// not a plan - you can't gain weight by aiming below where you are now. Returns
+// the message to show, or null when there's nothing to complain about (no
+// weight goal, or either weight left blank). Both weights always share
+// form.weightUnit, so they're directly comparable.
+function goalWeightConflict(
+  form: Pick<FormState, "goal" | "weight" | "goalWeight" | "weightUnit">,
+): string | null {
+  if (!WEIGHT_GOALS.has(form.goal)) return null;
+  const current = parseFloat(form.weight);
+  const target = parseFloat(form.goalWeight);
+  if (!Number.isFinite(current) || !Number.isFinite(target)) return null;
+
+  const unit = form.weightUnit;
+  if (target === current) {
+    const direction = form.goal === "gain_weight" ? "above" : "below";
+    return `That's your current weight (${current} ${unit}), so there's nothing to reach. Enter a target ${direction} it, or pick General fitness instead.`;
+  }
+  if (form.goal === "gain_weight" && target < current) {
+    return `You picked Gain weight, but ${target} ${unit} is below your current ${current} ${unit} - that's losing weight. Enter a target above ${current} ${unit}, or switch your goal to Lose weight.`;
+  }
+  if (form.goal === "lose_weight" && target > current) {
+    return `You picked Lose weight, but ${target} ${unit} is above your current ${current} ${unit} - that's gaining weight. Enter a target below ${current} ${unit}, or switch your goal to Gain weight.`;
+  }
+  return null;
+}
+
 const ACTIVITY = [
   { value: "low", label: "Low", sub: "Fewer than 6,000 steps a day" },
   { value: "moderate", label: "Moderate", sub: "6,000 – 9,999 steps a day" },
@@ -68,18 +95,20 @@ const EQUIPMENT = [
 const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 
 // Everyone gets mode + the profile basics also editable later in Settings
-// (name, age, weight). Everything else is AI-coaching input - it's only
-// meaningful when the AI is the one building/adjusting your program, so
-// Independent mode skips straight to the review step.
+// (name, age, weight), plus the goal - Independent users don't get a program
+// built for them, but their goal and target weight still drive the dashboard's
+// progress tracking. Everything else is AI-coaching input - only meaningful
+// when the AI is the one building/adjusting your program - so Independent mode
+// goes from the goal straight to the review step.
 type StepKey =
-  | "mode" | "name" | "bodyStats"
-  | "goal" | "experience" | "activity" | "trainingDays" | "preferredRestDays" | "equipment" | "details" | "priorityMuscles"
+  | "mode" | "name" | "bodyStats" | "goal"
+  | "experience" | "activity" | "trainingDays" | "preferredRestDays" | "equipment" | "details" | "priorityMuscles"
   | "review";
 
 function stepsFor(mode: string): StepKey[] {
-  const base: StepKey[] = ["mode", "name", "bodyStats"];
+  const base: StepKey[] = ["mode", "name", "bodyStats", "goal"];
   if (mode === "ai") {
-    return [...base, "goal", "experience", "activity", "trainingDays", "preferredRestDays", "equipment", "details", "priorityMuscles", "review"];
+    return [...base, "experience", "activity", "trainingDays", "preferredRestDays", "equipment", "details", "priorityMuscles", "review"];
   }
   return [...base, "review"];
 }
@@ -126,6 +155,13 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [showGoalWeight, setShowGoalWeight] = useState(false);
+  // The target-weight popup edits a local draft, not form.goalWeight directly,
+  // so half-typed values (the "6" on the way to "68") never reach the form and
+  // can't flash a direction error. The draft is only validated and committed on
+  // Save; goalWeightSaveError holds the message from a failed Save attempt and
+  // clears as soon as the user types again.
+  const [goalWeightDraft, setGoalWeightDraft] = useState("");
+  const [goalWeightSaveError, setGoalWeightSaveError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"form" | "generating" | "presentation" | "commitment">("form");
   const [program, setProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
@@ -156,10 +192,12 @@ export default function Onboarding() {
 
   // A profile that's in AI mode but missing goal/experience means AI
   // coaching was never set up - either the user onboarded through
-  // Independent mode (which skips those questions entirely) and later
+  // Independent mode (which skips the AI-only questions) and later
   // switched modes in Settings, or a previous AI setup attempt didn't
-  // finish. Either way, mode/name/bodyStats are already saved, so resume
-  // straight into the AI-only questions instead of re-asking for them.
+  // finish. Either way the basics are already saved, so prefill them and
+  // resume at the goal step rather than re-asking from the top. Independent
+  // onboarding does capture a goal, so carry that over too - the step is
+  // still shown, just pre-answered.
   const resumeInitRef = useRef(false);
   useEffect(() => {
     if (resumeInitRef.current || profileQuery.isLoading) return;
@@ -175,6 +213,8 @@ export default function Onboarding() {
       sex: profile.sex ?? "",
       weight: profile.weight != null ? String(profile.weight) : "",
       weightUnit: profile.weightUnit ?? "kg",
+      goal: profile.goal ?? "",
+      goalWeight: profile.goalWeight != null ? String(profile.goalWeight) : "",
     }));
     setStep(stepsFor("ai").indexOf("goal"));
   }, [profileQuery.isLoading, profileQuery.data]);
@@ -198,10 +238,14 @@ export default function Onboarding() {
   const maxPreferredRestDays = 7 - form.trainingDays + 1;
   const tooManyPreferredRestDays = form.preferredRestDays.length > maxPreferredRestDays;
 
+  // Recomputed every render so editing either weight - the target in the popup
+  // or the body weight a step earlier - re-checks the pair immediately.
+  const goalWeightError = goalWeightConflict(form);
+
   function canAdvance() {
     switch (currentStep) {
       case "mode": return !!form.mode;
-      case "goal": return !!form.goal;
+      case "goal": return !!form.goal && !goalWeightError;
       case "experience": return !!form.experience;
       case "preferredRestDays": return !tooManyPreferredRestDays;
       case "equipment": return form.equipment.length > 0;
@@ -209,11 +253,31 @@ export default function Onboarding() {
     }
   }
 
+  // Opens the target-weight popup with a fresh draft seeded from whatever's
+  // already saved, and no stale error from a previous attempt.
+  function openGoalWeight() {
+    setGoalWeightDraft(form.goalWeight);
+    setGoalWeightSaveError(null);
+    setShowGoalWeight(true);
+  }
+
+  // Validate the draft against the current body weight; on a conflict, keep the
+  // popup open and show why, otherwise commit the draft and close.
+  function saveGoalWeight() {
+    const conflict = goalWeightConflict({ ...form, goalWeight: goalWeightDraft });
+    if (conflict) {
+      setGoalWeightSaveError(conflict);
+      return;
+    }
+    setForm((f) => ({ ...f, goalWeight: goalWeightDraft }));
+    setShowGoalWeight(false);
+  }
+
   // Selecting a weight goal opens the target-weight popup; picking General
   // fitness clears any previously entered target.
   function selectGoal(value: string) {
     setForm((f) => ({ ...f, goal: value, goalWeight: WEIGHT_GOALS.has(value) ? f.goalWeight : "" }));
-    if (WEIGHT_GOALS.has(value)) setShowGoalWeight(true);
+    if (WEIGHT_GOALS.has(value)) openGoalWeight();
   }
 
   function togglePreferredRestDay(value: string) {
@@ -407,10 +471,13 @@ export default function Onboarding() {
               <input
                 type="number"
                 autoFocus
-                value={form.goalWeight}
-                onChange={(e) => setForm((f) => ({ ...f, goalWeight: e.target.value }))}
+                value={goalWeightDraft}
+                onChange={(e) => { setGoalWeightDraft(e.target.value); setGoalWeightSaveError(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") saveGoalWeight(); }}
                 placeholder={`Target ${form.weightUnit}`}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                className={`flex-1 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                  goalWeightSaveError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
+                }`}
                 data-testid="input-goal-weight"
               />
               <div className="flex rounded-xl border border-border overflow-hidden">
@@ -418,7 +485,7 @@ export default function Onboarding() {
                   <button
                     key={u}
                     data-testid={`goal-weight-unit-${u}`}
-                    onClick={() => setForm((f) => ({ ...f, weightUnit: u }))}
+                    onClick={() => { setForm((f) => ({ ...f, weightUnit: u })); setGoalWeightSaveError(null); }}
                     className={`px-4 py-2.5 text-sm font-medium transition-colors ${
                       form.weightUnit === u
                         ? "bg-primary text-primary-foreground"
@@ -430,6 +497,11 @@ export default function Onboarding() {
                 ))}
               </div>
             </div>
+            {goalWeightSaveError && (
+              <p className="mt-3 text-sm font-medium text-destructive" data-testid="text-goal-weight-error">
+                {goalWeightSaveError}
+              </p>
+            )}
             <div className="flex gap-2 mt-5">
               <Button
                 variant="outline"
@@ -441,7 +513,7 @@ export default function Onboarding() {
               </Button>
               <Button
                 className="flex-1 h-11"
-                onClick={() => setShowGoalWeight(false)}
+                onClick={saveGoalWeight}
                 data-testid="button-save-goal-weight"
               >
                 Save target
@@ -590,12 +662,14 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {/* Goal - AI mode only */}
+              {/* Goal - both modes */}
               {currentStep === "goal" && (
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
                   <p className="text-muted-foreground mb-8">
-                    Shapes your program and targets. Every option is built around building or keeping muscle.
+                    {form.mode === "ai"
+                      ? "Shapes your program and targets. Every option is built around building or keeping muscle."
+                      : "Sets the target your dashboard tracks against. Every option is built around building or keeping muscle."}
                   </p>
                   <div className="grid grid-cols-1 gap-3">
                     {GOALS.map((g) => (
@@ -614,7 +688,7 @@ export default function Onboarding() {
                         {form.goal === g.value && WEIGHT_GOALS.has(g.value) && (
                           <div className="mt-2 flex items-center gap-2 text-sm">
                             <span className="text-muted-foreground">Goal weight:</span>
-                            <span className="font-medium text-foreground">
+                            <span className={`font-medium ${goalWeightError ? "text-destructive" : "text-foreground"}`}>
                               {form.goalWeight ? `${form.goalWeight} ${form.weightUnit}` : "Not set"}
                             </span>
                             <span
@@ -631,6 +705,14 @@ export default function Onboarding() {
                       </button>
                     ))}
                   </div>
+                  {/* Reachable by dismissing the popup with a bad target still in
+                      it, or by going back and changing the body weight - Continue
+                      stays blocked until it's resolved. */}
+                  {goalWeightError && (
+                    <p className="mt-4 text-sm font-medium text-destructive" data-testid="text-goal-weight-error-step">
+                      {goalWeightError}
+                    </p>
+                  )}
                 </div>
               )}
 
