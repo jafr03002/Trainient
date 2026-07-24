@@ -15,7 +15,16 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    entryPoints: [
+      // The long-running Node server (calls app.listen) - local dev & any
+      // persistent host.
+      path.resolve(artifactDir, "src/index.ts"),
+      // The bare Express app (default export, no listen) - imported by the
+      // Vercel serverless function at /api/[...path].ts. Bundled self-contained
+      // (no code splitting) so the workspace deps are inlined and Vercel never
+      // has to resolve the pnpm graph.
+      path.resolve(artifactDir, "src/app.ts"),
+    ],
     platform: "node",
     bundle: true,
     format: "esm",
