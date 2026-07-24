@@ -26,6 +26,7 @@ import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { toast } from "@/hooks/use-toast";
 
@@ -502,6 +503,12 @@ export default function Dashboard() {
           </dl>
         </motion.div>
       )}
+
+      {/* Your targets - Independent mode's editable stand-in for the AI narrative
+          above. Phases only exist in the AI lineage, so this is where an
+          independent user declares (and edits) their own phase/calorie/step/
+          cardio targets. */}
+      {isIndependent && profile && <IndependentTargetsCard profile={profile} />}
 
       {/* Daily check-in */}
       <motion.div
