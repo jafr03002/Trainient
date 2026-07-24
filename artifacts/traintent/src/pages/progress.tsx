@@ -14,7 +14,7 @@ import {
   useGetProfile,
   getGetStrengthProgressQueryKey,
 } from "@workspace/api-client-react";
-import { Trophy } from "lucide-react";
+import { Trophy, Dumbbell, Scale } from "lucide-react";
 import { MUSCLE_COLORS } from "@/lib/muscles";
 
 // Keys match the MuscleVolumeWeek schema; colours come from the shared
@@ -66,6 +66,13 @@ export default function Progress() {
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => isRecent(pr.date, 7)).length;
 
+  // Headline stats for the hero. Bodyweight data is chronological, so the last
+  // point is the most recent logged weight.
+  const totalPrCount = personalRecords.data?.length ?? 0;
+  const exercisesTracked = exercises.data?.length ?? 0;
+  const bwSeries = bodyweightProgress.data ?? [];
+  const latestBodyweight = bwSeries.length ? bwSeries[bwSeries.length - 1].weight : null;
+
   // Strength Y-axis: lower ≈ 75% of the lowest weight, upper at the top weight,
   // both snapped to multiples of 5, with a tick at every 5 in between.
   const strengthBounds = (() => {
@@ -97,16 +104,52 @@ export default function Progress() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-center justify-between">
+      {/* Hero - same glow/gradient/display-type conviction as the dashboard,
+          with a live stat row so the header carries evidence, not just a title. */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="p-6 rounded-xl border border-primary/25 glow-primary"
+        style={{ background: "radial-gradient(120% 140% at 0% 0%, hsl(var(--primary) / 0.18), transparent 55%), hsl(var(--card))" }}
+      >
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Progress</h1>
-            <p className="text-muted-foreground mt-1">Track your strength, volume, bodyweight, and personal records.</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Overview</p>
+            <h1 className="text-2xl font-bold text-foreground mt-1 font-display">Progress</h1>
+            <p className="text-muted-foreground text-sm mt-1">Strength, volume, bodyweight, and personal records.</p>
           </div>
           {recentPrCount > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold">
-              <Trophy className="w-4 h-4" />
-              {recentPrCount} new PR{recentPrCount > 1 ? "s" : ""} this week
+            <span className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full whitespace-nowrap shrink-0 font-semibold uppercase tracking-wider bg-chart-3/15 text-chart-3 border border-chart-3/25">
+              <Trophy className="w-3 h-3" />
+              {recentPrCount} new PR{recentPrCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mt-6">
+          <div>
+            <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
+              <Trophy className="w-4 h-4 text-chart-3" />
+              {personalRecords.isLoading ? "-" : totalPrCount}
+            </div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">Personal records</div>
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
+              <Dumbbell className="w-4 h-4 text-primary" />
+              {exercises.isLoading ? "-" : exercisesTracked}
+            </div>
+            <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">Exercises tracked</div>
+          </div>
+          {latestBodyweight != null && (
+            <div>
+              <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
+                <Scale className="w-4 h-4 text-chart-2" />
+                {latestBodyweight}
+                <span className="text-sm font-medium text-muted-foreground">{weightUnit}</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">Current bodyweight</div>
             </div>
           )}
         </div>
@@ -269,7 +312,7 @@ export default function Progress() {
                     return (
                       <tr
                         key={pr.exercise}
-                        className={`border-b border-border/40 last:border-0 transition-colors ${recent ? "bg-amber-500/5" : ""}`}
+                        className={`border-b border-border/40 last:border-0 transition-colors ${recent ? "bg-chart-3/5" : ""}`}
                         data-testid={`pr-${pr.exercise.toLowerCase().replace(/\s+/g, "-")}`}
                       >
                         <td className="py-3 text-sm font-medium text-foreground">
@@ -280,12 +323,12 @@ export default function Progress() {
                                 animate={{ scale: 1 }}
                                 transition={{ type: "spring", stiffness: 300 }}
                               >
-                                <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <Trophy className="w-3.5 h-3.5 text-chart-3 shrink-0" />
                               </motion.div>
                             )}
                             {pr.exercise}
                             {recent && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-chart-3/15 text-chart-3 border border-chart-3/25 uppercase tracking-wider">
                                 New
                               </span>
                             )}
