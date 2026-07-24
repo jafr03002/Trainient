@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitCheckinBody } from "@workspace/api-zod";
-import { anthropic } from "../lib/anthropic";
+import { getAnthropic } from "../lib/anthropic";
 import { checkinAdjustmentOutputSchema } from "../lib/programSchema";
 import { checkInEngineKnowledge } from "../lib/knowledge";
 import { buildCheckinEvidence } from "../lib/checkinData";
@@ -316,7 +316,7 @@ ${formatPriorCheckins(priorCheckins)}
 
 ${evidence.text}`;
 
-  const completion = await anthropic.messages.create({
+  const completion = await getAnthropic().messages.create({
     model: "claude-opus-4-8",
     max_tokens: 4000,
     thinking: { type: "adaptive" },

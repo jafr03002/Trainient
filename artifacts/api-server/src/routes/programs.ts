@@ -8,7 +8,7 @@ import {
   GenerateProgramBody,
 } from "@workspace/api-zod";
 import { requireAuth, getUserId } from "../lib/auth";
-import { anthropic } from "../lib/anthropic";
+import { getAnthropic } from "../lib/anthropic";
 import { generateProgramOutputSchema } from "../lib/programSchema";
 import { programGenerationKnowledge } from "../lib/knowledge";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
@@ -280,7 +280,7 @@ For each day, provide 5–7 exercises. For each exercise provide:
 - One coaching cue (one sentence)
 - Primary muscle group${feedbackBlock}`;
 
-  const completion = await anthropic.messages.create({
+  const completion = await getAnthropic().messages.create({
     model: "claude-opus-4-8",
     max_tokens: 4000,
     thinking: { type: "adaptive" },
