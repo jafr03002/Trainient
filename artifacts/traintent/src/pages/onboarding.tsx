@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
+import { CARDIO_DAYS, orderCardioDays } from "@/lib/independentTargets";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { CommitmentScreen } from "@/components/onboarding/CommitmentScreen";
@@ -103,14 +104,28 @@ const MUSCLES = [...MUSCLE_OPTIONS, "No preference"];
 type StepKey =
   | "mode" | "name" | "bodyStats" | "goal"
   | "experience" | "activity" | "trainingDays" | "preferredRestDays" | "equipment" | "details" | "priorityMuscles"
-  | "review";
+  | "targets" | "review";
 
 function stepsFor(mode: string): StepKey[] {
   const base: StepKey[] = ["mode", "name", "bodyStats", "goal"];
   if (mode === "ai") {
     return [...base, "experience", "activity", "trainingDays", "preferredRestDays", "equipment", "details", "priorityMuscles", "review"];
   }
-  return [...base, "review"];
+  // Independent users get no AI-built program, so they set their own daily
+  // targets here (optional - the box is editable later on the dashboard).
+  return [...base, "targets", "review"];
+}
+
+// A rough daily-calorie starting point so the targets step isn't a blank
+// staring contest - maintenance ~= 30 kcal/kg, nudged for the chosen goal.
+// It's only a suggestion; the user overwrites or clears it freely.
+function suggestCalories(weightStr: string, weightUnit: string, goal: string): number {
+  const w = parseFloat(weightStr);
+  const kg = Number.isFinite(w) ? (weightUnit === "lbs" ? w / 2.2046 : w) : 75;
+  let cals = kg * 30;
+  if (goal === "lose_weight") cals -= 400;
+  else if (goal === "gain_weight") cals += 300;
+  return Math.round(cals / 50) * 50;
 }
 
 type FormState = {
@@ -130,6 +145,10 @@ type FormState = {
   injuries: string;
   injurySeverity: string;
   priorityMuscles: string[];
+  dailyCalorieTarget: string;
+  dailyStepTarget: string;
+  cardioDays: string[];
+  cardioMinutes: string;
 };
 
 const INITIAL: FormState = {
@@ -149,6 +168,10 @@ const INITIAL: FormState = {
   injuries: "",
   injurySeverity: "",
   priorityMuscles: [],
+  dailyCalorieTarget: "",
+  dailyStepTarget: "",
+  cardioDays: [],
+  cardioMinutes: "",
 };
 
 export default function Onboarding() {
@@ -242,6 +265,20 @@ export default function Onboarding() {
   // or the body weight a step earlier - re-checks the pair immediately.
   const goalWeightError = goalWeightConflict(form);
 
+  // Seed the optional targets step with sensible starting values the first time
+  // it's shown, so it reads as a suggestion to tweak rather than empty fields.
+  // Only fills blanks, so re-visiting it never clobbers the user's own numbers.
+  const targetsSeededRef = useRef(false);
+  useEffect(() => {
+    if (currentStep !== "targets" || targetsSeededRef.current) return;
+    targetsSeededRef.current = true;
+    setForm((f) => ({
+      ...f,
+      dailyCalorieTarget: f.dailyCalorieTarget || String(suggestCalories(f.weight, f.weightUnit, f.goal)),
+      dailyStepTarget: f.dailyStepTarget || "8000",
+    }));
+  }, [currentStep]);
+
   function canAdvance() {
     switch (currentStep) {
       case "mode": return !!form.mode;
@@ -278,6 +315,13 @@ export default function Onboarding() {
   function selectGoal(value: string) {
     setForm((f) => ({ ...f, goal: value, goalWeight: WEIGHT_GOALS.has(value) ? f.goalWeight : "" }));
     if (WEIGHT_GOALS.has(value)) openGoalWeight();
+  }
+
+  function toggleCardioDay(day: string) {
+    setForm((f) => ({
+      ...f,
+      cardioDays: f.cardioDays.includes(day) ? f.cardioDays.filter((d) => d !== day) : [...f.cardioDays, day],
+    }));
   }
 
   function togglePreferredRestDay(value: string) {
@@ -341,6 +385,12 @@ export default function Onboarding() {
           injuries: form.injuries || undefined,
           injurySeverity: form.injuries ? (form.injurySeverity || undefined) as UserProfileInputInjurySeverity | undefined : undefined,
           priorityMuscles: form.priorityMuscles,
+          // Independent-only self-set targets; AI mode leaves these unset and
+          // gets equivalents from its generated program instead.
+          dailyCalorieTarget: form.dailyCalorieTarget ? parseInt(form.dailyCalorieTarget, 10) : undefined,
+          dailyStepTarget: form.dailyStepTarget ? parseInt(form.dailyStepTarget, 10) : undefined,
+          cardioDays: orderCardioDays(form.cardioDays),
+          cardioMinutes: form.cardioDays.length && form.cardioMinutes ? parseInt(form.cardioMinutes, 10) : undefined,
         },
       });
 
@@ -977,6 +1027,95 @@ export default function Onboarding() {
                 </div>
               )}
 
+              {/* Daily targets - Independent mode only. Fully optional: every
+                  field can be left as-is, cleared, or skipped, and all of it is
+                  editable later from the dashboard's targets box. */}
+              {currentStep === "targets" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">Set your targets</h2>
+                  <p className="text-muted-foreground mb-8">
+                    What you're aiming for day to day. We've suggested a starting point - adjust anything, or skip and set it later.
+                  </p>
+
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">Calorie target</label>
+                        <div className="flex items-center gap-2 px-4 rounded-xl border border-border bg-card focus-within:border-primary">
+                          <input
+                            type="number"
+                            value={form.dailyCalorieTarget}
+                            onChange={(e) => setForm((f) => ({ ...f, dailyCalorieTarget: e.target.value }))}
+                            placeholder="e.g. 2200"
+                            className="flex-1 min-w-0 py-2.5 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                            data-testid="input-target-calories"
+                          />
+                          <span className="text-sm text-muted-foreground shrink-0">kcal / day</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground mb-1.5 block">Step target</label>
+                        <div className="flex items-center gap-2 px-4 rounded-xl border border-border bg-card focus-within:border-primary">
+                          <input
+                            type="number"
+                            value={form.dailyStepTarget}
+                            onChange={(e) => setForm((f) => ({ ...f, dailyStepTarget: e.target.value }))}
+                            placeholder="e.g. 8000"
+                            className="flex-1 min-w-0 py-2.5 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                            data-testid="input-target-steps"
+                          />
+                          <span className="text-sm text-muted-foreground shrink-0">steps / day</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Cardio <span className="text-muted-foreground font-normal">(optional)</span></label>
+                      <div className="flex flex-wrap gap-2">
+                        {CARDIO_DAYS.map((d) => {
+                          const selected = form.cardioDays.includes(d);
+                          return (
+                            <button
+                              key={d}
+                              data-testid={`target-cardio-${d.toLowerCase()}`}
+                              onClick={() => toggleCardioDay(d)}
+                              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                                selected
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {form.cardioDays.length > 0 && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">Minutes each day:</span>
+                          <div className="flex items-center gap-2 px-3 rounded-xl border border-border bg-card focus-within:border-primary w-28">
+                            <input
+                              type="number"
+                              value={form.cardioMinutes}
+                              onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
+                              placeholder="e.g. 25"
+                              className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                              data-testid="input-target-cardio-minutes"
+                            />
+                            <span className="text-sm text-muted-foreground shrink-0">min</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 p-3 rounded-xl bg-secondary/30 border border-border text-xs text-muted-foreground flex gap-2">
+                    <span>💡</span>
+                    <span>You can change these anytime from your dashboard.</span>
+                  </div>
+                </div>
+              )}
+
               {/* Review & finish */}
               {currentStep === "review" && (
                 <div>
@@ -1005,6 +1144,12 @@ export default function Onboarding() {
                       form.injuries && { label: "Injuries", value: form.injuries },
                       form.injuries && form.injurySeverity && { label: "Severity", value: INJURY_SEVERITY.find((s) => s.value === form.injurySeverity)?.label },
                       form.priorityMuscles.length > 0 && { label: "Priority muscles", value: form.priorityMuscles.join(", ") },
+                      form.mode !== "ai" && form.dailyCalorieTarget && { label: "Calorie target", value: `${parseInt(form.dailyCalorieTarget, 10).toLocaleString()} kcal/day` },
+                      form.mode !== "ai" && form.dailyStepTarget && { label: "Step target", value: `${parseInt(form.dailyStepTarget, 10).toLocaleString()} steps/day` },
+                      form.mode !== "ai" && form.cardioDays.length > 0 && {
+                        label: "Cardio",
+                        value: `${orderCardioDays(form.cardioDays).join(", ")}${form.cardioMinutes ? ` · ${form.cardioMinutes} min each` : ""}`,
+                      },
                     ]
                       .filter(Boolean)
                       .map((item: any) => (

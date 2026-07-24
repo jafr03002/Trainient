@@ -37,6 +37,10 @@ export const GetProfileResponse = zod.object({
   "injuries": zod.string().nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "cardioDays": zod.array(zod.string()).optional(),
+  "cardioMinutes": zod.number().nullish(),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
@@ -66,7 +70,11 @@ export const CreateProfileBody = zod.object({
   "preferredRestDays": zod.array(zod.string()).optional(),
   "injuries": zod.string().nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
-  "priorityMuscles": zod.array(zod.string()).optional()
+  "priorityMuscles": zod.array(zod.string()).optional(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "cardioDays": zod.array(zod.string()).optional(),
+  "cardioMinutes": zod.number().nullish()
 })
 
 
@@ -76,11 +84,17 @@ export const CreateProfileBody = zod.object({
 export const UpdateProfileBody = zod.object({
   "name": zod.string().optional(),
   "mode": zod.string().optional(),
+  "goal": zod.string().optional(),
+  "goalWeight": zod.number().nullish(),
   "age": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "weightUnit": zod.string().nullish(),
   "injuries": zod.string().nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "cardioDays": zod.array(zod.string()).optional(),
+  "cardioMinutes": zod.number().nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
@@ -105,6 +119,10 @@ export const UpdateProfileResponse = zod.object({
   "injuries": zod.string().nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "cardioDays": zod.array(zod.string()).optional(),
+  "cardioMinutes": zod.number().nullish(),
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),

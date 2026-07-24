@@ -697,6 +697,10 @@ components:
         injuries:               { type: ["string", "null"] }
         injurySeverity:         { type: ["string", "null"], enum: [low, medium, high, null] }
         priorityMuscles:        { type: array, items: { type: string } }
+        dailyCalorieTarget:     { type: ["integer", "null"] }
+        dailyStepTarget:        { type: ["integer", "null"] }
+        cardioDays:             { type: array, items: { type: string } }
+        cardioMinutes:          { type: ["integer", "null"] }
         onboardingComplete:     { type: boolean }
         onboardingCompletedAt:  { type: ["string", "null"] }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
@@ -725,17 +729,27 @@ components:
         injuries:               { type: ["string", "null"] }
         injurySeverity:         { type: ["string", "null"], enum: [low, medium, high, null] }
         priorityMuscles:        { type: array, items: { type: string } }
+        dailyCalorieTarget:     { type: ["integer", "null"] }
+        dailyStepTarget:        { type: ["integer", "null"] }
+        cardioDays:             { type: array, items: { type: string } }
+        cardioMinutes:          { type: ["integer", "null"] }
 
     UserProfileUpdate:
       type: object
       properties:
         name:           { type: string }
         mode:           { type: string }
+        goal:           { type: string }
+        goalWeight:     { type: ["number", "null"] }
         age:            { type: ["integer", "null"] }
         weight:         { type: ["number", "null"] }
         weightUnit:     { type: ["string", "null"] }
         injuries:       { type: ["string", "null"] }
         injurySeverity: { type: ["string", "null"], enum: [low, medium, high, null] }
+        dailyCalorieTarget:     { type: ["integer", "null"] }
+        dailyStepTarget:        { type: ["integer", "null"] }
+        cardioDays:             { type: array, items: { type: string } }
+        cardioMinutes:          { type: ["integer", "null"] }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
