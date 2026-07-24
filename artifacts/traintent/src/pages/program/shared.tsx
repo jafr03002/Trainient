@@ -112,11 +112,6 @@ function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
             {ex.muscle || "—"}
           </span>
           {ex.secondaryMuscle && <> · {ex.secondaryMuscle}</>}
-          {ex.isUnilateral && (
-            <span className="ml-1.5 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-              Unilateral
-            </span>
-          )}
         </p>
       </div>
       <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
