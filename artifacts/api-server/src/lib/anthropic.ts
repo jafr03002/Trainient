@@ -2,10 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 
 // Constructed lazily rather than at import time. The AI routes are always
 // mounted (see routes/index.ts), so a top-level `new Anthropic(...)` - or a
-// top-level throw on a missing key - would take the whole server down at boot
-// for a deployment that never uses AI at all, e.g. the Independent-only alpha.
-// Failing here instead means the key is only required by the request that
-// actually needs it.
+// top-level throw on a missing key - would take the whole server down at boot,
+// either for a deployment that never uses AI at all (e.g. the Independent-only
+// alpha) or, on a serverless platform, as a cold start that crashes instead of
+// serving. Failing here instead means the key is only required by the request
+// that actually needs it.
 let client: Anthropic | null = null;
 
 export function getAnthropic(): Anthropic {

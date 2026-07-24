@@ -26,6 +26,7 @@ import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
@@ -95,6 +96,7 @@ export default function Dashboard() {
   const updateProfile = useUpdateProfile();
   const tourDailyCheckinRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
+  const tourBuildProgramRef = useRef<HTMLAnchorElement>(null);
   const tourProgressRef = useRef<HTMLDivElement>(null);
   const programNavTarget = useNavTourTarget("/program");
 
@@ -108,7 +110,14 @@ export default function Dashboard() {
   const profile = profileQuery.data;
   const isIndependent = profile?.mode === "independent";
 
-  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !!program.data?.days?.[0];
+  // The dashboard is the first leg of the first-run walkthrough (dashboard ->
+  // program -> log workout), so it must fire the moment the user lands here
+  // after onboarding. It deliberately does NOT wait for a program to exist:
+  // Independent mode has none yet at that point, and gating on one used to
+  // push the whole tour back to after the user had already built a program.
+  // Only the program query settling matters - the hero's tour target depends
+  // on whether a program came back (see dashboardTourSteps).
+  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !program.isLoading;
   useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
 
   const todayStr = todayDateString();
@@ -248,6 +257,10 @@ export default function Dashboard() {
     if (!AI_MODE_ENABLED) return false;
     if (isIndependent) return false;
     if (profileQuery.isLoading || latestCheckin.isLoading) return false;
+    // No AI program means AI coaching was never set up (e.g. the user switched
+    // over from Independent mode without generating one). The weekly check-in
+    // has nothing to adjust and its submit would 400, so don't invite them in.
+    if (program.isLoading || !program.data) return false;
     if (!profile?.onboardingCompletedAt) return false;
 
     const daysSinceOnboarding = daysSince(profile.onboardingCompletedAt);
@@ -262,9 +275,25 @@ export default function Dashboard() {
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => daysSince(pr.date) <= 7).length;
 
   const nextDay = program.data?.days?.[0] as any;
+
+  // The hero renders one of three things - Start workout, the build/generate
+  // link, or nothing - so the second step points at whichever is actually
+  // there. Anchoring it at a ref that never gets attached would stall the
+  // tour on a step it can't measure.
+  const heroTourStep: CoachmarkStep | null = nextDay
+    ? { target: tourStartWorkoutRef, text: "Tap here to log today's workout." }
+    : !program.data
+    ? {
+        target: tourBuildProgramRef,
+        text: isIndependent
+          ? "You don't have a program yet - this is your shortcut to build one."
+          : "You don't have a program yet - this is your shortcut to generate one.",
+      }
+    : null;
+
   const dashboardTourSteps: CoachmarkStep[] = [
-    { target: tourDailyCheckinRef, text: "Log your bodyweight and daily activity here." },
-    { target: tourStartWorkoutRef, text: "Tap here to log today's workout." },
+    { target: tourDailyCheckinRef, text: "This is your daily check-in that you need to do every day." },
+    ...(heroTourStep ? [heroTourStep] : []),
     { target: tourProgressRef, text: "And down here you can track your progress." },
     { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
   ];
@@ -322,7 +351,9 @@ export default function Dashboard() {
           ) : !program.data ? (
             <Link
               href="/program"
+              ref={tourBuildProgramRef}
               className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
+              data-testid="link-build-program"
             >
               {isIndependent ? "Build your program" : "Generate a program"}
               <ChevronRight className="w-4 h-4" />
@@ -488,6 +519,12 @@ export default function Dashboard() {
           </dl>
         </motion.div>
       )}
+
+      {/* Your targets - Independent mode's editable stand-in for the AI narrative
+          above. Phases only exist in the AI lineage, so this is where an
+          independent user declares (and edits) their own phase/calorie/step/
+          cardio targets. */}
+      {isIndependent && profile && <IndependentTargetsCard profile={profile} />}
 
       {/* Daily check-in */}
       <motion.div

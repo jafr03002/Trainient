@@ -6,10 +6,11 @@ import { requireAuth, getUserId } from "../lib/auth";
 import { CreateCheckoutSessionBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
 
-// Constructed lazily, for the same reason as lib/anthropic.ts: this router is
-// always mounted, and the Stripe SDK throws on an undefined key, so building
-// the client at import time would stop the whole server booting on a
-// deployment with billing turned off.
+// Constructed lazily, same reasoning as lib/anthropic.ts: this router is always
+// mounted and the Stripe SDK throws on an undefined key, so building the client
+// at import time would stop the whole server booting - on a deployment with
+// billing turned off, or as a serverless cold start that crashes whenever the
+// key isn't set.
 let stripeClient: Stripe | null = null;
 
 function getStripe(): Stripe {
@@ -107,7 +108,9 @@ router.post("/subscriptions/portal", requireAuth, async (req, res) => {
   }
   const session = await getStripe().billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
-    return_url: req.headers.origin ?? "https://traintent.replit.app",
+    // A browser-initiated portal request always carries an Origin; APP_URL is
+    // the server-side fallback, and localhost keeps local dev working.
+    return_url: req.headers.origin ?? process.env.APP_URL ?? "http://localhost:24301",
   });
   res.json({ url: session.url });
 });

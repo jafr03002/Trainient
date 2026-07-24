@@ -48,6 +48,13 @@ export interface UserProfile {
   /** @nullable */
   injurySeverity?: UserProfileInjurySeverity;
   priorityMuscles: string[];
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  dailyStepTarget?: number | null;
+  cardioDays?: string[];
+  /** @nullable */
+  cardioMinutes?: number | null;
   onboardingComplete: boolean;
   /** @nullable */
   onboardingCompletedAt?: string | null;
@@ -99,6 +106,13 @@ export interface UserProfileInput {
   /** @nullable */
   injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  dailyStepTarget?: number | null;
+  cardioDays?: string[];
+  /** @nullable */
+  cardioMinutes?: number | null;
 }
 
 /**
@@ -116,6 +130,9 @@ export const UserProfileUpdateInjurySeverity = {
 export interface UserProfileUpdate {
   name?: string;
   mode?: string;
+  goal?: string;
+  /** @nullable */
+  goalWeight?: number | null;
   /** @nullable */
   age?: number | null;
   /** @nullable */
@@ -126,6 +143,13 @@ export interface UserProfileUpdate {
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileUpdateInjurySeverity;
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  dailyStepTarget?: number | null;
+  cardioDays?: string[];
+  /** @nullable */
+  cardioMinutes?: number | null;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
   /** @nullable */

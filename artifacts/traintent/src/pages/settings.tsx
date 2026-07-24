@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/react";
 import { motion } from "framer-motion";
 import { Loader2, AlertTriangle } from "lucide-react";

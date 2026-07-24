@@ -34,6 +34,13 @@ export interface UserProfile {
   /** @nullable */
   injurySeverity?: UserProfileInjurySeverity;
   priorityMuscles: string[];
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  dailyStepTarget?: number | null;
+  cardioDays?: string[];
+  /** @nullable */
+  cardioMinutes?: number | null;
   onboardingComplete: boolean;
   /** @nullable */
   onboardingCompletedAt?: string | null;

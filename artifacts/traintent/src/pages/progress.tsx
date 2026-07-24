@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Legend, CartesianGrid,
+  ResponsiveContainer, Legend, CartesianGrid, ReferenceLine,
 } from "recharts";
 import {
   useGetVolumeProgress,
@@ -62,6 +62,7 @@ export default function Progress() {
   const bodyweightProgress = useGetBodyweightProgress();
   const profileQuery = useGetProfile();
   const weightUnit = profileQuery.data?.weightUnit ?? "kg";
+  const goalWeight = profileQuery.data?.goalWeight ?? null;
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => isRecent(pr.date, 7)).length;
 
@@ -79,11 +80,14 @@ export default function Progress() {
   })();
 
   // Same lower/upper snapping as the strength chart, just on the bodyweight
-  // data's own scale - bodyweight moves in much smaller increments.
+  // data's own scale - bodyweight moves in much smaller increments. The goal
+  // weight is folded into the range too so its reference line is always drawn
+  // inside the frame, even when the goal sits beyond every logged point.
   const bodyweightBounds = (() => {
     const data = bodyweightProgress.data ?? [];
     if (!data.length) return null;
     const weights = data.map((p) => p.weight);
+    if (goalWeight != null) weights.push(goalWeight);
     const lower = Math.max(0, Math.round((Math.min(...weights) * 0.95) / 5) * 5);
     const upper = Math.ceil((Math.max(...weights) * 1.05) / 5) * 5;
     const ticks: number[] = [];
@@ -186,6 +190,21 @@ export default function Progress() {
                 allowDecimals={false}
               />
               <Tooltip {...tooltipStyle} formatter={(v: number) => [`${v} ${weightUnit}`, "Bodyweight"]} />
+              {goalWeight != null && (
+                <ReferenceLine
+                  y={goalWeight}
+                  stroke="hsl(var(--chart-2))"
+                  strokeWidth={2}
+                  strokeDasharray="6 5"
+                  label={{
+                    value: `Goal ${goalWeight} ${weightUnit}`,
+                    position: "insideTopRight",
+                    fill: "hsl(var(--chart-2))",
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                />
+              )}
               <Line type="monotone" dataKey="weight" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>

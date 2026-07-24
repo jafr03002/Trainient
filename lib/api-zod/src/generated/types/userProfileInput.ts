@@ -32,4 +32,11 @@ export interface UserProfileInput {
   /** @nullable */
   injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
+  /** @nullable */
+  dailyCalorieTarget?: number | null;
+  /** @nullable */
+  dailyStepTarget?: number | null;
+  cardioDays?: string[];
+  /** @nullable */
+  cardioMinutes?: number | null;
 }

@@ -72,6 +72,10 @@ router.post("/profile", requireAuth, async (req, res) => {
       injuries: data.injuries ?? null,
       injurySeverity: data.injurySeverity ?? null,
       priorityMuscles: data.priorityMuscles ?? [],
+      dailyCalorieTarget: data.dailyCalorieTarget ?? null,
+      dailyStepTarget: data.dailyStepTarget ?? null,
+      cardioDays: data.cardioDays ?? [],
+      cardioMinutes: data.cardioMinutes ?? null,
       onboardingComplete: true,
       onboardingCompletedAt: now,
     })
@@ -94,6 +98,10 @@ router.post("/profile", requireAuth, async (req, res) => {
         injuries: data.injuries ?? null,
         injurySeverity: data.injurySeverity ?? null,
         priorityMuscles: data.priorityMuscles ?? [],
+        dailyCalorieTarget: data.dailyCalorieTarget ?? null,
+        dailyStepTarget: data.dailyStepTarget ?? null,
+        cardioDays: data.cardioDays ?? [],
+        cardioMinutes: data.cardioMinutes ?? null,
         onboardingComplete: true,
         // Re-onboarding (e.g. switching mode back to AI) must not reset the
         // clock the app's "Week N" displays are computed from - only stamp
