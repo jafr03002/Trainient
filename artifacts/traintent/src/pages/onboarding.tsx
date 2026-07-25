@@ -7,6 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { CARDIO_DAYS, orderCardioDays } from "@/lib/independentTargets";
+import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { CommitmentScreen } from "@/components/onboarding/CommitmentScreen";
@@ -42,6 +44,10 @@ function goalWeightConflict(
   form: Pick<FormState, "goal" | "weight" | "goalWeight" | "weightUnit">,
 ): string | null {
   if (!WEIGHT_GOALS.has(form.goal)) return null;
+  // Range before direction: "-50 is below your current 1500" is a useless thing to
+  // say about a number that was never a weight in the first place.
+  const outOfRange = rangeError(form.goalWeight, FIELD_LIMITS.goalWeight);
+  if (outOfRange) return outOfRange;
   const current = parseFloat(form.weight);
   const target = parseFloat(form.goalWeight);
   if (!Number.isFinite(current) || !Number.isFinite(target)) return null;
@@ -125,13 +131,22 @@ function stepsFor(mode: string): StepKey[] {
 // A rough daily-calorie starting point so the targets step isn't a blank
 // staring contest - maintenance ~= 30 kcal/kg, nudged for the chosen goal.
 // It's only a suggestion; the user overwrites or clears it freely.
+//
+// The result is clamped because a suggestion is worse than no suggestion when it's
+// absurd: an unclamped 30 kcal/kg pre-filled 20,000 kcal/day off a mistyped body
+// weight. The body-weight field is range-checked now too, so this is the second
+// line of defence rather than the only one.
+const SUGGESTED_CALORIES_MIN = 1200;
+const SUGGESTED_CALORIES_MAX = 5000;
+
 function suggestCalories(weightStr: string, weightUnit: string, goal: string): number {
   const w = parseFloat(weightStr);
   const kg = Number.isFinite(w) ? (weightUnit === "lbs" ? w / 2.2046 : w) : 75;
   let cals = kg * 30;
   if (goal === "lose_weight") cals -= 400;
   else if (goal === "gain_weight") cals += 300;
-  return Math.round(cals / 50) * 50;
+  const rounded = Math.round(cals / 50) * 50;
+  return Math.min(Math.max(rounded, SUGGESTED_CALORIES_MIN), SUGGESTED_CALORIES_MAX);
 }
 
 type FormState = {
@@ -232,6 +247,13 @@ export default function Onboarding() {
   useEffect(() => {
     if (resumeInitRef.current || profileQuery.isLoading) return;
     resumeInitRef.current = true;
+    // Flag-gated ahead of the mode test, same as the dashboard's check-in
+    // banner: this is the one path that can still put form.mode back to "ai"
+    // on an Independent-only build. A profile row carrying mode "ai" (from an
+    // earlier build, or a database shared with a full deployment) would
+    // otherwise resume the whole AI question flow and finish on a Generate
+    // button that the server answers with a 403.
+    if (!AI_MODE_ENABLED) return;
     const profile = profileQuery.data;
     if (!profile || profile.mode !== "ai" || (profile.goal && profile.experience)) return;
 
@@ -268,6 +290,15 @@ export default function Onboarding() {
   // or the body weight a step earlier - re-checks the pair immediately.
   const goalWeightError = goalWeightConflict(form);
 
+  // Plausibility checks on the free-number fields, in the same recompute-every-render
+  // style as goalWeightError. Blank is never an error - every one of these is
+  // optional - so these only fire on a value that was actually typed.
+  const ageError = rangeError(form.age, FIELD_LIMITS.age);
+  const weightError = rangeError(form.weight, FIELD_LIMITS.weight);
+  const calorieTargetError = rangeError(form.dailyCalorieTarget, FIELD_LIMITS.dailyCalorieTarget);
+  const stepTargetError = rangeError(form.dailyStepTarget, FIELD_LIMITS.dailyStepTarget);
+  const cardioMinutesError = form.cardioDays.length ? rangeError(form.cardioMinutes, FIELD_LIMITS.cardioMinutes) : null;
+
   // Seed the optional targets step with sensible starting values the first time
   // it's shown, so it reads as a suggestion to tweak rather than empty fields.
   // Only fills blanks, so re-visiting it never clobbers the user's own numbers.
@@ -284,10 +315,14 @@ export default function Onboarding() {
 
   function canAdvance() {
     switch (currentStep) {
+      // No "mode" case: the Independent-only alpha drops that step entirely
+      // (see stepsFor above), so there is nothing to validate here.
+      case "bodyStats": return !ageError && !weightError;
       case "goal": return !!form.goal && !goalWeightError;
       case "experience": return !!form.experience;
       case "preferredRestDays": return !tooManyPreferredRestDays;
       case "equipment": return form.equipment.length > 0;
+      case "targets": return !calorieTargetError && !stepTargetError && !cardioMinutesError;
       default: return true;
     }
   }
@@ -606,6 +641,7 @@ export default function Onboarding() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    maxLength={MAX_PROFILE_NAME}
                     placeholder="Your name"
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                     data-testid="input-name"
@@ -626,9 +662,16 @@ export default function Onboarding() {
                         value={form.age}
                         onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
                         placeholder="e.g. 28"
-                        className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                        className={`w-full px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                          ageError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
+                        }`}
                         data-testid="input-age"
                       />
+                      {ageError && (
+                        <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-age-error">
+                          {ageError}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Weight</label>
@@ -638,7 +681,9 @@ export default function Onboarding() {
                           value={form.weight}
                           onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))}
                           placeholder="e.g. 80"
-                          className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                          className={`flex-1 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                            weightError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
+                          }`}
                           data-testid="input-weight"
                         />
                         <div className="flex rounded-xl border border-border overflow-hidden">
@@ -658,6 +703,11 @@ export default function Onboarding() {
                           ))}
                         </div>
                       </div>
+                      {weightError && (
+                        <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-weight-error">
+                          {weightError}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -992,7 +1042,9 @@ export default function Onboarding() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-foreground mb-1.5 block">Calorie target</label>
-                        <div className="flex items-center gap-2 px-4 rounded-xl border border-border bg-card focus-within:border-primary">
+                        <div className={`flex items-center gap-2 px-4 rounded-xl border bg-card ${
+                          calorieTargetError ? "border-destructive" : "border-border focus-within:border-primary"
+                        }`}>
                           <input
                             type="number"
                             value={form.dailyCalorieTarget}
@@ -1003,10 +1055,17 @@ export default function Onboarding() {
                           />
                           <span className="text-sm text-muted-foreground shrink-0">kcal / day</span>
                         </div>
+                        {calorieTargetError && (
+                          <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-calories-error">
+                            {calorieTargetError}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-foreground mb-1.5 block">Step target</label>
-                        <div className="flex items-center gap-2 px-4 rounded-xl border border-border bg-card focus-within:border-primary">
+                        <div className={`flex items-center gap-2 px-4 rounded-xl border bg-card ${
+                          stepTargetError ? "border-destructive" : "border-border focus-within:border-primary"
+                        }`}>
                           <input
                             type="number"
                             value={form.dailyStepTarget}
@@ -1017,6 +1076,11 @@ export default function Onboarding() {
                           />
                           <span className="text-sm text-muted-foreground shrink-0">steps / day</span>
                         </div>
+                        {stepTargetError && (
+                          <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-steps-error">
+                            {stepTargetError}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -1041,22 +1105,35 @@ export default function Onboarding() {
                           );
                         })}
                       </div>
-                      {form.cardioDays.length > 0 && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Minutes each day:</span>
-                          <div className="flex items-center gap-2 px-3 rounded-xl border border-border bg-card focus-within:border-primary w-28">
-                            <input
-                              type="number"
-                              value={form.cardioMinutes}
-                              onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
-                              placeholder="e.g. 25"
-                              className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
-                              data-testid="input-target-cardio-minutes"
-                            />
-                            <span className="text-sm text-muted-foreground shrink-0">min</span>
+                      {(() => {
+                        const hasDays = form.cardioDays.length > 0;
+                        return (
+                          <div className={`mt-3 transition-opacity ${hasDays ? "opacity-100" : "opacity-40"}`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">Minutes each day:</span>
+                              <div className={`flex items-center gap-2 px-3 rounded-xl border bg-card w-28 ${
+                                cardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
+                              }`}>
+                                <input
+                                  type="number"
+                                  value={form.cardioMinutes}
+                                  onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
+                                  placeholder="e.g. 25"
+                                  disabled={!hasDays}
+                                  className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+                                  data-testid="input-target-cardio-minutes"
+                                />
+                                <span className="text-sm text-muted-foreground shrink-0">min</span>
+                              </div>
+                            </div>
+                            {cardioMinutesError && (
+                              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-cardio-minutes-error">
+                                {cardioMinutesError}
+                              </p>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
 

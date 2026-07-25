@@ -82,36 +82,68 @@ export const UserProfileInputInjurySeverity = {
 } as const;
 
 export interface UserProfileInput {
+  /** @maxLength 80 */
   name?: string;
   mode: string;
   goal?: string;
   experience?: string;
+  /**
+     * @minimum 1
+     * @maximum 7
+     */
   trainingDays: number;
   equipment?: string[];
-  /** @nullable */
+  /**
+     * @minimum 13
+     * @maximum 120
+     * @nullable
+     */
   age?: number | null;
   /** @nullable */
   sex?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
   /** @nullable */
   weightUnit?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   goalWeight?: number | null;
   /** @nullable */
   activityLevel?: string | null;
   preferredRestDays?: string[];
-  /** @nullable */
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
-  /** @nullable */
+  /**
+     * @minimum 800
+     * @maximum 10000
+     * @nullable
+     */
   dailyCalorieTarget?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
   dailyStepTarget?: number | null;
   cardioDays?: string[];
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
 }
 
@@ -128,27 +160,55 @@ export const UserProfileUpdateInjurySeverity = {
 } as const;
 
 export interface UserProfileUpdate {
+  /** @maxLength 80 */
   name?: string;
   mode?: string;
   goal?: string;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   goalWeight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 13
+     * @maximum 120
+     * @nullable
+     */
   age?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
   /** @nullable */
   weightUnit?: string | null;
-  /** @nullable */
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileUpdateInjurySeverity;
-  /** @nullable */
+  /**
+     * @minimum 800
+     * @maximum 10000
+     * @nullable
+     */
   dailyCalorieTarget?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
   dailyStepTarget?: number | null;
   cardioDays?: string[];
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
@@ -161,8 +221,14 @@ export interface UserProfileUpdate {
 }
 
 export interface Exercise {
+  /** @maxLength 80 */
   name: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
   sets: number;
+  /** @maxLength 50 */
   reps: string;
   /** @nullable */
   rpe?: number | null;
@@ -178,7 +244,9 @@ export interface Exercise {
 
 export interface ProgramDay {
   dayNumber: number;
+  /** @maxLength 60 */
   label: string;
+  /** @maxLength 60 */
   focus: string;
   exercises: Exercise[];
 }
@@ -321,15 +389,39 @@ export interface GenerateProgramInput {
 }
 
 export interface LoggedSet {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
   setNumber: number;
+  /**
+     * @minimum 0
+     * @maximum 2000
+     */
   weight: number;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   reps?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   repsLeft?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   repsRight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
   rpe?: number | null;
   completed: boolean;
   /** @nullable */
@@ -337,6 +429,7 @@ export interface LoggedSet {
 }
 
 export interface LoggedExercise {
+  /** @maxLength 80 */
   name: string;
   muscle: string;
   sets: LoggedSet[];
@@ -370,13 +463,20 @@ export interface WorkoutLog {
 }
 
 export interface WorkoutLogInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
   dayNumber: number;
   weekNumber: number;
-  /** @nullable */
+  /**
+     * @maxLength 60
+     * @nullable
+     */
   dayLabel?: string | null;
   exercisesLogged: LoggedExercise[];
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   notes?: string | null;
 }
 
@@ -546,7 +646,12 @@ export interface BodyweightLog {
 }
 
 export interface BodyweightLogInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
+  /**
+     * @minimum 20
+     * @maximum 1000
+     */
   weight: number;
 }
 
@@ -567,16 +672,36 @@ export interface DailyLog {
 }
 
 export interface DailyCheckinInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 20000
+     * @nullable
+     */
   calories?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 200000
+     * @nullable
+     */
   steps?: number | null;
-  /** @nullable */
+  /**
+     * @maxLength 60
+     * @nullable
+     */
   cardioType?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
 }
 

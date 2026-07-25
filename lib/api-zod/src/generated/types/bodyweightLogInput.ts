@@ -7,6 +7,11 @@
  */
 
 export interface BodyweightLogInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
+  /**
+     * @minimum 20
+     * @maximum 1000
+     */
   weight: number;
 }

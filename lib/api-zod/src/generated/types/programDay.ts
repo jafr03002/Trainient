@@ -9,7 +9,9 @@ import type { Exercise } from './exercise';
 
 export interface ProgramDay {
   dayNumber: number;
+  /** @maxLength 60 */
   label: string;
+  /** @maxLength 60 */
   focus: string;
   exercises: Exercise[];
 }

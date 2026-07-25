@@ -7,8 +7,14 @@
  */
 
 export interface Exercise {
+  /** @maxLength 80 */
   name: string;
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
   sets: number;
+  /** @maxLength 50 */
   reps: string;
   /** @nullable */
   rpe?: number | null;

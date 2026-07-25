@@ -20,17 +20,12 @@ import { computeSessionAdherence, MISSED_REASON_TEXT } from "../lib/sessionAdher
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
 import { PHASE_TEMPLATES, resolvePhaseProgression, effectivePhase, type LongTermPhase } from "../lib/phaseTemplate";
+// Today's date as YYYY-MM-DD (server local) - the reference "end of this week" for
+// the past-week evidence windows in buildCheckinEvidence. Lives in dateWindow.ts
+// with the rest of the date-string helpers, shared with the log-date guards.
+import { todayDateString } from "../lib/dateWindow";
 
 const router = Router();
-
-// Today's date as YYYY-MM-DD (server local) - the reference "end of this week"
-// for the past-week evidence windows in buildCheckinEvidence.
-function todayDateString(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${mm}-${dd}`;
-}
 
 // Prior check-ins condensed to one line each, exposing the SAME questions this
 // week's form asks so the model can compare week over week for patterns (the

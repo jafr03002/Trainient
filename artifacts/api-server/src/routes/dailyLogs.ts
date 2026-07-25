@@ -3,6 +3,8 @@ import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { db, dailyLogsTable, bodyweightLogsTable, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { SubmitDailyCheckinBody, GetDailyLogsWeekQueryParams } from "@workspace/api-zod";
+import { logDateError } from "../lib/dateWindow";
+import { syncProfileWeightToLatestLog } from "../lib/profileWeight";
 
 const router = Router();
 
@@ -39,7 +41,9 @@ function addDaysToDateString(dateStr: string, days: number): string {
 // submission it's upserted into bodyweightLogsTable too (same table the
 // dedicated bodyweight card already reads/writes), so the "one form, one
 // save button" UI maps to one API call touching both tables.
-router.post("/daily-checkin", requireAuth, async (req, res) => {
+// `/daily-logs` is an alias so API consumers who mirror the `GET /daily-logs/week`
+// read path can POST to the matching noun instead of hitting a 404.
+router.post(["/daily-checkin", "/daily-logs"], requireAuth, async (req, res) => {
   const userId = getUserId(req);
   const parsed = SubmitDailyCheckinBody.safeParse(req.body);
   if (!parsed.success) {
@@ -47,6 +51,14 @@ router.post("/daily-checkin", requireAuth, async (req, res) => {
     return;
   }
   const { date, weight, calories, steps, cardioType, cardioMinutes } = parsed.data;
+
+  // The zod schema only checks the YYYY-MM-DD shape - this rejects dates that match
+  // it but aren't real days, and days that haven't happened yet.
+  const dateError = logDateError(date);
+  if (dateError) {
+    res.status(400).json({ error: dateError });
+    return;
+  }
 
   // Only touch columns actually present in this submission - a check-in
   // that only logs steps shouldn't null out calories/cardio from an earlier
@@ -80,10 +92,11 @@ router.post("/daily-checkin", requireAuth, async (req, res) => {
       })
       .returning();
 
-    // Keeps user_profiles.weight in sync with the latest log, same as the
-    // dedicated /bodyweight route.
+    // Keeps user_profiles.weight in sync with the newest log - NOT with whatever
+    // this request happened to carry, or backfilling an older date would clobber
+    // the current weight. Same helper as the dedicated /bodyweight route.
     if (profile) {
-      await db.update(userProfilesTable).set({ weight, weightUnit }).where(eq(userProfilesTable.userId, userId));
+      await syncProfileWeightToLatestLog(userId);
     }
   }
 

@@ -14,6 +14,7 @@ import {
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
+import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
@@ -151,14 +152,36 @@ function programToEditDays(program: { days: unknown }): EditDay[] {
   }));
 }
 
+// Which field is blocking the save, and what to say about it. `exercise` is
+// undefined when the offender is the day's own name.
+type FieldError = {
+  day: number;
+  exercise?: number;
+  field: "label" | "name" | "sets";
+  message: string;
+};
+
+const MISSING_FIELD_MESSAGE = "Missing fields above - fill them in before saving.";
+
 // Shared between the Save-button gate and the draft-restore path, so a crash
-// or reload mid-edit reproduces exactly the same "first missing field" flag
+// or reload mid-edit reproduces exactly the same "first bad field" flag
 // the user would have seen by clicking Save right before it happened.
-function findMissingName(days: EditDay[]): { day: number; exercise?: number } | null {
+//
+// Sets is checked here rather than being quietly coerced at save time: entering 0
+// used to display 0, save 2, and say nothing about it.
+function findInvalidField(days: EditDay[]): FieldError | null {
   for (let di = 0; di < days.length; di++) {
-    if (!days[di].label.trim()) return { day: di };
-    const missingExercise = days[di].exercises.findIndex((e) => !e.name.trim());
-    if (missingExercise !== -1) return { day: di, exercise: missingExercise };
+    if (!days[di].label.trim()) return { day: di, field: "label", message: MISSING_FIELD_MESSAGE };
+    for (let ei = 0; ei < days[di].exercises.length; ei++) {
+      const ex = days[di].exercises[ei];
+      if (!ex.name.trim()) return { day: di, exercise: ei, field: "name", message: MISSING_FIELD_MESSAGE };
+      // Blank is an error here, unlike the optional profile fields rangeError is
+      // usually pointing at - an exercise has to have a set count.
+      const setsMessage = ex.sets.trim()
+        ? rangeError(ex.sets, FIELD_LIMITS.sets)
+        : `Enter ${FIELD_LIMITS.sets.article} ${FIELD_LIMITS.sets.noun} between ${FIELD_LIMITS.sets.min} and ${FIELD_LIMITS.sets.max}.`;
+      if (setsMessage) return { day: di, exercise: ei, field: "sets", message: setsMessage };
+    }
   }
   return null;
 }
@@ -252,11 +275,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       : editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()] }],
   );
   const [dragDay, setDragDay] = useState<number | null>(null);
-  // exercise undefined => the day's own name is missing; otherwise it's that
-  // exercise's name within the day. Seeded from the restored draft (if any) so
-  // a crash/reload mid-edit shows the same flags a Save click would have.
-  const [nameError, setNameError] = useState<{ day: number; exercise?: number } | null>(
-    () => (initialDraft ? findMissingName(initialDraft.days) : null),
+  // The one field currently blocking a save. Seeded from the restored draft (if
+  // any) so a crash/reload mid-edit shows the same flag a Save click would have.
+  const [fieldError, setFieldError] = useState<FieldError | null>(
+    () => (initialDraft ? findInvalidField(initialDraft.days) : null),
   );
   const [showMuscleConfirm, setShowMuscleConfirm] = useState(false);
 
@@ -287,8 +309,8 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
 
   function updateDay(di: number, field: keyof EditDay, value: string) {
     setDays((d) => d.map((day, i) => i === di ? { ...day, [field]: value } : day));
-    if (field === "label" && nameError?.day === di && nameError.exercise === undefined && value.trim()) {
-      setNameError(null);
+    if (field === "label" && fieldError?.field === "label" && fieldError.day === di && value.trim()) {
+      setFieldError(null);
     }
   }
 
@@ -321,12 +343,12 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
         ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, [field]: value } : ex) }
         : day
     ));
-    if (
-      field === "name" && nameError?.day === di && nameError.exercise === ei &&
-      typeof value === "string" && value.trim()
-    ) {
-      setNameError(null);
-    }
+    // Clear the flag as soon as the offending field is made valid, so the red
+    // border tracks the fix instead of waiting for another Save click.
+    if (fieldError?.day !== di || fieldError.exercise !== ei || field !== fieldError.field) return;
+    if (typeof value !== "string") return;
+    if (field === "name" && value.trim()) setFieldError(null);
+    if (field === "sets" && value.trim() && !rangeError(value, FIELD_LIMITS.sets)) setFieldError(null);
   }
 
   async function performSave() {
@@ -336,7 +358,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       focus: d.label.trim(),
       exercises: d.exercises.map((e) => ({
         name: e.name.trim(),
-        sets: parseInt(e.sets) || 2,
+        // Safe to parse bare: handleSave/findInvalidField already rejected anything
+        // that isn't a whole number in range, so there's no fallback to hide a 0
+        // behind any more.
+        sets: parseInt(e.sets, 10),
         reps: e.reps,
         rpe: null,
         restSeconds: null,
@@ -374,18 +399,18 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }
   }
 
-  // Gate before performSave: block on the first missing name - a day's own
-  // name or an exercise's name within it - one at a time (fixing it and
-  // saving again surfaces the next one, rather than dumping every error on
-  // screen at once). Once every name is filled, a dismissible reminder covers
-  // exercises with no muscle group set (allowed to proceed, unlike a name).
+  // Gate before performSave: block on the first bad field - a day's own name, an
+  // exercise's name, or its set count - one at a time (fixing it and saving again
+  // surfaces the next one, rather than dumping every error on screen at once).
+  // Once those are clean, a dismissible reminder covers exercises with no muscle
+  // group set (allowed to proceed, unlike a name).
   function handleSave() {
-    const missing = findMissingName(days);
-    if (missing) {
-      setNameError(missing);
+    const invalid = findInvalidField(days);
+    if (invalid) {
+      setFieldError(invalid);
       return;
     }
-    setNameError(null);
+    setFieldError(null);
 
     const hasUnsetMuscle = days.some((d) => d.exercises.some((e) => e.name.trim() && !e.muscle));
     if (hasUnsetMuscle) {
@@ -443,9 +468,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
               type="text"
               value={day.label}
               onChange={(e) => updateDay(di, "label", e.target.value)}
+              maxLength={MAX_DAY_LABEL}
               placeholder={`Day ${di + 1} name (e.g. Push, Upper A)`}
               className={`flex-1 px-3 py-2 rounded-lg border bg-secondary/20 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary ${
-                nameError?.day === di && nameError.exercise === undefined ? "border-destructive" : "border-border"
+                fieldError?.field === "label" && fieldError.day === di ? "border-destructive" : "border-border"
               }`}
               data-testid={`day-name-input-${di}`}
             />
@@ -475,9 +501,12 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                     type="text"
                     value={ex.name}
                     onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
+                    maxLength={MAX_EXERCISE_NAME}
                     placeholder="Exercise name"
                     className={`flex-1 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
-                      nameError?.day === di && nameError.exercise === ei ? "border-destructive" : "border-border"
+                      fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
+                        ? "border-destructive"
+                        : "border-border"
                     }`}
                     data-testid={`exercise-name-input-${di}-${ei}`}
                   />
@@ -526,7 +555,12 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                       value={ex.sets}
                       onChange={(e) => updateExercise(di, ei, "sets", e.target.value)}
                       placeholder="Sets"
-                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
+                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary ${
+                        fieldError?.field === "sets" && fieldError.day === di && fieldError.exercise === ei
+                          ? "border-destructive"
+                          : "border-border"
+                      }`}
+                      data-testid={`exercise-sets-input-${di}-${ei}`}
                     />
                   </div>
                   <div className="col-span-3">
@@ -585,9 +619,9 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
         Add training day
       </button>
 
-      {nameError && (
+      {fieldError && (
         <p className="text-sm text-destructive" data-testid="name-error">
-          Missing fields above - fill them in before saving.
+          {fieldError.message}
         </p>
       )}
 
@@ -706,9 +740,17 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
+  // In Independent mode the user reaches this page straight from the empty-state
+  // tour (my.tsx), which already opened with "This is your program page…", so
+  // repeating that intro here reads as two overlapping tours. Drop it and open
+  // on the real program. AI mode has no empty-state tour (the program is
+  // generated), so it keeps the page intro as its first step.
+  const isIndependent = profileQuery.data?.mode === "independent";
   const programTourSteps: CoachmarkStep[] = [
-    { kind: "center", text: "Here is your program page where you will find your programs." },
-    { target: tourDayTabsRef, text: "Here is your program." },
+    ...(isIndependent
+      ? []
+      : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
+    { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];

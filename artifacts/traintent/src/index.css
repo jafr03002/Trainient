@@ -302,3 +302,20 @@
     inset: -1px;
   }
 }
+
+/* Coach mascot (CoachRobot) — gentle float / sway / blink. Defined once here
+   rather than inlined as a <style> inside each CoachRobot so the keyframes
+   aren't duplicated into the DOM (and into tour-tooltip textContent) for every
+   mascot on screen. Transform lengths are in the SVG's user-space units, so the
+   same values scale proportionally at any rendered size. */
+.coach-robot .coach-float { animation: coach-float 3.6s ease-in-out infinite; }
+.coach-robot .coach-sway { animation: coach-sway 6s ease-in-out infinite; transform-origin: 50% 90%; }
+.coach-robot .coach-eye { animation: coach-blink 4.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes coach-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
+@keyframes coach-sway { 0%, 100% { transform: rotate(-2.2deg); } 50% { transform: rotate(2.2deg); } }
+@keyframes coach-blink { 0%, 7%, 100% { transform: scaleY(1); } 3.5% { transform: scaleY(0.1); } }
+@media (prefers-reduced-motion: reduce) {
+  .coach-robot .coach-float,
+  .coach-robot .coach-sway,
+  .coach-robot .coach-eye { animation: none; }
+}

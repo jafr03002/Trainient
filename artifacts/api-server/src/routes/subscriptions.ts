@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { db, subscriptionsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateCheckoutSessionBody } from "@workspace/api-zod";
+import { BILLING_ENABLED } from "../lib/featureFlags";
 import { logger } from "../lib/logger";
 
 // Constructed lazily, same reasoning as lib/anthropic.ts: this router is always
@@ -49,7 +50,16 @@ router.get("/subscriptions/current", requireAuth, async (req, res) => {
   });
 });
 
+// Note: /subscriptions/current above is deliberately left ungated. It never
+// touches Stripe - it reads (or seeds) the local row and reports "free", which
+// is the honest answer on a deployment with billing switched off. Everything
+// below this point does reach Stripe, so all of it is refused up front.
 router.post("/subscriptions/checkout", requireAuth, async (req, res) => {
+  if (!BILLING_ENABLED) {
+    res.status(403).json({ error: "Billing is not available" });
+    return;
+  }
+
   const userId = getUserId(req);
   const parsed = CreateCheckoutSessionBody.safeParse(req.body);
   if (!parsed.success) {
@@ -98,6 +108,11 @@ router.post("/subscriptions/checkout", requireAuth, async (req, res) => {
 });
 
 router.post("/subscriptions/portal", requireAuth, async (req, res) => {
+  if (!BILLING_ENABLED) {
+    res.status(403).json({ error: "Billing is not available" });
+    return;
+  }
+
   const userId = getUserId(req);
   const sub = await db.query.subscriptionsTable.findFirst({
     where: eq(subscriptionsTable.userId, userId),
@@ -117,6 +132,14 @@ router.post("/subscriptions/portal", requireAuth, async (req, res) => {
 
 // Stripe webhook - raw body needed, wired separately
 router.post("/subscriptions/webhook", async (req, res) => {
+  // Refused ahead of signature verification: with billing off there is no
+  // Stripe account sending us events, so anything arriving here is unsolicited
+  // and must not reach constructEvent (which would call Stripe) at all.
+  if (!BILLING_ENABLED) {
+    res.status(403).json({ error: "Billing is not available" });
+    return;
+  }
+
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 

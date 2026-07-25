@@ -15,3 +15,17 @@
  * Set AI_MODE_ENABLED=true (plus ANTHROPIC_API_KEY) to turn it back on.
  */
 export const AI_MODE_ENABLED = process.env.AI_MODE_ENABLED === "true";
+
+/**
+ * Billing: Stripe checkout, the customer portal, and the webhook.
+ *
+ * Same opt-in shape as AI_MODE_ENABLED, for the same reason. Until now these
+ * routes were held shut only by STRIPE_SECRET_KEY being absent, which is the
+ * footgun the flag above exists to avoid: setting that key for any reason -
+ * copying a full env file between deployments, say - would quietly reopen a
+ * live checkout on a build whose UI has no billing in it at all.
+ *
+ * Set BILLING_ENABLED=true (plus STRIPE_SECRET_KEY, and STRIPE_WEBHOOK_SECRET
+ * for the webhook) to turn billing back on.
+ */
+export const BILLING_ENABLED = process.env.BILLING_ENABLED === "true";

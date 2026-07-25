@@ -23,6 +23,7 @@ import {
   getGetCurrentProgramQueryKey,
 } from "@workspace/api-client-react";
 import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
+import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
@@ -154,22 +155,42 @@ export default function Dashboard() {
     todayEntry?.cardioType != null,
   ].filter(Boolean).length;
 
+  // The API enforces these bands too; checking here means a fat-fingered entry is
+  // flagged under the field rather than silently failing to save. Blank stays
+  // valid - a check-in that only logs steps is normal.
+  const checkinWeightError = rangeError(weightInput, FIELD_LIMITS.weight);
+  const checkinCaloriesError = rangeError(caloriesInput, FIELD_LIMITS.calories);
+  const checkinStepsError = rangeError(stepsInput, FIELD_LIMITS.steps);
+  const checkinCardioMinutesError = rangeError(cardioMinutesInput, FIELD_LIMITS.cardioMinutes);
+  const checkinHasError =
+    !!checkinWeightError || !!checkinCaloriesError || !!checkinStepsError || !!checkinCardioMinutesError;
+
   async function handleSaveDailyCheckin() {
+    if (checkinHasError) return;
     const weight = weightInput ? parseFloat(weightInput) : undefined;
     const calories = caloriesInput ? parseInt(caloriesInput, 10) : undefined;
     const steps = stepsInput ? parseInt(stepsInput, 10) : undefined;
     const cardioMinutes = cardioMinutesInput ? parseInt(cardioMinutesInput, 10) : undefined;
 
-    await submitDailyCheckin.mutateAsync({
-      data: {
-        date: todayStr,
-        weight: weight != null && Number.isFinite(weight) ? weight : undefined,
-        calories: calories != null && Number.isFinite(calories) ? calories : undefined,
-        steps: steps != null && Number.isFinite(steps) ? steps : undefined,
-        cardioType: cardioTypeInput || undefined,
-        cardioMinutes: cardioMinutes != null && Number.isFinite(cardioMinutes) ? cardioMinutes : undefined,
-      },
-    });
+    try {
+      await submitDailyCheckin.mutateAsync({
+        data: {
+          date: todayStr,
+          weight: weight != null && Number.isFinite(weight) ? weight : undefined,
+          calories: calories != null && Number.isFinite(calories) ? calories : undefined,
+          steps: steps != null && Number.isFinite(steps) ? steps : undefined,
+          cardioType: cardioTypeInput || undefined,
+          cardioMinutes: cardioMinutes != null && Number.isFinite(cardioMinutes) ? cardioMinutes : undefined,
+        },
+      });
+    } catch {
+      toast({
+        title: "Couldn't save your check-in",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: getGetDailyLogsWeekQueryKey({ startDate: weekStartStr }) });
     queryClient.invalidateQueries({ queryKey: getGetGoalProgressQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
@@ -555,7 +576,9 @@ export default function Dashboard() {
         <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 ${dailyCheckinLocked ? "opacity-50" : ""}`}>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weight</label>
-            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
+              checkinWeightError ? "border-destructive" : "border-border focus-within:border-primary"
+            }`}>
               <input
                 type="number"
                 step="0.1"
@@ -571,7 +594,9 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Calories</label>
-            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
+              checkinCaloriesError ? "border-destructive" : "border-border focus-within:border-primary"
+            }`}>
               <input
                 type="number"
                 value={caloriesInput}
@@ -586,7 +611,9 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Steps</label>
-            <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
+              checkinStepsError ? "border-destructive" : "border-border focus-within:border-primary"
+            }`}>
               <input
                 type="number"
                 value={stepsInput}
@@ -600,7 +627,9 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cardio</label>
-            <div className="mt-1.5 flex items-center gap-1 h-12 rounded-xl border border-border bg-secondary/30 px-2 focus-within:border-primary">
+            <div className={`mt-1.5 flex items-center gap-1 h-12 rounded-xl border bg-secondary/30 px-2 ${
+              checkinCardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
+            }`}>
               <select
                 value={cardioTypeInput}
                 onChange={(e) => setCardioTypeInput(e.target.value)}
@@ -625,10 +654,17 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        {/* One line for the whole row - only ever one field is wrong at a time in
+            practice, and four columns have no room for their own error text. */}
+        {(checkinWeightError || checkinCaloriesError || checkinStepsError || checkinCardioMinutesError) && (
+          <p className="text-xs font-medium text-destructive mt-2" data-testid="text-checkin-error">
+            {checkinWeightError ?? checkinCaloriesError ?? checkinStepsError ?? checkinCardioMinutesError}
+          </p>
+        )}
         <div className="flex justify-end mt-4">
           <button
             onClick={handleSaveDailyCheckin}
-            disabled={submitDailyCheckin.isPending || dailyCheckinLocked}
+            disabled={submitDailyCheckin.isPending || dailyCheckinLocked || checkinHasError}
             className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50"
             data-testid="button-save-checkin"
           >
@@ -658,6 +694,9 @@ export default function Dashboard() {
                 <div className="text-3xl font-bold text-foreground">
                   {goal.currentTrendWeight.toFixed(1)}
                   <span className="text-base font-medium text-muted-foreground"> {weightUnit}</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  trend weight (smoothed average)
                 </div>
               </div>
               {goal.goalWeight != null && kgToGo != null && (

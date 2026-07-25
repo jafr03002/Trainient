@@ -723,60 +723,70 @@ components:
         dashboardTourSeenAt: { type: ["string", "null"] }
         createdAt:              { type: string }
 
+    # Ranges below are plausibility guards, not coaching opinions - they exist so a
+    # typo or a hostile client can't persist age 999 / weight -50 / a 0 kcal target.
+    # Weights are deliberately unit-agnostic (the same column stores kg and lbs, each
+    # log carrying its own weightUnit), so the band has to span 20 kg .. 1000 lbs.
+    # Only the *Input* schemas are constrained: the response schemas stay open so
+    # profiles that already hold out-of-range values from before this guard existed
+    # remain readable.
     UserProfileInput:
       type: object
       required: [mode, trainingDays]
       properties:
-        name:                   { type: string }
+        name:                   { type: string, maxLength: 80 }
         mode:                   { type: string }
         goal:                   { type: string }
         experience:             { type: string }
-        trainingDays:           { type: integer }
+        trainingDays:           { type: integer, minimum: 1, maximum: 7 }
         equipment:              { type: array, items: { type: string } }
-        age:                    { type: ["integer", "null"] }
+        age:                    { type: ["integer", "null"], minimum: 13, maximum: 120 }
         sex:                    { type: ["string", "null"] }
-        weight:                 { type: ["number", "null"] }
+        weight:                 { type: ["number", "null"], minimum: 20, maximum: 1000 }
         weightUnit:             { type: ["string", "null"] }
-        goalWeight:             { type: ["number", "null"] }
+        goalWeight:             { type: ["number", "null"], minimum: 20, maximum: 1000 }
         activityLevel:          { type: ["string", "null"] }
         preferredRestDays:      { type: array, items: { type: string } }
-        injuries:               { type: ["string", "null"] }
+        injuries:               { type: ["string", "null"], maxLength: 1000 }
         injurySeverity:         { type: ["string", "null"], enum: [low, medium, high, null] }
         priorityMuscles:        { type: array, items: { type: string } }
-        dailyCalorieTarget:     { type: ["integer", "null"] }
-        dailyStepTarget:        { type: ["integer", "null"] }
+        dailyCalorieTarget:     { type: ["integer", "null"], minimum: 800, maximum: 10000 }
+        dailyStepTarget:        { type: ["integer", "null"], minimum: 0, maximum: 100000 }
         cardioDays:             { type: array, items: { type: string } }
-        cardioMinutes:          { type: ["integer", "null"] }
+        cardioMinutes:          { type: ["integer", "null"], minimum: 0, maximum: 1440 }
 
     UserProfileUpdate:
       type: object
       properties:
-        name:           { type: string }
+        name:           { type: string, maxLength: 80 }
         mode:           { type: string }
         goal:           { type: string }
-        goalWeight:     { type: ["number", "null"] }
-        age:            { type: ["integer", "null"] }
-        weight:         { type: ["number", "null"] }
+        goalWeight:     { type: ["number", "null"], minimum: 20, maximum: 1000 }
+        age:            { type: ["integer", "null"], minimum: 13, maximum: 120 }
+        weight:         { type: ["number", "null"], minimum: 20, maximum: 1000 }
         weightUnit:     { type: ["string", "null"] }
-        injuries:       { type: ["string", "null"] }
+        injuries:       { type: ["string", "null"], maxLength: 1000 }
         injurySeverity: { type: ["string", "null"], enum: [low, medium, high, null] }
-        dailyCalorieTarget:     { type: ["integer", "null"] }
-        dailyStepTarget:        { type: ["integer", "null"] }
+        dailyCalorieTarget:     { type: ["integer", "null"], minimum: 800, maximum: 10000 }
+        dailyStepTarget:        { type: ["integer", "null"], minimum: 0, maximum: 100000 }
         cardioDays:             { type: array, items: { type: string } }
-        cardioMinutes:          { type: ["integer", "null"] }
+        cardioMinutes:          { type: ["integer", "null"], minimum: 0, maximum: 1440 }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
         dashboardTourSeenAt: { type: ["string", "null"] }
 
     # ── Programs ───────────────────────────────────────────────────────────────
+    # The sets/reps ceilings are absurdity backstops (a set count of 99999 is a typo,
+    # not a workout), not programming advice - hence the generous 50. Length caps keep
+    # a pasted essay out of the exercise row, which has nowhere to put it.
     Exercise:
       type: object
       required: [name, sets, reps, muscle]
       properties:
-        name:            { type: string }
-        sets:            { type: integer }
-        reps:            { type: string }
+        name:            { type: string, maxLength: 80 }
+        sets:            { type: integer, minimum: 1, maximum: 50 }
+        reps:            { type: string, maxLength: 50 }
         rpe:             { type: ["integer", "null"] }
         restSeconds:     { type: ["integer", "null"] }
         cue:             { type: ["string", "null"] }
@@ -789,8 +799,8 @@ components:
       required: [dayNumber, label, focus, exercises]
       properties:
         dayNumber:  { type: integer }
-        label:      { type: string }
-        focus:      { type: string }
+        label:      { type: string, maxLength: 60 }
+        focus:      { type: string, maxLength: 60 }
         exercises:
           type: array
           items:
@@ -888,16 +898,19 @@ components:
           $ref: "#/components/schemas/ProgramFeedback"
 
     # ── Workouts ──────────────────────────────────────────────────────────────
+    # Absurdity backstops again, sized so no real set is ever rejected: 0 weight is a
+    # bodyweight movement, and the ceilings only exist to keep -100 kg x 500 reps out
+    # of the volume/PR maths that reads these rows back.
     LoggedSet:
       type: object
       required: [setNumber, weight, completed]
       properties:
-        setNumber: { type: integer }
-        weight:    { type: number }
-        reps:      { type: ["integer", "null"] }
-        repsLeft:  { type: ["integer", "null"] }
-        repsRight: { type: ["integer", "null"] }
-        rpe:       { type: ["integer", "null"] }
+        setNumber: { type: integer, minimum: 1, maximum: 50 }
+        weight:    { type: number, minimum: 0, maximum: 2000 }
+        reps:      { type: ["integer", "null"], minimum: 0, maximum: 1000 }
+        repsLeft:  { type: ["integer", "null"], minimum: 0, maximum: 1000 }
+        repsRight: { type: ["integer", "null"], minimum: 0, maximum: 1000 }
+        rpe:       { type: ["integer", "null"], minimum: 1, maximum: 10 }
         completed: { type: boolean }
         isNewPr:   { type: ["boolean", "null"] }
 
@@ -905,7 +918,7 @@ components:
       type: object
       required: [name, muscle, sets]
       properties:
-        name:   { type: string }
+        name:   { type: string, maxLength: 80 }
         muscle: { type: string }
         sets:
           type: array
@@ -934,15 +947,15 @@ components:
       type: object
       required: [date, dayNumber, weekNumber, exercisesLogged]
       properties:
-        date:             { type: string }
+        date:             { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
         dayNumber:        { type: integer }
         weekNumber:       { type: integer }
-        dayLabel:         { type: ["string", "null"] }
+        dayLabel:         { type: ["string", "null"], maxLength: 60 }
         exercisesLogged:
           type: array
           items:
             $ref: "#/components/schemas/LoggedExercise"
-        notes:            { type: ["string", "null"] }
+        notes:            { type: ["string", "null"], maxLength: 2000 }
 
     WorkoutStats:
       type: object
@@ -1105,8 +1118,8 @@ components:
       type: object
       required: [date, weight]
       properties:
-        date:       { type: string }
-        weight:     { type: number }
+        date:       { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        weight:     { type: number, minimum: 20, maximum: 1000 }
 
     # ── Daily logs (calories / steps / cardio) ─────────────────────────────────
     DailyLog:
@@ -1127,12 +1140,12 @@ components:
       type: object
       required: [date]
       properties:
-        date:          { type: string }
-        weight:        { type: ["number", "null"] }
-        calories:      { type: ["integer", "null"] }
-        steps:         { type: ["integer", "null"] }
-        cardioType:    { type: ["string", "null"] }
-        cardioMinutes: { type: ["integer", "null"] }
+        date:          { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+        weight:        { type: ["number", "null"], minimum: 20, maximum: 1000 }
+        calories:      { type: ["integer", "null"], minimum: 0, maximum: 20000 }
+        steps:         { type: ["integer", "null"], minimum: 0, maximum: 200000 }
+        cardioType:    { type: ["string", "null"], maxLength: 60 }
+        cardioMinutes: { type: ["integer", "null"], minimum: 0, maximum: 1440 }
 
     DailyCheckinResult:
       type: object

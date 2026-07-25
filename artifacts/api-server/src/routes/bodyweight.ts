@@ -3,6 +3,8 @@ import { eq, and } from "drizzle-orm";
 import { db, bodyweightLogsTable, userProfilesTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { LogBodyweightBody, GetTodaysBodyweightQueryParams } from "@workspace/api-zod";
+import { logDateError } from "../lib/dateWindow";
+import { syncProfileWeightToLatestLog } from "../lib/profileWeight";
 
 const router = Router();
 
@@ -23,6 +25,14 @@ router.post("/bodyweight", requireAuth, async (req, res) => {
   }
   const { date, weight } = parsed.data;
 
+  // Shape is already checked by the zod pattern; this rejects dates that are the
+  // right shape but not real days, and days that haven't happened yet.
+  const dateError = logDateError(date);
+  if (dateError) {
+    res.status(400).json({ error: dateError });
+    return;
+  }
+
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });
   const weightUnit = profile?.weightUnit ?? "kg";
 
@@ -35,10 +45,11 @@ router.post("/bodyweight", requireAuth, async (req, res) => {
     })
     .returning();
 
-  // Keeps user_profiles.weight - the field program generation reads - in
-  // sync with the latest log, so AI mode always reasons from current weight.
+  // Keeps user_profiles.weight - the field program generation reads - in sync with
+  // the newest log (not necessarily this one, which may be a backfill), so AI mode
+  // always reasons from the actual current weight.
   if (profile) {
-    await db.update(userProfilesTable).set({ weight, weightUnit }).where(eq(userProfilesTable.userId, userId));
+    await syncProfileWeightToLatestLog(userId);
   }
 
   res.json(serialize(entry));
