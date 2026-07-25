@@ -155,12 +155,16 @@ function estimatedOneRepMax(weight: number, reps: number): number {
 }
 
 // Section 10: format a single previous set for the per-set "last time" hint.
-function formatPrevSet(s: any, weightUnit: string): string | null {
+// `isUnilateral` is the exercise's *current* flag: when it's on but the historic
+// set was logged bilaterally (single rep value), we tag the hint so the lone
+// number doesn't look like a bug next to the new L/R input columns.
+function formatPrevSet(s: any, weightUnit: string, isUnilateral: boolean): string | null {
   if (isEmptySet(s)) return null;
   if (s.repsLeft != null || s.repsRight != null) {
     return `${s.weight ?? 0} ${weightUnit} × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
   }
-  return `${s.weight ?? 0} ${weightUnit} × ${s.reps ?? 0}`;
+  const base = `${s.weight ?? 0} ${weightUnit} × ${s.reps ?? 0}`;
+  return isUnilateral ? `${base} (both sides)` : base;
 }
 
 export default function Log() {
@@ -191,6 +195,8 @@ export default function Log() {
       { data: { weightLoggingTourSeenAt: new Date().toISOString() } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
     );
+    // After the tour ends (skipped or finished), send the user back to the
+    // dashboard.
     setLocation("/dashboard");
   }
 
@@ -457,6 +463,29 @@ export default function Log() {
     setLocation("/program");
   }
 
+  // Switch which program day the logger is showing. Only offered before the
+  // current sheet has any logged data (the day picker locks once a session is
+  // started - see `sessionStarted` below), so there is never an in-progress
+  // draft to orphan here. Re-seeds `logs` for the target day exactly like the
+  // mount effect, and syncs `?day=` so a reload lands on the same day.
+  function switchDay(targetNum: number) {
+    if (!program?.days || !user?.id) return;
+    if (targetNum === activeDay?.dayNumber) return;
+    const target = (program.days as any[]).find((d) => d.dayNumber === targetNum);
+    if (!target) return;
+
+    const key = draftKey(user.id, program.id, target.dayNumber);
+    initializedKeyRef.current = key;
+    currentDraftKeyRef.current = key;
+    activeSessionRef.current = { programId: program.id, dayNumber: target.dayNumber };
+
+    setActiveDay(target);
+    setResumedElsewhere(false);
+    const draft = loadDraft(key);
+    setLogs(draft ? draft.logs : buildFreshLogs(target));
+    setLocation(`/log?day=${target.dayNumber}`, { replace: true });
+  }
+
   if (program && isPreCalibrationLocked(program, new Date())) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
@@ -508,6 +537,10 @@ export default function Log() {
 
   const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
+  // Once any set is filled in, the day picker locks - switching would abandon
+  // the in-progress session, which the one-session-at-a-time model forbids.
+  const sessionStarted = hasLoggedData(logs);
+  const programDays = (program.days as any[]) ?? [];
   const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
   const logTourSteps: CoachmarkStep[] = [
     { target: tourSetRowRef, text: "Here you can track your weight and reps." },
@@ -571,6 +604,42 @@ export default function Log() {
         </div>
       </motion.div>
 
+      {/* Day picker - lets a user starting from the "Log Workout" nav choose
+          which split day to log instead of being forced onto day 1. Hidden for
+          single-day programs; locked once the current session has data. */}
+      {programDays.length > 1 && (
+        <div className="mt-4">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="log-day-picker">
+            {programDays.map((d) => {
+              const isActive = d.dayNumber === day.dayNumber;
+              const locked = sessionStarted && !isActive;
+              return (
+                <button
+                  key={d.dayNumber}
+                  onClick={() => switchDay(d.dayNumber)}
+                  disabled={locked}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : locked
+                      ? "bg-secondary/20 text-muted-foreground/40 border-border/50 cursor-not-allowed"
+                      : "bg-secondary/20 text-muted-foreground border-border hover:text-foreground hover:border-border/80"
+                  }`}
+                  data-testid={`log-day-tab-${d.dayNumber}`}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+          {sessionStarted && (
+            <p className="text-[11px] text-muted-foreground/60 mt-1.5">
+              Finish or cancel this session to log a different day.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
@@ -632,7 +701,7 @@ export default function Log() {
 
               <div className="space-y-2">
                 {ex.sets.map((set, setIdx) => {
-                  const prevStr = formatPrevSet(prevSets?.[setIdx], weightUnit);
+                  const prevStr = formatPrevSet(prevSets?.[setIdx], weightUnit, ex.isUnilateral);
                   return (
                   <div key={set.setNumber}>
                   <motion.div
