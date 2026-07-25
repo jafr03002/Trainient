@@ -10,10 +10,24 @@ so no CORS in play). Postgres is Neon; auth is Clerk.
 - Create a Neon project. From **Connection Details** copy two URLs:
   - **pooled** (host contains `-pooler`) — used at runtime as `DATABASE_URL`
   - **direct** (no `-pooler`) — used only to run migrations
-- Create the tables:
+- Create the tables. **Nothing in the Vercel build does this** - the build only
+  compiles the API and the frontend, so if you skip this step the deploy will
+  succeed, `/api/healthz` will return 200, and every route that touches the
+  database will 500:
   ```
-  DATABASE_URL="<direct url>" pnpm --filter @workspace/db run push
+  DATABASE_URL="<direct url>" pnpm run db:push
   ```
+  PowerShell has no inline env-var prefix, so there it is two statements (and
+  the variable must be cleared afterwards, or it will shadow your local
+  `.env` for the rest of the session):
+  ```powershell
+  $env:DATABASE_URL = "<direct url>"
+  pnpm run db:push
+  Remove-Item Env:\DATABASE_URL
+  ```
+  Use the **direct** URL here, not the pooled one - schema changes over Neon's
+  pooled connection are unreliable. Re-run this command after any change to
+  `lib/db/src/schema/` (again, deploying does not do it for you).
 
 ### 2. Clerk (auth)
 - Create a Clerk application. A **development** instance works on any
@@ -38,13 +52,39 @@ so no CORS in play). Postgres is Neon; auth is Clerk.
 | `CLERK_SECRET_KEY` | Clerk `sk_…` | backend |
 | `ANTHROPIC_API_KEY` | Anthropic key | required only if AI is on |
 | `AI_MODE_ENABLED` | `true` | omit to keep AI off (the alpha build) |
+| `BILLING_ENABLED` | `true` | omit to keep billing off (the alpha build) |
 | `STRIPE_SECRET_KEY` | Stripe key | required only if billing is on |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | required only if billing is on |
 | `CORS_ALLOWED_ORIGINS` | comma-separated | only for genuine cross-origin callers |
 | `APP_URL` | deploy URL | fallback for Stripe billing return_url |
 
 `VITE_*` variables are read at **build** time (Vite inlines them), so they must
-be set in Vercel before the build runs.
+be set in Vercel before the build runs. Changing one later has no effect until
+you redeploy - there is no bundle to update otherwise. `vite.config.ts` fails
+the build outright if `VITE_CLERK_PUBLISHABLE_KEY` is missing, because the
+alternative is a build that succeeds and then serves a blank page.
+
+## Package manager (why the install command is pinned)
+
+`vercel.json` pins the install step to `npx --yes pnpm@10.34.5`. This is not
+cosmetic. Vercel picks a pnpm version by reading `lockfileVersion` from
+`pnpm-lock.yaml`, and `9.0` maps to "pnpm 9 **or** 10" - it will not say which
+in advance. That matters because this repo keeps `overrides` in
+`pnpm-workspace.yaml`, which is the pnpm 10+ location; pnpm 9 only looks for
+`pnpm.overrides` in `package.json`, finds none, and aborts the install:
+
+```
+ERR_PNPM_LOCKFILE_CONFIG_MISMATCH  Cannot proceed with the frozen installation.
+The current "overrides" configuration doesn't match the value found in the lockfile
+```
+
+Pinning removes the coin flip. `minimumReleaseAge` in `pnpm-workspace.yaml` is
+also pnpm 10.16+ only, so pnpm 9 would silently drop that supply-chain guard.
+
+Note that Vercel supports **pnpm 6-10 only** - do not pin a pnpm 11 version
+here. The matching `packageManager` field in `package.json` keeps local
+development on the same version (pnpm manages this itself), so the lockfile
+never gets rewritten by a version Vercel cannot run.
 
 ## How the build works
 - `vercel.json` runs `pnpm run vercel-build`, which builds the API bundle
