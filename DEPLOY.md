@@ -92,7 +92,12 @@ never gets rewritten by a version Vercel cannot run.
   because Vercel compiles the function entry to CommonJS, which cannot
   `require()` an ES module) and the
   frontend (`artifacts/traintent/dist/public`).
-- `api/[...path].ts` is the serverless function; it re-exports that bundle so
+- `api/index.ts` is the serverless function, reached via the `/api/(.*)` rewrite
+  in `vercel.json`. Both halves are required: a catch-all `api/[...path].ts`
+  without that rewrite serves single-segment paths (`/api/profile`) but returns
+  Vercel's own NOT_FOUND for nested ones (`/api/programs/current`), and because
+  the request is rejected before the function runs, nothing appears in the
+  runtime logs. It re-exports that bundle so
   Vercel never has to resolve the pnpm workspace graph.
 - Non-`/api` routes fall back to `index.html` for client-side routing.
 
