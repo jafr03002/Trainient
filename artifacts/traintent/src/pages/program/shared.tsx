@@ -405,9 +405,19 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       // this stays useful for a real failure without inventing a diagnosis.
       // The draft is deliberately left in place - the work isn't saved, so
       // clearing it would lose the program the user just built.
+      //
+      // ApiError also records which request failed. It isn't exported from
+      // @workspace/api-client-react, so read those fields structurally rather
+      // than widening that package's API for an error message. Naming the
+      // method and URL is the difference between "something went wrong" and a
+      // report that can actually be acted on.
+      const request =
+        err && typeof err === "object" && "method" in err && "url" in err
+          ? ` [${String((err as { method: unknown }).method)} ${String((err as { url: unknown }).url)}]`
+          : "";
       setSaveError(
         err instanceof Error
-          ? `Couldn't save your program: ${err.message}`
+          ? `Couldn't save your program: ${err.message}${request}`
           : "Couldn't save your program. Please try again.",
       );
     } finally {
