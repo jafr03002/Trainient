@@ -683,6 +683,9 @@ export default function Dashboard() {
                   {goal.currentTrendWeight.toFixed(1)}
                   <span className="text-base font-medium text-muted-foreground"> {weightUnit}</span>
                 </div>
+                <div className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  trend weight (smoothed average)
+                </div>
               </div>
               {goal.goalWeight != null && kgToGo != null && (
                 <div className="text-right">
