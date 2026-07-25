@@ -1,11 +1,12 @@
 // "Coach" — the AI coach mascot. A minimal, all-blue robot head riding a
-// genie-style wisp tail that gently bobs, sways, and blinks. Pure inline SVG +
-// CSS, no dependencies, crisp at any size, and honors prefers-reduced-motion.
-// Rendered as the mascot above every CoachmarkTour bubble (see CoachmarkTour).
+// genie-style wisp tail that gently bobs, sways, and blinks. Inline SVG, crisp
+// at any size. The float/sway/blink keyframes (and prefers-reduced-motion
+// opt-out) live once in index.css under `.coach-robot` rather than in a per-
+// instance <style> tag - see that file. Rendered as the mascot above every
+// CoachmarkTour bubble (see CoachmarkTour) and on the auth panel (AuthShell).
 export function CoachRobot({ size = 30, className }: { size?: number; className?: string }) {
   return (
     <span className={className} style={{ display: "inline-block", lineHeight: 0 }} aria-hidden={false}>
-      <style>{coachCss}</style>
       <svg
         width={size}
         height={(size * 214) / 150}
@@ -41,19 +42,3 @@ export function CoachRobot({ size = 30, className }: { size?: number; className?
     </span>
   );
 }
-
-// Scoped keyframes. Transform lengths are in the SVG's user-space units, so the
-// same values scale proportionally at any rendered `size`.
-const coachCss = `
-.coach-robot .coach-float { animation: coach-float 3.6s ease-in-out infinite; }
-.coach-robot .coach-sway { animation: coach-sway 6s ease-in-out infinite; transform-origin: 50% 90%; }
-.coach-robot .coach-eye { animation: coach-blink 4.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-@keyframes coach-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-13px); } }
-@keyframes coach-sway { 0%, 100% { transform: rotate(-2.2deg); } 50% { transform: rotate(2.2deg); } }
-@keyframes coach-blink { 0%, 7%, 100% { transform: scaleY(1); } 3.5% { transform: scaleY(0.1); } }
-@media (prefers-reduced-motion: reduce) {
-  .coach-robot .coach-float,
-  .coach-robot .coach-sway,
-  .coach-robot .coach-eye { animation: none; }
-}
-`;

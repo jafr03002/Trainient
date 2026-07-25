@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CoachRobot } from "@/components/CoachRobot";
 
 // A single coachmark step.
@@ -47,10 +47,27 @@ export function CoachmarkTour({
   const [phase, setPhase] = useState<"intro" | "steps">(intro ? "intro" : "steps");
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [bubbleH, setBubbleH] = useState(160);
   const total = steps.length;
   const isLast = step === total - 1;
   const current = steps[step];
   const isCenter = current?.kind === "center";
+  // navClick steps hand the user off to a real link, so their backdrop must stay
+  // click-through; every other surface (intro card, centered/anchored bubbles)
+  // can be dismissed by clicking the dimmed backdrop.
+  const dismissable = phase === "intro" || current?.kind !== "navClick";
+
+  // Escape always ends the tour, so a user who somehow can't reach Skip/Next
+  // (an unusual viewport, a mispositioned bubble) is never trapped behind the
+  // overlay.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDone();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDone]);
 
   useLayoutEffect(() => {
     if (phase !== "steps") return;
@@ -60,24 +77,50 @@ export function CoachmarkTour({
       setRect(null);
       return;
     }
-    if (current.kind !== "navClick") {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    const update = () => setRect(measure(el));
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    const measureNow = () => setRect(measure(el));
+    const bringIntoView = () => {
+      // Instant (not smooth) so the measurement reflects the settled position
+      // immediately instead of racing a scroll animation. navClick steps aren't
+      // scrolled - the tour hands off to the real nav link the user must tap.
+      if (current.kind !== "navClick") el.scrollIntoView({ block: "center" });
+      measureNow();
+    };
+    bringIntoView();
+    // The dashboard opens the tour before its data has loaded, so the page grows
+    // taller underneath the target after the first measurement - which is
+    // exactly how a user ends up stranded with the highlight far below the fold.
+    // Re-center whenever the page (or the target) resizes, and keep the rect in
+    // sync with scroll/resize.
+    const ro = new ResizeObserver(() => bringIntoView());
+    ro.observe(document.body);
+    ro.observe(el);
+    window.addEventListener("resize", measureNow);
+    window.addEventListener("scroll", measureNow, true);
     return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      ro.disconnect();
+      window.removeEventListener("resize", measureNow);
+      window.removeEventListener("scroll", measureNow, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, current?.kind, phase]);
 
+  // Measure the live bubble so the anchored placement below can keep the whole
+  // box - Skip/Next included - inside the viewport on short screens.
+  useLayoutEffect(() => {
+    if (bubbleRef.current) setBubbleH(bubbleRef.current.offsetHeight);
+  }, [step, phase, rect, current?.text]);
+
   // Dimming backdrop rendered behind every tour surface so the info box stands
-  // out from the page. pointer-events-none so it never blocks the real nav
-  // links a `navClick` step needs the user to tap.
-  const scrim = <div className="fixed inset-0 z-[60] bg-black/60 pointer-events-none" aria-hidden />;
+  // out from the page. Clicking it dismisses the tour, except on a navClick
+  // step, where it stays pointer-events-none so it never blocks the real nav
+  // link the user needs to tap.
+  const scrim = (
+    <div
+      className={`fixed inset-0 z-[60] bg-black/60 ${dismissable ? "" : "pointer-events-none"}`}
+      aria-hidden
+      onClick={dismissable ? onDone : undefined}
+    />
+  );
 
   // Coach, the AI coach mascot, perches in the top-left corner of every tour
   // box. He's a child of the box element (never the scrim), so he always paints
@@ -94,8 +137,9 @@ export function CoachmarkTour({
     return (
       <>
         {scrim}
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onDone}>
           <div
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm p-5 rounded-xl bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-intro`}
           >
@@ -163,8 +207,12 @@ export function CoachmarkTour({
     return (
       <>
         {scrim}
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={dismissable ? onDone : undefined}
+        >
           <div
+            onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm p-4 rounded-xl bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-bubble`}
           >
@@ -178,7 +226,15 @@ export function CoachmarkTour({
 
   const spaceBelow = window.innerHeight - (rect!.top + rect!.height);
   const placeAbove = spaceBelow < 180;
-  const bubbleTop = placeAbove ? rect!.top - 8 : rect!.top + rect!.height + 8;
+  // Keep the whole bubble on-screen regardless of where the target sits.
+  // TOP_MARGIN leaves room for the Coach mascot, which overhangs the bubble's
+  // top edge (-top-9). Without this vertical clamp the bubble - and its
+  // Skip/Next buttons - can land below the fold on a short viewport.
+  const TOP_MARGIN = 44;
+  const BOTTOM_MARGIN = 12;
+  const desiredTop = placeAbove ? rect!.top - 8 - bubbleH : rect!.top + rect!.height + 8;
+  const maxTop = window.innerHeight - bubbleH - BOTTOM_MARGIN;
+  const bubbleTop = Math.min(Math.max(desiredTop, TOP_MARGIN), Math.max(TOP_MARGIN, maxTop));
   const bubbleLeft = Math.min(Math.max(rect!.left, 16), window.innerWidth - 16 - BUBBLE_WIDTH);
 
   return (
@@ -189,13 +245,9 @@ export function CoachmarkTour({
         style={{ top: rect!.top - 4, left: rect!.left - 4, width: rect!.width + 8, height: rect!.height + 8 }}
       />
       <div
+        ref={bubbleRef}
         className="fixed z-[60] p-4 rounded-xl bg-primary text-primary-foreground shadow-xl transition-all duration-200"
-        style={{
-          top: bubbleTop,
-          left: bubbleLeft,
-          width: BUBBLE_WIDTH,
-          transform: placeAbove ? "translateY(-100%)" : undefined,
-        }}
+        style={{ top: bubbleTop, left: bubbleLeft, width: BUBBLE_WIDTH }}
         data-testid={`${testIdPrefix}-bubble`}
       >
         {coach}
