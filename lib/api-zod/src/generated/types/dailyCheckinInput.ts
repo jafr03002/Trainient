@@ -7,15 +7,35 @@
  */
 
 export interface DailyCheckinInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 20000
+     * @nullable
+     */
   calories?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 200000
+     * @nullable
+     */
   steps?: number | null;
-  /** @nullable */
+  /**
+     * @maxLength 60
+     * @nullable
+     */
   cardioType?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
 }

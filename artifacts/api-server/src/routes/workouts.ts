@@ -4,6 +4,7 @@ import { db, workoutLogsTable, userProfilesTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateWorkoutBody, ListWorkoutsQueryParams } from "@workspace/api-zod";
 import { trainingWeekNumber } from "../lib/trainingWeek";
+import { logDateError } from "../lib/dateWindow";
 
 const router = Router();
 
@@ -34,6 +35,13 @@ router.post("/workouts", requireAuth, async (req, res) => {
   const parsed = CreateWorkoutBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  // Same guard as the other routes that take a client-supplied log date: the zod
+  // pattern only checks the shape, this rejects non-days and the future.
+  const dateError = logDateError(parsed.data.date);
+  if (dateError) {
+    res.status(400).json({ error: dateError });
     return;
   }
   // Compute the week ourselves rather than trusting the client-submitted

@@ -8,6 +8,7 @@
 import type { LoggedSet } from './loggedSet';
 
 export interface LoggedExercise {
+  /** @maxLength 80 */
   name: string;
   muscle: string;
   sets: LoggedSet[];

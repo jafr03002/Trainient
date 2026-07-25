@@ -7,15 +7,39 @@
  */
 
 export interface LoggedSet {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
   setNumber: number;
+  /**
+     * @minimum 0
+     * @maximum 2000
+     */
   weight: number;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   reps?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   repsLeft?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1000
+     * @nullable
+     */
   repsRight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 1
+     * @maximum 10
+     * @nullable
+     */
   rpe?: number | null;
   completed: boolean;
   /** @nullable */

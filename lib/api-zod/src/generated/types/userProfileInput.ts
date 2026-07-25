@@ -8,35 +8,67 @@
 import type { UserProfileInputInjurySeverity } from './userProfileInputInjurySeverity';
 
 export interface UserProfileInput {
+  /** @maxLength 80 */
   name?: string;
   mode: string;
   goal?: string;
   experience?: string;
+  /**
+     * @minimum 1
+     * @maximum 7
+     */
   trainingDays: number;
   equipment?: string[];
-  /** @nullable */
+  /**
+     * @minimum 13
+     * @maximum 120
+     * @nullable
+     */
   age?: number | null;
   /** @nullable */
   sex?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
   /** @nullable */
   weightUnit?: string | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   goalWeight?: number | null;
   /** @nullable */
   activityLevel?: string | null;
   preferredRestDays?: string[];
-  /** @nullable */
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileInputInjurySeverity;
   priorityMuscles?: string[];
-  /** @nullable */
+  /**
+     * @minimum 800
+     * @maximum 10000
+     * @nullable
+     */
   dailyCalorieTarget?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
   dailyStepTarget?: number | null;
   cardioDays?: string[];
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
 }
