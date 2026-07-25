@@ -12,4 +12,9 @@
 // @workspace/api-zod - so Vercel's function bundler never has to resolve the
 // pnpm workspace graph, which is the one thing that doesn't reliably survive
 // pnpm's symlinked node_modules.
-export { default } from "../artifacts/api-server/dist/app.mjs";
+//
+// The bundle is CommonJS (.cjs), not ESM. Vercel compiles this file to
+// CommonJS, and CommonJS cannot require() an ES module - pointing at an .mjs
+// bundle builds fine and then dies on the first request with ERR_REQUIRE_ESM.
+// See the CJS build in artifacts/api-server/build.mjs.
+export { default } from "../artifacts/api-server/dist/app.cjs";

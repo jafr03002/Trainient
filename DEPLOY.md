@@ -88,7 +88,9 @@ never gets rewritten by a version Vercel cannot run.
 
 ## How the build works
 - `vercel.json` runs `pnpm run vercel-build`, which builds the API bundle
-  (`artifacts/api-server/dist/app.mjs`, a self-contained Express app) and the
+  (`artifacts/api-server/dist/app.cjs`, a self-contained Express app - CommonJS
+  because Vercel compiles the function entry to CommonJS, which cannot
+  `require()` an ES module) and the
   frontend (`artifacts/traintent/dist/public`).
 - `api/[...path].ts` is the serverless function; it re-exports that bundle so
   Vercel never has to resolve the pnpm workspace graph.
