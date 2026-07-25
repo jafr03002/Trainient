@@ -281,6 +281,11 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     () => (initialDraft ? findInvalidField(initialDraft.days) : null),
   );
   const [showMuscleConfirm, setShowMuscleConfirm] = useState(false);
+  // A failed save used to be swallowed entirely: performSave had a `finally`
+  // but no `catch`, so a rejected request left the builder sitting there with
+  // no program saved and nothing on screen to say why. Hold the reason here so
+  // the user sees it instead of an apparent no-op.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Mirror every change to localStorage so a reload never loses in-progress
   // program edits - only cleared once the program actually saves.
@@ -379,6 +384,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     };
 
     setSaving(true);
+    setSaveError(null);
     try {
       if (editProgram) {
         // Generated useUpdateProgram has a broken URL (literal :id), so call directly.
@@ -393,6 +399,17 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
       if (draftKey) clearProgramDraft(draftKey);
       onSaved();
+    } catch (err) {
+      // Surface the reason rather than failing silently. ApiError's message
+      // already carries the status and whatever the server chose to return, so
+      // this stays useful for a real failure without inventing a diagnosis.
+      // The draft is deliberately left in place - the work isn't saved, so
+      // clearing it would lose the program the user just built.
+      setSaveError(
+        err instanceof Error
+          ? `Couldn't save your program: ${err.message}`
+          : "Couldn't save your program. Please try again.",
+      );
     } finally {
       setSaving(false);
       setShowMuscleConfirm(false);
@@ -623,6 +640,15 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
         <p className="text-sm text-destructive" data-testid="name-error">
           {fieldError.message}
         </p>
+      )}
+
+      {saveError && (
+        <div
+          className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm"
+          data-testid="save-error"
+        >
+          {saveError}
+        </div>
       )}
 
       {showMuscleConfirm ? (
