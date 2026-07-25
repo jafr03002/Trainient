@@ -54,47 +54,97 @@ export const GetProfileResponse = zod.object({
 /**
  * @summary Create or upsert user profile (called at end of onboarding)
  */
+export const createProfileBodyNameMax = 80;
+
+export const createProfileBodyTrainingDaysMax = 7;
+
+export const createProfileBodyAgeMin = 13;
+export const createProfileBodyAgeMax = 120;
+
+export const createProfileBodyWeightMin = 20;
+export const createProfileBodyWeightMax = 1000;
+
+export const createProfileBodyGoalWeightMin = 20;
+export const createProfileBodyGoalWeightMax = 1000;
+
+export const createProfileBodyInjuriesMax = 1000;
+
+export const createProfileBodyDailyCalorieTargetMin = 800;
+export const createProfileBodyDailyCalorieTargetMax = 10000;
+
+export const createProfileBodyDailyStepTargetMin = 0;
+export const createProfileBodyDailyStepTargetMax = 100000;
+
+export const createProfileBodyCardioMinutesMin = 0;
+export const createProfileBodyCardioMinutesMax = 1440;
+
+
+
 export const CreateProfileBody = zod.object({
-  "name": zod.string().optional(),
+  "name": zod.string().max(createProfileBodyNameMax).optional(),
   "mode": zod.string(),
   "goal": zod.string().optional(),
   "experience": zod.string().optional(),
-  "trainingDays": zod.number(),
+  "trainingDays": zod.number().min(1).max(createProfileBodyTrainingDaysMax),
   "equipment": zod.array(zod.string()).optional(),
-  "age": zod.number().nullish(),
+  "age": zod.number().min(createProfileBodyAgeMin).max(createProfileBodyAgeMax).nullish(),
   "sex": zod.string().nullish(),
-  "weight": zod.number().nullish(),
+  "weight": zod.number().min(createProfileBodyWeightMin).max(createProfileBodyWeightMax).nullish(),
   "weightUnit": zod.string().nullish(),
-  "goalWeight": zod.number().nullish(),
+  "goalWeight": zod.number().min(createProfileBodyGoalWeightMin).max(createProfileBodyGoalWeightMax).nullish(),
   "activityLevel": zod.string().nullish(),
   "preferredRestDays": zod.array(zod.string()).optional(),
-  "injuries": zod.string().nullish(),
+  "injuries": zod.string().max(createProfileBodyInjuriesMax).nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "priorityMuscles": zod.array(zod.string()).optional(),
-  "dailyCalorieTarget": zod.number().nullish(),
-  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().min(createProfileBodyDailyCalorieTargetMin).max(createProfileBodyDailyCalorieTargetMax).nullish(),
+  "dailyStepTarget": zod.number().min(createProfileBodyDailyStepTargetMin).max(createProfileBodyDailyStepTargetMax).nullish(),
   "cardioDays": zod.array(zod.string()).optional(),
-  "cardioMinutes": zod.number().nullish()
+  "cardioMinutes": zod.number().min(createProfileBodyCardioMinutesMin).max(createProfileBodyCardioMinutesMax).nullish()
 })
 
 
 /**
  * @summary Update user profile fields
  */
+export const updateProfileBodyNameMax = 80;
+
+export const updateProfileBodyGoalWeightMin = 20;
+export const updateProfileBodyGoalWeightMax = 1000;
+
+export const updateProfileBodyAgeMin = 13;
+export const updateProfileBodyAgeMax = 120;
+
+export const updateProfileBodyWeightMin = 20;
+export const updateProfileBodyWeightMax = 1000;
+
+export const updateProfileBodyInjuriesMax = 1000;
+
+export const updateProfileBodyDailyCalorieTargetMin = 800;
+export const updateProfileBodyDailyCalorieTargetMax = 10000;
+
+export const updateProfileBodyDailyStepTargetMin = 0;
+export const updateProfileBodyDailyStepTargetMax = 100000;
+
+export const updateProfileBodyCardioMinutesMin = 0;
+export const updateProfileBodyCardioMinutesMax = 1440;
+
+
+
 export const UpdateProfileBody = zod.object({
-  "name": zod.string().optional(),
+  "name": zod.string().max(updateProfileBodyNameMax).optional(),
   "mode": zod.string().optional(),
   "goal": zod.string().optional(),
-  "goalWeight": zod.number().nullish(),
-  "age": zod.number().nullish(),
-  "weight": zod.number().nullish(),
+  "goalWeight": zod.number().min(updateProfileBodyGoalWeightMin).max(updateProfileBodyGoalWeightMax).nullish(),
+  "age": zod.number().min(updateProfileBodyAgeMin).max(updateProfileBodyAgeMax).nullish(),
+  "weight": zod.number().min(updateProfileBodyWeightMin).max(updateProfileBodyWeightMax).nullish(),
   "weightUnit": zod.string().nullish(),
-  "injuries": zod.string().nullish(),
+  "injuries": zod.string().max(updateProfileBodyInjuriesMax).nullish(),
   "injurySeverity": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
-  "dailyCalorieTarget": zod.number().nullish(),
-  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().min(updateProfileBodyDailyCalorieTargetMin).max(updateProfileBodyDailyCalorieTargetMax).nullish(),
+  "dailyStepTarget": zod.number().min(updateProfileBodyDailyStepTargetMin).max(updateProfileBodyDailyStepTargetMax).nullish(),
   "cardioDays": zod.array(zod.string()).optional(),
-  "cardioMinutes": zod.number().nullish(),
+  "cardioMinutes": zod.number().min(updateProfileBodyCardioMinutesMin).max(updateProfileBodyCardioMinutesMax).nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
@@ -140,6 +190,18 @@ export const GetCurrentProgramQueryParams = zod.object({
   "lineage": zod.enum(['ai', 'manual']).optional().describe('Resolve \"current\" within this explicit lineage instead of the caller\'s active mode - lets either mode\'s program page view its own lineage without switching modes.')
 })
 
+export const getCurrentProgramResponseDaysItemLabelMax = 60;
+
+export const getCurrentProgramResponseDaysItemFocusMax = 60;
+
+export const getCurrentProgramResponseDaysItemExercisesItemNameMax = 80;
+
+export const getCurrentProgramResponseDaysItemExercisesItemSetsMax = 50;
+
+export const getCurrentProgramResponseDaysItemExercisesItemRepsMax = 50;
+
+
+
 export const GetCurrentProgramResponse = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -153,12 +215,12 @@ export const GetCurrentProgramResponse = zod.object({
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(getCurrentProgramResponseDaysItemLabelMax),
+  "focus": zod.string().max(getCurrentProgramResponseDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(getCurrentProgramResponseDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(getCurrentProgramResponseDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(getCurrentProgramResponseDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -193,6 +255,18 @@ export const GetCurrentProgramResponse = zod.object({
 /**
  * @summary List all programs for the user
  */
+export const listProgramsResponseDaysItemLabelMax = 60;
+
+export const listProgramsResponseDaysItemFocusMax = 60;
+
+export const listProgramsResponseDaysItemExercisesItemNameMax = 80;
+
+export const listProgramsResponseDaysItemExercisesItemSetsMax = 50;
+
+export const listProgramsResponseDaysItemExercisesItemRepsMax = 50;
+
+
+
 export const ListProgramsResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -206,12 +280,12 @@ export const ListProgramsResponseItem = zod.object({
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(listProgramsResponseDaysItemLabelMax),
+  "focus": zod.string().max(listProgramsResponseDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(listProgramsResponseDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(listProgramsResponseDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(listProgramsResponseDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -251,6 +325,16 @@ export const createManualProgramBodyProgramNameMax = 120;
 
 export const createManualProgramBodySplitTypeMax = 80;
 
+export const createManualProgramBodyDaysItemLabelMax = 60;
+
+export const createManualProgramBodyDaysItemFocusMax = 60;
+
+export const createManualProgramBodyDaysItemExercisesItemNameMax = 80;
+
+export const createManualProgramBodyDaysItemExercisesItemSetsMax = 50;
+
+export const createManualProgramBodyDaysItemExercisesItemRepsMax = 50;
+
 
 
 export const CreateManualProgramBody = zod.object({
@@ -258,12 +342,12 @@ export const CreateManualProgramBody = zod.object({
   "splitType": zod.string().max(createManualProgramBodySplitTypeMax),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(createManualProgramBodyDaysItemLabelMax),
+  "focus": zod.string().max(createManualProgramBodyDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(createManualProgramBodyDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(createManualProgramBodyDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(createManualProgramBodyDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -297,6 +381,16 @@ export const updateProgramBodyProgramNameMax = 120;
 
 export const updateProgramBodySplitTypeMax = 80;
 
+export const updateProgramBodyDaysItemLabelMax = 60;
+
+export const updateProgramBodyDaysItemFocusMax = 60;
+
+export const updateProgramBodyDaysItemExercisesItemNameMax = 80;
+
+export const updateProgramBodyDaysItemExercisesItemSetsMax = 50;
+
+export const updateProgramBodyDaysItemExercisesItemRepsMax = 50;
+
 
 
 export const UpdateProgramBody = zod.object({
@@ -304,12 +398,12 @@ export const UpdateProgramBody = zod.object({
   "splitType": zod.string().max(updateProgramBodySplitTypeMax),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(updateProgramBodyDaysItemLabelMax),
+  "focus": zod.string().max(updateProgramBodyDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(updateProgramBodyDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(updateProgramBodyDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(updateProgramBodyDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -319,6 +413,18 @@ export const UpdateProgramBody = zod.object({
 }))
 }))
 })
+
+export const updateProgramResponseDaysItemLabelMax = 60;
+
+export const updateProgramResponseDaysItemFocusMax = 60;
+
+export const updateProgramResponseDaysItemExercisesItemNameMax = 80;
+
+export const updateProgramResponseDaysItemExercisesItemSetsMax = 50;
+
+export const updateProgramResponseDaysItemExercisesItemRepsMax = 50;
+
+
 
 export const UpdateProgramResponse = zod.object({
   "id": zod.number(),
@@ -333,12 +439,12 @@ export const UpdateProgramResponse = zod.object({
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(updateProgramResponseDaysItemLabelMax),
+  "focus": zod.string().max(updateProgramResponseDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(updateProgramResponseDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(updateProgramResponseDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(updateProgramResponseDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -381,6 +487,18 @@ export const SetProgramStartDateBody = zod.object({
   "startDate": zod.coerce.date()
 })
 
+export const setProgramStartDateResponseDaysItemLabelMax = 60;
+
+export const setProgramStartDateResponseDaysItemFocusMax = 60;
+
+export const setProgramStartDateResponseDaysItemExercisesItemNameMax = 80;
+
+export const setProgramStartDateResponseDaysItemExercisesItemSetsMax = 50;
+
+export const setProgramStartDateResponseDaysItemExercisesItemRepsMax = 50;
+
+
+
 export const SetProgramStartDateResponse = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -394,12 +512,12 @@ export const SetProgramStartDateResponse = zod.object({
   "aiGenerated": zod.boolean(),
   "days": zod.array(zod.object({
   "dayNumber": zod.number(),
-  "label": zod.string(),
-  "focus": zod.string(),
+  "label": zod.string().max(setProgramStartDateResponseDaysItemLabelMax),
+  "focus": zod.string().max(setProgramStartDateResponseDaysItemFocusMax),
   "exercises": zod.array(zod.object({
-  "name": zod.string(),
-  "sets": zod.number(),
-  "reps": zod.string(),
+  "name": zod.string().max(setProgramStartDateResponseDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(setProgramStartDateResponseDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(setProgramStartDateResponseDaysItemExercisesItemRepsMax),
   "rpe": zod.number().nullish(),
   "restSeconds": zod.number().nullish(),
   "cue": zod.string().nullish(),
@@ -442,6 +560,26 @@ export const ListWorkoutsQueryParams = zod.object({
   "offset": zod.coerce.number().default(listWorkoutsQueryOffsetDefault)
 })
 
+export const listWorkoutsResponseExercisesLoggedItemNameMax = 80;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemWeightMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemSetsItemWeightMax = 2000;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsMax = 1000;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMax = 1000;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax = 1000;
+
+export const listWorkoutsResponseExercisesLoggedItemSetsItemRpeMax = 10;
+
+
+
 export const ListWorkoutsResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -451,15 +589,15 @@ export const ListWorkoutsResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
-  "name": zod.string(),
+  "name": zod.string().max(listWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
   "sets": zod.array(zod.object({
-  "setNumber": zod.number(),
-  "weight": zod.number(),
-  "reps": zod.number().nullish(),
-  "repsLeft": zod.number().nullish(),
-  "repsRight": zod.number().nullish(),
-  "rpe": zod.number().nullish(),
+  "setNumber": zod.number().min(1).max(listWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax),
+  "weight": zod.number().min(listWorkoutsResponseExercisesLoggedItemSetsItemWeightMin).max(listWorkoutsResponseExercisesLoggedItemSetsItemWeightMax),
+  "reps": zod.number().min(listWorkoutsResponseExercisesLoggedItemSetsItemRepsMin).max(listWorkoutsResponseExercisesLoggedItemSetsItemRepsMax).nullish(),
+  "repsLeft": zod.number().min(listWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMin).max(listWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMax).nullish(),
+  "repsRight": zod.number().min(listWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMin).max(listWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax).nullish(),
+  "rpe": zod.number().min(1).max(listWorkoutsResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
 }))
@@ -473,32 +611,77 @@ export const ListWorkoutsResponse = zod.array(ListWorkoutsResponseItem)
 /**
  * @summary Save a completed workout
  */
+export const createWorkoutBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkoutBodyDayLabelMax = 60;
+
+export const createWorkoutBodyExercisesLoggedItemNameMax = 80;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemSetNumberMax = 50;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemWeightMin = 0;
+export const createWorkoutBodyExercisesLoggedItemSetsItemWeightMax = 2000;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsMin = 0;
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsMax = 1000;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsLeftMin = 0;
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsLeftMax = 1000;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsRightMin = 0;
+export const createWorkoutBodyExercisesLoggedItemSetsItemRepsRightMax = 1000;
+
+export const createWorkoutBodyExercisesLoggedItemSetsItemRpeMax = 10;
+
+export const createWorkoutBodyNotesMax = 2000;
+
+
+
 export const CreateWorkoutBody = zod.object({
-  "date": zod.string(),
+  "date": zod.string().regex(createWorkoutBodyDateRegExp),
   "dayNumber": zod.number(),
   "weekNumber": zod.number(),
-  "dayLabel": zod.string().nullish(),
+  "dayLabel": zod.string().max(createWorkoutBodyDayLabelMax).nullish(),
   "exercisesLogged": zod.array(zod.object({
-  "name": zod.string(),
+  "name": zod.string().max(createWorkoutBodyExercisesLoggedItemNameMax),
   "muscle": zod.string(),
   "sets": zod.array(zod.object({
-  "setNumber": zod.number(),
-  "weight": zod.number(),
-  "reps": zod.number().nullish(),
-  "repsLeft": zod.number().nullish(),
-  "repsRight": zod.number().nullish(),
-  "rpe": zod.number().nullish(),
+  "setNumber": zod.number().min(1).max(createWorkoutBodyExercisesLoggedItemSetsItemSetNumberMax),
+  "weight": zod.number().min(createWorkoutBodyExercisesLoggedItemSetsItemWeightMin).max(createWorkoutBodyExercisesLoggedItemSetsItemWeightMax),
+  "reps": zod.number().min(createWorkoutBodyExercisesLoggedItemSetsItemRepsMin).max(createWorkoutBodyExercisesLoggedItemSetsItemRepsMax).nullish(),
+  "repsLeft": zod.number().min(createWorkoutBodyExercisesLoggedItemSetsItemRepsLeftMin).max(createWorkoutBodyExercisesLoggedItemSetsItemRepsLeftMax).nullish(),
+  "repsRight": zod.number().min(createWorkoutBodyExercisesLoggedItemSetsItemRepsRightMin).max(createWorkoutBodyExercisesLoggedItemSetsItemRepsRightMax).nullish(),
+  "rpe": zod.number().min(1).max(createWorkoutBodyExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
 }))
 })),
-  "notes": zod.string().nullish()
+  "notes": zod.string().max(createWorkoutBodyNotesMax).nullish()
 })
 
 
 /**
  * @summary Get the 3 most recent workout logs (dashboard use)
  */
+export const getRecentWorkoutsResponseExercisesLoggedItemNameMax = 80;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemWeightMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemWeightMax = 2000;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsMax = 1000;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMax = 1000;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax = 1000;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRpeMax = 10;
+
+
+
 export const GetRecentWorkoutsResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -508,15 +691,15 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
-  "name": zod.string(),
+  "name": zod.string().max(getRecentWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
   "sets": zod.array(zod.object({
-  "setNumber": zod.number(),
-  "weight": zod.number(),
-  "reps": zod.number().nullish(),
-  "repsLeft": zod.number().nullish(),
-  "repsRight": zod.number().nullish(),
-  "rpe": zod.number().nullish(),
+  "setNumber": zod.number().min(1).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax),
+  "weight": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemSetsItemWeightMin).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemWeightMax),
+  "reps": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsMin).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsMax).nullish(),
+  "repsLeft": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMin).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsLeftMax).nullish(),
+  "repsRight": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMin).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax).nullish(),
+  "rpe": zod.number().min(1).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
 }))
@@ -545,6 +728,26 @@ export const GetWorkoutsByDayLabelQueryParams = zod.object({
   "label": zod.coerce.string()
 })
 
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemNameMax = 80;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemWeightMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemWeightMax = 2000;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsMax = 1000;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsLeftMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsLeftMax = 1000;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsRightMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsRightMax = 1000;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRpeMax = 10;
+
+
+
 export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.string(),
@@ -554,15 +757,15 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "exercisesLogged": zod.array(zod.object({
-  "name": zod.string(),
+  "name": zod.string().max(getWorkoutsByDayLabelResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
   "sets": zod.array(zod.object({
-  "setNumber": zod.number(),
-  "weight": zod.number(),
-  "reps": zod.number().nullish(),
-  "repsLeft": zod.number().nullish(),
-  "repsRight": zod.number().nullish(),
-  "rpe": zod.number().nullish(),
+  "setNumber": zod.number().min(1).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemSetNumberMax),
+  "weight": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemWeightMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemWeightMax),
+  "reps": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsMax).nullish(),
+  "repsLeft": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsLeftMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsLeftMax).nullish(),
+  "repsRight": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsRightMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsRightMax).nullish(),
+  "rpe": zod.number().min(1).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
 }))
@@ -753,9 +956,15 @@ export const ListTrackedExercisesResponse = zod.array(ListTrackedExercisesRespon
 /**
  * @summary Log (upsert) the bodyweight entry for a given date
  */
+export const logBodyweightBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const logBodyweightBodyWeightMin = 20;
+export const logBodyweightBodyWeightMax = 1000;
+
+
+
 export const LogBodyweightBody = zod.object({
-  "date": zod.string(),
-  "weight": zod.number()
+  "date": zod.string().regex(logBodyweightBodyDateRegExp),
+  "weight": zod.number().min(logBodyweightBodyWeightMin).max(logBodyweightBodyWeightMax)
 })
 
 export const LogBodyweightResponse = zod.object({
@@ -813,13 +1022,30 @@ export const GetGoalProgressResponse = zod.object({
 /**
  * @summary Log (upsert) today's calories/steps/cardio, and optionally bodyweight, in one call
  */
+export const submitDailyCheckinBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const submitDailyCheckinBodyWeightMin = 20;
+export const submitDailyCheckinBodyWeightMax = 1000;
+
+export const submitDailyCheckinBodyCaloriesMin = 0;
+export const submitDailyCheckinBodyCaloriesMax = 20000;
+
+export const submitDailyCheckinBodyStepsMin = 0;
+export const submitDailyCheckinBodyStepsMax = 200000;
+
+export const submitDailyCheckinBodyCardioTypeMax = 60;
+
+export const submitDailyCheckinBodyCardioMinutesMin = 0;
+export const submitDailyCheckinBodyCardioMinutesMax = 1440;
+
+
+
 export const SubmitDailyCheckinBody = zod.object({
-  "date": zod.string(),
-  "weight": zod.number().nullish(),
-  "calories": zod.number().nullish(),
-  "steps": zod.number().nullish(),
-  "cardioType": zod.string().nullish(),
-  "cardioMinutes": zod.number().nullish()
+  "date": zod.string().regex(submitDailyCheckinBodyDateRegExp),
+  "weight": zod.number().min(submitDailyCheckinBodyWeightMin).max(submitDailyCheckinBodyWeightMax).nullish(),
+  "calories": zod.number().min(submitDailyCheckinBodyCaloriesMin).max(submitDailyCheckinBodyCaloriesMax).nullish(),
+  "steps": zod.number().min(submitDailyCheckinBodyStepsMin).max(submitDailyCheckinBodyStepsMax).nullish(),
+  "cardioType": zod.string().max(submitDailyCheckinBodyCardioTypeMax).nullish(),
+  "cardioMinutes": zod.number().min(submitDailyCheckinBodyCardioMinutesMin).max(submitDailyCheckinBodyCardioMinutesMax).nullish()
 })
 
 export const SubmitDailyCheckinResponse = zod.object({

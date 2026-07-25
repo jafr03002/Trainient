@@ -8,27 +8,55 @@
 import type { UserProfileUpdateInjurySeverity } from './userProfileUpdateInjurySeverity';
 
 export interface UserProfileUpdate {
+  /** @maxLength 80 */
   name?: string;
   mode?: string;
   goal?: string;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   goalWeight?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 13
+     * @maximum 120
+     * @nullable
+     */
   age?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 20
+     * @maximum 1000
+     * @nullable
+     */
   weight?: number | null;
   /** @nullable */
   weightUnit?: string | null;
-  /** @nullable */
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
   injuries?: string | null;
   /** @nullable */
   injurySeverity?: UserProfileUpdateInjurySeverity;
-  /** @nullable */
+  /**
+     * @minimum 800
+     * @maximum 10000
+     * @nullable
+     */
   dailyCalorieTarget?: number | null;
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
   dailyStepTarget?: number | null;
   cardioDays?: string[];
-  /** @nullable */
+  /**
+     * @minimum 0
+     * @maximum 1440
+     * @nullable
+     */
   cardioMinutes?: number | null;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;

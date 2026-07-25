@@ -8,12 +8,19 @@
 import type { LoggedExercise } from './loggedExercise';
 
 export interface WorkoutLogInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
   date: string;
   dayNumber: number;
   weekNumber: number;
-  /** @nullable */
+  /**
+     * @maxLength 60
+     * @nullable
+     */
   dayLabel?: string | null;
   exercisesLogged: LoggedExercise[];
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   notes?: string | null;
 }
