@@ -39,7 +39,9 @@ function addDaysToDateString(dateStr: string, days: number): string {
 // submission it's upserted into bodyweightLogsTable too (same table the
 // dedicated bodyweight card already reads/writes), so the "one form, one
 // save button" UI maps to one API call touching both tables.
-router.post("/daily-checkin", requireAuth, async (req, res) => {
+// `/daily-logs` is an alias so API consumers who mirror the `GET /daily-logs/week`
+// read path can POST to the matching noun instead of hitting a 404.
+router.post(["/daily-checkin", "/daily-logs"], requireAuth, async (req, res) => {
   const userId = getUserId(req);
   const parsed = SubmitDailyCheckinBody.safeParse(req.body);
   if (!parsed.success) {

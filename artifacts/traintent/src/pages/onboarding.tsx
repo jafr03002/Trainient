@@ -1090,22 +1090,26 @@ export default function Onboarding() {
                           );
                         })}
                       </div>
-                      {form.cardioDays.length > 0 && (
-                        <div className="mt-3 flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">Minutes each day:</span>
-                          <div className="flex items-center gap-2 px-3 rounded-xl border border-border bg-card focus-within:border-primary w-28">
-                            <input
-                              type="number"
-                              value={form.cardioMinutes}
-                              onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
-                              placeholder="e.g. 25"
-                              className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
-                              data-testid="input-target-cardio-minutes"
-                            />
-                            <span className="text-sm text-muted-foreground shrink-0">min</span>
+                      {(() => {
+                        const hasDays = form.cardioDays.length > 0;
+                        return (
+                          <div className={`mt-3 flex items-center gap-2 transition-opacity ${hasDays ? "opacity-100" : "opacity-40"}`}>
+                            <span className="text-sm text-muted-foreground">Minutes each day:</span>
+                            <div className="flex items-center gap-2 px-3 rounded-xl border border-border bg-card focus-within:border-primary w-28">
+                              <input
+                                type="number"
+                                value={form.cardioMinutes}
+                                onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
+                                placeholder="e.g. 25"
+                                disabled={!hasDays}
+                                className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+                                data-testid="input-target-cardio-minutes"
+                              />
+                              <span className="text-sm text-muted-foreground shrink-0">min</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
 

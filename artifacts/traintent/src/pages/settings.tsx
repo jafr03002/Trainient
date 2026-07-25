@@ -154,7 +154,7 @@ export default function Settings() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground mt-1">{user?.primaryEmailAddress?.emailAddress}</p>
       </motion.div>
@@ -163,7 +163,7 @@ export default function Settings() {
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.06 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.06 }}
         className="p-5 rounded-xl bg-card border border-border space-y-5"
       >
         <h2 className="font-semibold text-foreground">Profile</h2>
@@ -238,7 +238,7 @@ export default function Settings() {
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
         className="p-5 rounded-xl bg-card border border-border space-y-4"
       >
         <h2 className="font-semibold text-foreground">Training mode</h2>
@@ -312,7 +312,7 @@ export default function Settings() {
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
           className="p-5 rounded-xl bg-card border border-border space-y-4"
         >
           <div>
@@ -349,7 +349,7 @@ export default function Settings() {
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.12 }}
         className="p-5 rounded-xl bg-card border border-border space-y-4"
       >
         <h2 className="font-semibold text-foreground">Subscription</h2>
@@ -407,7 +407,7 @@ export default function Settings() {
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.16 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.16 }}
         className="p-5 rounded-xl bg-card border border-destructive/20 space-y-4"
         data-testid="danger-zone"
       >

@@ -8,6 +8,7 @@ import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListW
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { toast } from "@/hooks/use-toast";
 
 type LoggedSet = {
   setNumber: number;
@@ -413,6 +414,14 @@ export default function Log() {
     });
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
+    const loggedCount = logs.filter((ex) => ex.name.trim()).length;
+    toast({
+      title: "Workout saved 🎉",
+      description:
+        sessionPrCount > 0
+          ? `${sessionPrCount} new PR${sessionPrCount > 1 ? "s" : ""}! Nice work.`
+          : `${loggedCount} exercise${loggedCount === 1 ? "" : "s"} logged.`,
+    });
     setLocation("/dashboard");
   }
 
