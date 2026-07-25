@@ -706,9 +706,17 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
+  // In Independent mode the user reaches this page straight from the empty-state
+  // tour (my.tsx), which already opened with "This is your program page…", so
+  // repeating that intro here reads as two overlapping tours. Drop it and open
+  // on the real program. AI mode has no empty-state tour (the program is
+  // generated), so it keeps the page intro as its first step.
+  const isIndependent = profileQuery.data?.mode === "independent";
   const programTourSteps: CoachmarkStep[] = [
-    { kind: "center", text: "Here is your program page where you will find your programs." },
-    { target: tourDayTabsRef, text: "Here is your program." },
+    ...(isIndependent
+      ? []
+      : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
+    { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
     { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
