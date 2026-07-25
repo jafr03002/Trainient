@@ -20,6 +20,7 @@ import {
   getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
 import { toast } from "@/hooks/use-toast";
 
 const DEFAULT_COLORS = [
@@ -68,15 +69,33 @@ export default function Settings() {
     }
   }, [calendarColors.data]);
 
+  // Same plausibility bands the API enforces, checked here so the user sees the
+  // problem under the field instead of a failed save.
+  const ageError = rangeError(age, FIELD_LIMITS.age);
+  const weightError = rangeError(weight, FIELD_LIMITS.weight);
+
   async function handleSave() {
-    await updateProfile.mutateAsync({
-      data: {
-        name: name || undefined,
-        weight: weight ? parseFloat(weight) : undefined,
-        weightUnit,
-        age: age ? parseInt(age) : undefined,
-      },
-    });
+    if (ageError || weightError) return;
+    try {
+      await updateProfile.mutateAsync({
+        data: {
+          name: name || undefined,
+          weight: weight ? parseFloat(weight) : undefined,
+          weightUnit,
+          age: age ? parseInt(age) : undefined,
+        },
+      });
+    } catch {
+      // A profile saved before the ranges existed can still hold an impossible
+      // value (age 999), which the server now rejects on the way back in. Without
+      // this the save just silently did nothing.
+      toast({
+        title: "Couldn't save your profile",
+        description: "Check that your age and weight look right, then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -174,6 +193,7 @@ export default function Settings() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={MAX_PROFILE_NAME}
             placeholder="Your name"
             className="w-full px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             data-testid="input-name"
@@ -188,9 +208,14 @@ export default function Settings() {
               value={age}
               onChange={(e) => setAge(e.target.value)}
               placeholder="e.g. 28"
-              className="w-full px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+              className={`w-full px-4 py-2.5 rounded-xl border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                ageError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
+              }`}
               data-testid="input-settings-age"
             />
+            {ageError && (
+              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-settings-age-error">{ageError}</p>
+            )}
           </div>
           <div className="min-w-0">
             <label className="text-sm font-medium text-muted-foreground block mb-1.5">Weight</label>
@@ -200,7 +225,9 @@ export default function Settings() {
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="e.g. 80"
-                className="flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                  weightError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
+                }`}
                 data-testid="input-settings-weight"
               />
               <div className="flex rounded-xl border border-border overflow-hidden">
@@ -220,12 +247,15 @@ export default function Settings() {
                 ))}
               </div>
             </div>
+            {weightError && (
+              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-settings-weight-error">{weightError}</p>
+            )}
           </div>
         </div>
 
         <button
           onClick={handleSave}
-          disabled={updateProfile.isPending}
+          disabled={updateProfile.isPending || !!ageError || !!weightError}
           className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
           data-testid="button-save-profile"
         >

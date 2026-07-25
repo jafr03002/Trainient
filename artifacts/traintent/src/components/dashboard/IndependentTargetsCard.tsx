@@ -18,6 +18,7 @@ import {
   orderCardioDays,
   type IndependentPhase,
 } from "@/lib/independentTargets";
+import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
 import { toast } from "@/hooks/use-toast";
 
 // The editable "targets" box for Independent mode. AI mode gets these numbers
@@ -82,8 +83,16 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
 
   const goalError = phaseGoalWeightError(phase, profile.weight, goalWeight, weightUnit);
 
+  // The same plausibility bands the API enforces, so an out-of-range target is
+  // caught here rather than coming back as a 400. Blank stays valid - clearing a
+  // target is how you remove it.
+  const caloriesError = rangeError(calories, FIELD_LIMITS.dailyCalorieTarget);
+  const stepsError = rangeError(steps, FIELD_LIMITS.dailyStepTarget);
+  const cardioMinutesError = cardioDays.length ? rangeError(cardioMinutes, FIELD_LIMITS.cardioMinutes) : null;
+  const hasRangeError = !!caloriesError || !!stepsError || !!cardioMinutesError;
+
   async function handleSave() {
-    if (goalError) return;
+    if (goalError || hasRangeError) return;
     const cal = calories ? parseInt(calories, 10) : null;
     const stp = steps ? parseInt(steps, 10) : null;
     const min = cardioMinutes ? parseInt(cardioMinutes, 10) : null;
@@ -214,7 +223,9 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5 mb-5">
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Calorie target</label>
-              <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
+                caloriesError ? "border-destructive" : "border-border focus-within:border-primary"
+              }`}>
                 <input
                   type="number"
                   value={calories}
@@ -225,10 +236,15 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                 />
                 <span className="text-xs text-muted-foreground shrink-0">kcal / day</span>
               </div>
+              {caloriesError && (
+                <p className="text-xs font-medium text-destructive mt-1.5" data-testid="text-targets-calories-error">{caloriesError}</p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Step target</label>
-              <div className="mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
+                stepsError ? "border-destructive" : "border-border focus-within:border-primary"
+              }`}>
                 <input
                   type="number"
                   value={steps}
@@ -239,6 +255,9 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                 />
                 <span className="text-xs text-muted-foreground shrink-0">steps / day</span>
               </div>
+              {stepsError && (
+                <p className="text-xs font-medium text-destructive mt-1.5" data-testid="text-targets-steps-error">{stepsError}</p>
+              )}
             </div>
           </div>
 
@@ -266,7 +285,9 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                 );
               })}
             </div>
-            <div className="flex items-center gap-1.5 h-11 w-32 shrink-0 rounded-xl border border-border bg-secondary/30 px-3 focus-within:border-primary">
+            <div className={`flex items-center gap-1.5 h-11 w-32 shrink-0 rounded-xl border bg-secondary/30 px-3 ${
+              cardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
+            }`}>
               <input
                 type="number"
                 value={cardioMinutes}
@@ -278,9 +299,13 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
               <span className="text-xs text-muted-foreground shrink-0">min</span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Tap the days you'll do cardio; the minutes apply to each of those days.
-          </p>
+          {cardioMinutesError ? (
+            <p className="text-xs font-medium text-destructive mt-2" data-testid="text-targets-cardio-minutes-error">{cardioMinutesError}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-2">
+              Tap the days you'll do cardio; the minutes apply to each of those days.
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 mt-5">
             <button
@@ -293,7 +318,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
             </button>
             <button
               onClick={handleSave}
-              disabled={updateProfile.isPending || !!goalError}
+              disabled={updateProfile.isPending || !!goalError || hasRangeError}
               className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-targets-save"
             >

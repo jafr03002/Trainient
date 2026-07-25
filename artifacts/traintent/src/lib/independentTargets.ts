@@ -4,6 +4,8 @@
 // short-term phase colours in phaseColors.ts, so nothing has to drift:
 //   gain_weight -> bulk (green), general -> maintenance (amber), lose_weight -> diet (pink)
 
+import { FIELD_LIMITS, rangeError } from "./fieldLimits";
+
 export type IndependentPhase = "bulk" | "maintenance" | "diet";
 
 export type PhaseOption = {
@@ -48,6 +50,10 @@ export function phaseGoalWeightError(
   if (!goalWeight.trim()) return "Set a goal weight to continue.";
   const target = parseFloat(goalWeight);
   if (!Number.isFinite(target)) return "Enter a valid goal weight.";
+  // Range before direction, same order as onboarding's goalWeightConflict: telling
+  // someone -50 is "below your current weight" explains nothing about why it's wrong.
+  const outOfRange = rangeError(goalWeight, FIELD_LIMITS.goalWeight);
+  if (outOfRange) return outOfRange;
   const current = currentWeight ?? NaN;
   if (!Number.isFinite(current)) return null; // no current weight to compare against
   if (target === current) {

@@ -6,6 +6,7 @@ import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell } fro
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
+import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
@@ -340,7 +341,11 @@ export default function Log() {
   function updateSet(exIdx: number, setIdx: number, field: "weight" | "reps" | "repsLeft" | "repsRight", value: number) {
     const ex = logs[exIdx];
     const set = ex.sets[setIdx];
-    const merged = { ...set, [field]: value };
+    // Clamped to the bands the API accepts, so a stray minus sign or a held-down
+    // key can't produce a session that silently fails to save (and can't poison
+    // the PR / volume maths that reads these numbers back).
+    const bounded = clampToBounds(value, field === "weight" ? LOGGED_SET_BOUNDS.weight : LOGGED_SET_BOUNDS.reps);
+    const merged = { ...set, [field]: bounded };
 
     const hasReps = ex.isUnilateral ? merged.repsLeft > 0 && merged.repsRight > 0 : merged.reps > 0;
     const completed = merged.weight > 0 && hasReps;
@@ -393,25 +398,36 @@ export default function Log() {
   }
 
   async function finishWorkout() {
-    await createWorkout.mutateAsync({
-      data: {
-        date: new Date().toISOString().split("T")[0],
-        dayNumber: activeDay?.dayNumber ?? 1,
-        weekNumber: program?.weekNumber ?? 1,
-        dayLabel: activeDay?.label ?? null,
-        exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
-          name: ex.name,
-          muscle: ex.muscle,
-          sets: ex.sets.map((s) =>
-            ex.isUnilateral
-              ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
-              : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
-          ),
-          notes: ex.notes || undefined,
-        })),
-        notes: null,
-      } as any,
-    });
+    try {
+      await createWorkout.mutateAsync({
+        data: {
+          date: new Date().toISOString().split("T")[0],
+          dayNumber: activeDay?.dayNumber ?? 1,
+          weekNumber: program?.weekNumber ?? 1,
+          dayLabel: activeDay?.label ?? null,
+          exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
+            name: ex.name,
+            muscle: ex.muscle,
+            sets: ex.sets.map((s) =>
+              ex.isUnilateral
+                ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
+                : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
+            ),
+            notes: ex.notes || undefined,
+          })),
+          notes: null,
+        } as any,
+      });
+    } catch {
+      // Leave the draft and the user on the page - losing a finished session to a
+      // failed request would be far worse than an extra tap on Finish.
+      toast({
+        title: "Couldn't save your workout",
+        description: "Your session is still here. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
     const loggedCount = logs.filter((ex) => ex.name.trim()).length;
@@ -637,6 +653,8 @@ export default function Log() {
                     </div>
                     <input
                       type="number"
+                      min={LOGGED_SET_BOUNDS.weight.min}
+                      max={LOGGED_SET_BOUNDS.weight.max}
                       value={set.weight || ""}
                       onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
                       placeholder="0"
@@ -649,6 +667,8 @@ export default function Log() {
                       <>
                         <input
                           type="number"
+                          min={LOGGED_SET_BOUNDS.reps.min}
+                          max={LOGGED_SET_BOUNDS.reps.max}
                           value={set.repsLeft || ""}
                           onChange={(e) => updateSet(exIdx, setIdx, "repsLeft", parseInt(e.target.value) || 0)}
                           placeholder="0"
@@ -657,6 +677,8 @@ export default function Log() {
                         />
                         <input
                           type="number"
+                          min={LOGGED_SET_BOUNDS.reps.min}
+                          max={LOGGED_SET_BOUNDS.reps.max}
                           value={set.repsRight || ""}
                           onChange={(e) => updateSet(exIdx, setIdx, "repsRight", parseInt(e.target.value) || 0)}
                           placeholder="0"
@@ -667,6 +689,8 @@ export default function Log() {
                     ) : (
                       <input
                         type="number"
+                        min={LOGGED_SET_BOUNDS.reps.min}
+                        max={LOGGED_SET_BOUNDS.reps.max}
                         value={set.reps || ""}
                         onChange={(e) => updateSet(exIdx, setIdx, "reps", parseInt(e.target.value) || 0)}
                         placeholder="0"
