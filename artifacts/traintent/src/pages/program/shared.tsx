@@ -130,7 +130,10 @@ type EditExercise = {
   secondaryMuscle: string;
   isUnilateral: boolean;
 };
-type EditDay = { label: string; exercises: EditExercise[] };
+// `accent` is the day's colour identity, not its position: it is assigned once
+// when the day is created and travels with the day when it's reordered, so
+// moving a day up or down doesn't repaint the whole list.
+type EditDay = { label: string; exercises: EditExercise[]; accent: number };
 
 function newExercise(): EditExercise {
   // Section 1: default sets to 2 in the build-your-own flow.
@@ -139,7 +142,8 @@ function newExercise(): EditExercise {
 
 function programToEditDays(program: { days: unknown }): EditDay[] {
   const days = (program.days as ProgramDay[]) ?? [];
-  return days.map((d) => ({
+  return days.map((d, i) => ({
+    accent: i,
     label: d.label ?? "",
     exercises: (d.exercises ?? []).map((e) => ({
       name: e.name ?? "",
@@ -200,6 +204,16 @@ const DAY_ACCENT_HUES: { h: number; s: number; l: number }[] = [
   { h: 142, s: 71, l: 45 }, // green
 ];
 
+// Colour for a brand new day: the first hue nobody is using, so adding a day
+// never duplicates a colour until every hue is spoken for.
+function nextAccent(days: EditDay[]): number {
+  const taken = new Set(days.map((d) => d.accent % DAY_ACCENT_HUES.length));
+  for (let i = 0; i < DAY_ACCENT_HUES.length; i++) {
+    if (!taken.has(i)) return i;
+  }
+  return days.length % DAY_ACCENT_HUES.length;
+}
+
 function dayAccent(index: number) {
   const { h, s, l } = DAY_ACCENT_HUES[index % DAY_ACCENT_HUES.length];
   return {
@@ -226,7 +240,12 @@ export function loadProgramDraft(key: string): ProgramDraft | null {
     const parsed = JSON.parse(raw) as ProgramDraft;
     if (!parsed || !Array.isArray(parsed.days)) return null;
     if (Date.now() - (parsed.savedAt ?? 0) > PROGRAM_DRAFT_MAX_AGE_MS) return null;
-    return parsed;
+    // Drafts written before days carried an accent fall back to positional
+    // colours, which is exactly what they were being rendered with anyway.
+    return {
+      ...parsed,
+      days: parsed.days.map((d, i) => ({ ...d, accent: typeof d?.accent === "number" ? d.accent : i })),
+    };
   } catch {
     return null;
   }
@@ -272,7 +291,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   const [days, setDays] = useState<EditDay[]>(() =>
     initialDraft
       ? initialDraft.days
-      : editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()] }],
+      : editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()], accent: 0 }],
   );
   const [dragDay, setDragDay] = useState<number | null>(null);
   // The one field currently blocking a save. Seeded from the restored draft (if
@@ -297,6 +316,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   function moveDay(from: number, to: number) {
     if (from === to) return;
     setDays((d) => {
+      if (to < 0 || to >= d.length) return d;
       const next = [...d];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
@@ -305,7 +325,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   }
 
   function addDay() {
-    setDays((d) => [...d, { label: "", exercises: [newExercise()] }]);
+    setDays((d) => [...d, { label: "", exercises: [newExercise()], accent: nextAccent(d) }]);
   }
 
   function removeDay(di: number) {
@@ -462,7 +482,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       </div>
 
       {days.map((day, di) => {
-        const accent = dayAccent(di);
+        const accent = dayAccent(day.accent);
         return (
         <div
           key={di}
@@ -497,18 +517,41 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
               onChange={(e) => updateDay(di, "label", e.target.value)}
               maxLength={MAX_DAY_LABEL}
               placeholder={`Day ${di + 1} name (e.g. Push, Upper A)`}
-              className={`flex-1 px-3 py-2 rounded-lg border bg-secondary/20 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary ${
+              className={`flex-1 min-w-0 px-3 py-2 rounded-lg border bg-secondary/20 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary ${
                 fieldError?.field === "label" && fieldError.day === di ? "border-destructive" : "border-border"
               }`}
               data-testid={`day-name-input-${di}`}
             />
             {days.length > 1 && (
-              <button
-                onClick={() => removeDay(di)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {/* Arrow reorder mirrors the exercise rows and keeps days
+                    reorderable where drag-and-drop is not available (touch). */}
+                <button
+                  onClick={() => moveDay(di, di - 1)}
+                  disabled={di === 0}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                  title="Move day up"
+                  data-testid={`day-move-up-${di}`}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => moveDay(di, di + 1)}
+                  disabled={di === days.length - 1}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                  title="Move day down"
+                  data-testid={`day-move-down-${di}`}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => removeDay(di)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Delete day"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </div>
 
@@ -530,7 +573,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                     onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
                     maxLength={MAX_EXERCISE_NAME}
                     placeholder="Exercise name"
-                    className={`flex-1 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
+                    className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
                       fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
                         ? "border-destructive"
                         : "border-border"
