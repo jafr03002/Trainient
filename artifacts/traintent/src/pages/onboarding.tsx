@@ -550,12 +550,12 @@ export default function Onboarding() {
                 onChange={(e) => { setGoalWeightDraft(e.target.value); setGoalWeightSaveError(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter") saveGoalWeight(); }}
                 placeholder={`Target ${form.weightUnit}`}
-                className={`flex-1 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
                   goalWeightSaveError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
                 }`}
                 data-testid="input-goal-weight"
               />
-              <div className="flex rounded-xl border border-border overflow-hidden">
+              <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
                 {["kg", "lbs"].map((u) => (
                   <button
                     key={u}
@@ -720,12 +720,12 @@ export default function Onboarding() {
                           value={form.weight}
                           onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))}
                           placeholder="e.g. 80"
-                          className={`flex-1 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
+                          className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
                             weightError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
                           }`}
                           data-testid="input-weight"
                         />
-                        <div className="flex rounded-xl border border-border overflow-hidden">
+                        <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
                           {["kg", "lbs"].map((u) => (
                             <button
                               key={u}

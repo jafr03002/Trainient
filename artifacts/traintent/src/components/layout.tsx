@@ -183,13 +183,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             // /program/ai and /program/my).
             const isActive = location === item.href || location.startsWith(`${item.href}/`);
             
+            // px-1 rather than p-1.5: six tabs at the wider padding needed
+            // 304px of a 320px phone's 289px of usable nav width, which pushed
+            // Settings off the right edge.
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 ref={(el) => navTourCtx.registerEl(item.href, "mobile", el)}
                 onClick={() => clickHandlersRef.current[item.href]?.()}
-                className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg ${
+                className={`flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg ${
                   isActive ? "text-primary" : "text-muted-foreground"
                 }`}
               >
