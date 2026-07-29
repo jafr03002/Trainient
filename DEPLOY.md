@@ -52,7 +52,6 @@ so no CORS in play). Postgres is Neon; auth is Clerk.
 | `CLERK_SECRET_KEY` | Clerk `sk_…` | backend |
 | `ANTHROPIC_API_KEY` | Anthropic key | required only if AI is on |
 | `AI_MODE_ENABLED` | `true` | omit to keep AI off (the alpha build) |
-| `BILLING_ENABLED` | `true` | omit to keep billing off (the alpha build) |
 | `STRIPE_SECRET_KEY` | Stripe key | required only if billing is on |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret | required only if billing is on |
 | `CORS_ALLOWED_ORIGINS` | comma-separated | only for genuine cross-origin callers |
