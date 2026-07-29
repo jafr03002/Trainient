@@ -511,6 +511,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                 Day {di + 1}
               </span>
             </div>
+            {/* min-w-0 is load-bearing: a text input's intrinsic width (~212px)
+                is its automatic minimum size, so without it the input refuses to
+                shrink on a phone and shoves the reorder and delete buttons out
+                past the card's right edge. */}
             <input
               type="text"
               value={day.label}

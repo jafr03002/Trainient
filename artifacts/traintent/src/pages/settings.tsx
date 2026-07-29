@@ -175,7 +175,9 @@ export default function Settings() {
     <div className="p-6 max-w-2xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1">{user?.primaryEmailAddress?.emailAddress}</p>
+        {/* An email address has no spaces to wrap at, so a long one runs off the
+            side of a phone screen without break-words. */}
+        <p className="text-muted-foreground mt-1 break-words">{user?.primaryEmailAddress?.emailAddress}</p>
       </motion.div>
 
       {/* Profile */}
@@ -200,7 +202,10 @@ export default function Settings() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* Side by side only from sm up. Two columns on a phone left the weight
+            field ~40px wide and clipped the kg/lbs toggle against the card edge,
+            because the toggle's buttons take ~84px of the ~135px column. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground block mb-1.5">Age</label>
             <input
@@ -230,7 +235,10 @@ export default function Settings() {
                 }`}
                 data-testid="input-settings-weight"
               />
-              <div className="flex rounded-xl border border-border overflow-hidden">
+              {/* shrink-0: overflow-hidden zeroes this box's automatic minimum
+                  size, so without it the toggle shrinks and clips "lbs" in half
+                  rather than letting the input next to it give up the space. */}
+              <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
                 {["kg", "lbs"].map((u) => (
                   <button
                     key={u}
