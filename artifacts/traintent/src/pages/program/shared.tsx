@@ -787,7 +787,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       ? []
       : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
     { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
-    { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
+    { target: tourStartWorkoutRef, text: "Hit this when you're ready to start logging your workout." },
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
