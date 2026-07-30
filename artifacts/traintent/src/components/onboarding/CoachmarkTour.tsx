@@ -12,10 +12,15 @@ import { CoachRobot } from "@/components/CoachRobot";
 //   steps hide the Next button and skip the auto scrollIntoView, so the tour
 //   hands the user off to the real UI instead of driving it for them (see
 //   useNavTourTarget/useNavTourClick in components/layout.tsx).
+// - "awaitAction": the same hand-off, but for an element the page itself owns
+//   (a logged session, a dialog's close button). The page reports the outcome
+//   of the action through `done`, and the step advances when that flips true -
+//   so the user has to really perform it, not just read about it.
 export type CoachmarkStep =
   | { kind?: "info"; target: RefObject<HTMLElement | null>; text: string }
   | { kind: "center"; text: string }
-  | { kind: "navClick"; target: RefObject<HTMLElement | null>; text: string };
+  | { kind: "navClick"; target: RefObject<HTMLElement | null>; text: string }
+  | { kind: "awaitAction"; target: RefObject<HTMLElement | null>; text: string; done: boolean };
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -28,11 +33,11 @@ const BUBBLE_WIDTH = 320;
 
 // Numbered, anchored coachmark sequence - points directly at a real element on
 // the page rather than explaining it in a separate full-screen deck. Shared by
-// the Dashboard, Program, and Log page first-time tours (see the *TourSeenAt
+// the Dashboard, Program, Log and Calendar page first-time tours (see the *TourSeenAt
 // profile fields for how each caller decides whether to render this).
 // Optionally opens with a full-screen `intro` card (Skip / Let's go) before the
-// anchored steps, and a `navClick` final step can end the tour by directing the
-// user to tap a real nav link rather than auto-navigating for them.
+// anchored steps, and a `navClick`/`awaitAction` final step can end the tour by
+// directing the user to tap something real rather than acting for them.
 export function CoachmarkTour({
   steps,
   onDone,
@@ -53,10 +58,11 @@ export function CoachmarkTour({
   const isLast = step === total - 1;
   const current = steps[step];
   const isCenter = current?.kind === "center";
-  // navClick steps hand the user off to a real link, so their backdrop must stay
-  // click-through; every other surface (intro card, centered/anchored bubbles)
-  // can be dismissed by clicking the dimmed backdrop.
-  const dismissable = phase === "intro" || current?.kind !== "navClick";
+  // Steps the user has to act on (a nav link, a session, a close button) need a
+  // click-through backdrop; every other surface (intro card, centered/anchored
+  // bubbles) can be dismissed by clicking the dimmed backdrop.
+  const handsOff = current?.kind === "navClick" || current?.kind === "awaitAction";
+  const dismissable = phase === "intro" || !handsOff;
 
   // Escape always ends the tour, so a user who somehow can't reach Skip/Next
   // (an unusual viewport, a mispositioned bubble) is never trapped behind the
@@ -69,6 +75,20 @@ export function CoachmarkTour({
     return () => window.removeEventListener("keydown", onKey);
   }, [onDone]);
 
+  // An awaitAction step is advanced by the page rather than by a Next button:
+  // the moment it reports the action done, move on (or end the tour if it was
+  // the last step). Latched per step so a `done` that stays true - and an
+  // `onDone` whose identity changes every parent render - can't fire twice.
+  const awaitDone = current?.kind === "awaitAction" && current.done;
+  const settledStepRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (phase !== "steps" || !awaitDone) return;
+    if (settledStepRef.current === step) return;
+    settledStepRef.current = step;
+    if (isLast) onDone();
+    else setStep((s) => s + 1);
+  }, [awaitDone, step, isLast, onDone, phase]);
+
   useLayoutEffect(() => {
     if (phase !== "steps") return;
     // Centered steps aren't anchored to anything - nothing to measure or scroll.
@@ -80,9 +100,11 @@ export function CoachmarkTour({
     const measureNow = () => setRect(measure(el));
     const bringIntoView = () => {
       // Instant (not smooth) so the measurement reflects the settled position
-      // immediately instead of racing a scroll animation. navClick steps aren't
-      // scrolled - the tour hands off to the real nav link the user must tap.
-      if (current.kind !== "navClick") el.scrollIntoView({ block: "center" });
+      // immediately instead of racing a scroll animation. Hand-off steps aren't
+      // scrolled at all: their targets are already on screen (a nav link, an
+      // open dialog), and re-centering on every resize would shift the page out
+      // from under the tap the step is asking the user to make.
+      if (!handsOff) el.scrollIntoView({ block: "center" });
       measureNow();
     };
     bringIntoView();
@@ -111,9 +133,9 @@ export function CoachmarkTour({
   }, [step, phase, rect, current?.text]);
 
   // Dimming backdrop rendered behind every tour surface so the info box stands
-  // out from the page. Clicking it dismisses the tour, except on a navClick
-  // step, where it stays pointer-events-none so it never blocks the real nav
-  // link the user needs to tap.
+  // out from the page. Clicking it dismisses the tour, except on a hand-off
+  // step, where it stays pointer-events-none so it never blocks the real
+  // element the user needs to tap.
   const scrim = (
     <div
       className={`fixed inset-0 z-[60] bg-black/60 ${dismissable ? "" : "pointer-events-none"}`}
@@ -190,7 +212,7 @@ export function CoachmarkTour({
           Skip tour
         </button>
         <div className="flex-1" />
-        {current.kind !== "navClick" && (
+        {!handsOff && (
           <button
             onClick={() => (isLast ? onDone() : setStep((s) => s + 1))}
             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-foreground text-primary hover:opacity-90 transition-opacity"

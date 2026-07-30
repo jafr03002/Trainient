@@ -431,7 +431,7 @@ export default function Log() {
   const logTourSteps: CoachmarkStep[] = [
     { target: tourSetRowRef, text: "Here you can track your weight and reps." },
     ...(!isIndependent ? [{ target: tourHelpRef, text: "Not sure how to perform this exercise? Tap the ? whenever you need it." }] : []),
-    { target: tourFinishRef, text: "This is where you save your workout - and that's the end of the walkthrough." },
+    { target: tourFinishRef, text: "This is where you save your workout." },
   ];
 
   return (
