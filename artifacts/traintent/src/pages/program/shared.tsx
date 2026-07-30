@@ -24,6 +24,16 @@ import {
 } from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { DiscardSessionDialog } from "@/components/workout/DiscardSessionDialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 
@@ -254,6 +264,47 @@ function clearProgramDraft(key: string) {
   }
 }
 
+// Canonical, order- and whitespace-independent form of a builder state, so
+// "does this draft actually differ from the saved program?" can't be answered
+// wrongly by key order or a stray space. Defensive about missing fields: drafts
+// are read back from localStorage and may predate any of them.
+function serializeBuilderState(programName: string, days: EditDay[]): string {
+  return JSON.stringify([
+    (programName ?? "").trim(),
+    (days ?? []).map((d) => [
+      (d.label ?? "").trim(),
+      (d.exercises ?? []).map((e) => [
+        (e.name ?? "").trim(),
+        (e.sets ?? "").trim(),
+        (e.reps ?? "").trim(),
+        e.muscle ?? "",
+        e.secondaryMuscle ?? "",
+        !!e.isUnilateral,
+      ]),
+    ]),
+  ]);
+}
+
+// What the builder opens on before the user touches anything: the saved program
+// when editing, or one blank day when creating.
+function baselineBuilderState(program?: { programName: string; days: unknown } | null): string {
+  return program
+    ? serializeBuilderState(program.programName, programToEditDays(program))
+    : serializeBuilderState("", [{ label: "", exercises: [newExercise()] }]);
+}
+
+// True only for a draft holding work that isn't already saved. The program page
+// uses this - not the mere existence of a draft - to decide whether to reopen
+// the builder, so a draft left behind by an earlier version (which saved one
+// unconditionally, even for an untouched editor) can't pin the page to edit mode.
+export function programDraftHasChanges(
+  draft: ProgramDraft | null,
+  program?: { programName: string; days: unknown } | null,
+): boolean {
+  if (!draft) return false;
+  return serializeBuilderState(draft.programName, draft.days) !== baselineBuilderState(program);
+}
+
 type BuilderProps = {
   onSaved: () => void;
   onCancel?: () => void;
@@ -292,13 +343,29 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   // no program saved and nothing on screen to say why. Hold the reason here so
   // the user sees it instead of an apparent no-op.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Cancel with unsaved work behind it asks first, rather than silently
+  // throwing the edits away.
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Mirror every change to localStorage so a reload never loses in-progress
-  // program edits - only cleared once the program actually saves.
+  // Anything on screen that differs from what's already saved is unsaved work -
+  // the baseline is the saved program (or a blank day), never the restored draft.
+  const baseline = useRef(baselineBuilderState(editProgram)).current;
+  const isDirty = serializeBuilderState(programName, days) !== baseline;
+
+  // Mirror unsaved changes to localStorage so a reload never loses in-progress
+  // program edits. A draft is *only* written while the builder differs from
+  // what's already saved: a draft that matches the program is indistinguishable
+  // from "nothing in progress", and my.tsx reads a draft's existence as the
+  // signal to reopen the builder - so merely opening the editor and leaving
+  // would otherwise pin the page to edit mode forever.
   useEffect(() => {
     if (!draftKey) return;
+    if (!isDirty) {
+      clearProgramDraft(draftKey);
+      return;
+    }
     saveProgramDraft(draftKey, programName, days);
-  }, [draftKey, programName, days]);
+  }, [draftKey, programName, days, isDirty]);
 
   function moveDay(from: number, to: number) {
     if (from === to) return;
@@ -452,6 +519,24 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }
 
     performSave();
+  }
+
+  // Cancel means "forget these edits", so the draft has to go with them -
+  // leaving it behind used to bounce the user straight back into the builder
+  // the next time the program page mounted (start a workout, log or discard it,
+  // come back, and the edit view was waiting there as if Cancel never happened).
+  function discardEdits() {
+    if (draftKey) clearProgramDraft(draftKey);
+    setShowCancelConfirm(false);
+    onCancel?.();
+  }
+
+  function handleCancel() {
+    if (isDirty) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    discardEdits();
   }
 
   return (
@@ -699,7 +784,8 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
         <div className="flex gap-2">
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
+              data-testid="button-cancel-builder"
               className="px-5 h-12 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
@@ -718,6 +804,34 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
           </button>
         </div>
       )}
+
+      <AlertDialog
+        open={showCancelConfirm}
+        onOpenChange={(next) => { if (!next) setShowCancelConfirm(false); }}
+      >
+        <AlertDialogContent data-testid="dialog-discard-program-edits">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard your changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editProgram
+                ? "Your program stays exactly as it was saved - everything you changed here will be lost."
+                : "The program you've started building won't be saved."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {/* Same footer ordering as DiscardSessionDialog: keep the safe action
+              first on mobile instead of the destructive one. */}
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel data-testid="button-keep-editing">Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={discardEdits}
+              className="bg-red-500/90 text-white hover:bg-red-500"
+              data-testid="button-discard-program-edits"
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
