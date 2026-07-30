@@ -339,14 +339,22 @@ function DayAgendaSheet({ date, sessions, colorFor, onSelect, onClose }: DayAgen
             {sessions.map((session) => {
               const label = session.dayLabel ?? "Workout";
               const color = colorFor(label);
+              const exerciseCount = (session.exercisesLogged as any[]).filter(exerciseHasData).length;
               return (
                 <button
                   key={session.id}
                   onClick={() => onSelect(session)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/60 bg-secondary/20 text-left hover:bg-secondary/40 transition-colors"
+                  data-testid={`day-agenda-session-${session.id}`}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-border/60 bg-secondary/20 text-left hover:bg-secondary/40 transition-colors"
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground truncate">{label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground shrink-0" />
                 </button>
               );
             })}
@@ -434,6 +442,13 @@ export default function Calendar() {
   function prevMonth() { setCurrentDate(new Date(year, month - 1, 1)); }
   function nextMonth() { setCurrentDate(new Date(year, month + 1, 1)); }
 
+  // Mobile tap on a day cell. A lone session opens straight to its detail -
+  // the agenda sheet would just be an extra tap to pick the only option.
+  function openDay(date: string, sessions: WorkoutLog[]) {
+    if (sessions.length === 1) setSelectedSession(sessions[0]);
+    else setDayAgenda({ date, sessions });
+  }
+
   const monthName = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
   const today = new Date().toISOString().split("T")[0];
@@ -510,7 +525,7 @@ export default function Calendar() {
           return (
             <div
               key={idx}
-              className={`min-h-[72px] md:min-h-[88px] p-1.5 rounded-xl border transition-colors ${
+              className={`relative min-h-[72px] md:min-h-[88px] p-1.5 rounded-xl border transition-colors ${
                 !isCurrentMonth
                   ? "border-transparent"
                   : isToday
@@ -570,28 +585,38 @@ export default function Calendar() {
                       );
                     })}
                   </div>
-                  {/* Mobile: dots (capped, +N overflow) - tap opens the day's full agenda */}
+                  {/* Mobile: dots (capped at 3, +N overflow) - purely decorative, the
+                      whole cell is the tap target (see the overlay button below) */}
                   {sessions.length > 0 && (
-                    <button
-                      onClick={() => setDayAgenda({ date: dateStr, sessions })}
-                      className="md:hidden flex flex-wrap items-center gap-1"
-                    >
-                      {sessions.slice(0, 4).map((session) => (
+                    <div className="md:hidden flex flex-wrap items-center gap-1">
+                      {sessions.slice(0, 3).map((session) => (
                         <span
                           key={session.id}
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          className="w-2 h-2 rounded-full shrink-0"
                           style={{ background: getColor(session.dayLabel ?? "Workout", colorMap, allLabels) }}
                         />
                       ))}
-                      {sessions.length > 4 && (
-                        <span className="text-[8px] font-bold text-muted-foreground">+{sessions.length - 4}</span>
+                      {sessions.length > 3 && (
+                        <span className="text-[9px] font-bold text-muted-foreground">+{sessions.length - 3}</span>
                       )}
-                    </button>
+                    </div>
                   )}
                   {showReviewNudge && (
                     <div className="mt-1 px-1 py-0.5 rounded text-[8px] font-semibold leading-tight text-amber-300 bg-amber-500/10 border border-amber-500/25">
                       Calibration review possible
                     </div>
+                  )}
+                  {/* Mobile tap target: the dots alone are a ~6px hit area, so the whole
+                      cell is the button. Safe to overlay - the desktop session pills are
+                      hidden at exactly the widths where this is shown. */}
+                  {sessions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openDay(dateStr, sessions)}
+                      aria-label={`${dayNum} ${monthName} - ${sessions.length} session${sessions.length === 1 ? "" : "s"}: ${sessions.map((s) => s.dayLabel ?? "Workout").join(", ")}`}
+                      data-testid={`day-cell-button-${dateStr}`}
+                      className="md:hidden absolute inset-0 rounded-xl transition-colors active:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
                   )}
                 </>
               )}
