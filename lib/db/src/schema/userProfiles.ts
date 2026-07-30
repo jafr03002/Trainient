@@ -34,6 +34,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   programPageTourSeenAt: timestamp("program_page_tour_seen_at", { withTimezone: true }),
   weightLoggingTourSeenAt: timestamp("weight_logging_tour_seen_at", { withTimezone: true }),
   dashboardTourSeenAt: timestamp("dashboard_tour_seen_at", { withTimezone: true }),
+  calendarTourSeenAt: timestamp("calendar_tour_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

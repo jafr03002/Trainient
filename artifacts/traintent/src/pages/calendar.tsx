@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,8 @@ import {
   useDeleteWorkout,
   useListPrograms,
   useGetProfile,
+  useUpdateProfile,
+  getGetProfileQueryKey,
   getListWorkoutsQueryKey,
   getGetRecentWorkoutsQueryKey,
   getGetWorkoutStatsQueryKey,
@@ -26,6 +28,7 @@ import {
   isReviewPossible,
   CALIBRATION_FAMILY,
 } from "@/lib/calibration";
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 
 const DEFAULT_COLORS = [
   "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -53,6 +56,9 @@ type SessionModalProps = {
   allWorkouts: WorkoutLog[];
   colorHex: string;
   onClose: () => void;
+  // Lets the first-run calendar tour anchor its last step on the close button,
+  // which lives in here rather than on the page.
+  closeButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 // A set with no real data (weight and all rep fields zero/empty).
@@ -90,7 +96,7 @@ function setRepsLabel(s: any): string {
   return `${s.reps ?? 0}`;
 }
 
-function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalProps) {
+function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
   const queryClient = useQueryClient();
   const deleteWorkout = useDeleteWorkout();
@@ -164,7 +170,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
                 <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
               </p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+            <button ref={closeButtonRef} onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -359,6 +365,10 @@ export default function Calendar() {
   const colorsQuery = useGetCalendarColors();
   const programsQuery = useListPrograms();
   const profileQuery = useGetProfile();
+  const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
+  const tourGridRef = useRef<HTMLDivElement>(null);
+  const tourCloseSessionRef = useRef<HTMLButtonElement>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -369,6 +379,34 @@ export default function Calendar() {
   const totalCells = Math.ceil((startPadding + lastDay.getDate()) / 7) * 7;
 
   const workouts = (workoutsQuery.data ?? []) as WorkoutLog[];
+
+  // Final leg of the walkthrough, handed over from the dashboard's "open up your
+  // calendar" nudge once the user has logged a session. Both steps are ones the
+  // user has to carry out - open a session, then close it again - so the tour
+  // ends having actually shown them a past session rather than describing one.
+  const showCalendarTour =
+    !!profileQuery.data && !profileQuery.data.calendarTourSeenAt && workouts.length > 0;
+  const calendarTourSteps: CoachmarkStep[] = [
+    {
+      kind: "awaitAction",
+      target: tourGridRef,
+      text: "Here you can track and look back at your sessions - tap one to open it.",
+      done: !!selectedSession,
+    },
+    {
+      kind: "awaitAction",
+      target: tourCloseSessionRef,
+      text: "And here's that past session in full - tap here to close it.",
+      done: !selectedSession,
+    },
+  ];
+  function finishCalendarTour() {
+    updateProfile.mutate(
+      { data: { calendarTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+  }
+
   // Independent mode has no AI-generated phase lineage - phases/calibration
   // only ever apply to AI mode (mirrors dashboard.tsx's isIndependent gate).
   // Skipping this avoids surfacing a leftover calibration phase from a
@@ -446,7 +484,7 @@ export default function Calendar() {
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div ref={tourGridRef} className="grid grid-cols-7 gap-1">
         {Array.from({ length: totalCells }).map((_, idx) => {
           const dayNum = idx - startPadding + 1;
           const isCurrentMonth = dayNum >= 1 && dayNum <= lastDay.getDate();
@@ -607,7 +645,15 @@ export default function Calendar() {
           allWorkouts={workouts}
           colorHex={getColor(selectedSession.dayLabel ?? "Workout", colorMap, allLabels)}
           onClose={() => setSelectedSession(null)}
+          closeButtonRef={showCalendarTour ? tourCloseSessionRef : undefined}
         />
+      )}
+
+      {/* Rendered after the session modal deliberately: both sit at z-[60], so
+          painting the tour last is what keeps its bubble on top of the open
+          session rather than behind it. */}
+      {showCalendarTour && (
+        <CoachmarkTour steps={calendarTourSteps} onDone={finishCalendarTour} testIdPrefix="calendar-tour" />
       )}
     </div>
   );

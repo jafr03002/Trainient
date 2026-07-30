@@ -99,10 +99,22 @@ export default function Dashboard() {
   const tourBuildProgramRef = useRef<HTMLAnchorElement>(null);
   const tourProgressRef = useRef<HTMLDivElement>(null);
   const programNavTarget = useNavTourTarget("/program");
+  const calendarNavTarget = useNavTourTarget("/calendar");
 
   function finishDashboardTour() {
     updateProfile.mutate(
       { data: { dashboardTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+  }
+
+  // Skipping out of the calendar prompt retires the whole calendar leg - it's a
+  // single nudge, and re-offering it on every dashboard visit would nag. Tapping
+  // the link instead leaves the flag alone: the calendar page's own tour finishes
+  // the leg (and sets it) once the user has opened a session.
+  function skipCalendarLeg() {
+    updateProfile.mutate(
+      { data: { calendarTourSeenAt: new Date().toISOString() } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
     );
   }
@@ -119,6 +131,19 @@ export default function Dashboard() {
   // on whether a program came back (see dashboardTourSteps).
   const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !program.isLoading;
   useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
+
+  // Second leg of the walkthrough, deliberately held back until the user has
+  // actually saved a workout: the calendar is only worth showing once there's a
+  // session on it to look back at. It picks up where the first-run tour left
+  // off, so it waits for that one to be done rather than stacking on top of it.
+  const showCalendarPrompt =
+    !!profile &&
+    !!profile.dashboardTourSeenAt &&
+    !profile.calendarTourSeenAt &&
+    (stats.data?.totalLogged ?? 0) > 0;
+  const calendarPromptSteps: CoachmarkStep[] = [
+    { kind: "navClick", target: calendarNavTarget, text: "Your first session is in the books - open up your calendar." },
+  ];
 
   const todayStr = todayDateString();
   const weekStartStr = startOfWeekDateString();
@@ -726,6 +751,10 @@ export default function Dashboard() {
           testIdPrefix="dashboard-tour"
           intro={{ text: "We're starting a quick tour to show you how the app works." }}
         />
+      )}
+
+      {showCalendarPrompt && (
+        <CoachmarkTour steps={calendarPromptSteps} onDone={skipCalendarLeg} testIdPrefix="calendar-prompt" />
       )}
     </div>
   );
