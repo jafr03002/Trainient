@@ -11,13 +11,19 @@ import {
   getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
+import {
+  type ActiveSessionPointer,
+  resolveActiveSession,
+  discardActiveSession,
+} from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
+import { DiscardSessionDialog } from "@/components/workout/DiscardSessionDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 
@@ -807,8 +813,12 @@ type ProgramWeekViewProps = {
 
 export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
   const [activeDay, setActiveDay] = useState(0);
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
+  // The in-progress session that "Start workout" would have to throw away.
+  const [conflict, setConflict] = useState<ActiveSessionPointer | null>(null);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const logNavTarget = useNavTourTarget("/log");
@@ -841,24 +851,44 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
   const heroToken = day ? dayHeroToken(day) : "var(--primary)";
 
-  const startWorkoutButton = locked ? (
+  // This page is the only way to pick which day to log - the log page itself
+  // shows just the one day it is logging. Only one session can be in progress
+  // at a time, so starting a different day has to offer to discard the current
+  // one rather than silently orphaning it.
+  function handleStartWorkout() {
+    if (!day) return; // also stops the old `?day=undefined` navigation
+    if (locked) {
+      setLockDialogOpen(true);
+      return;
+    }
+    const active = user?.id ? resolveActiveSession(user.id) : null;
+    const isSameSession =
+      !!active &&
+      String(active.pointer.programId) === String(program.id) &&
+      active.pointer.dayNumber === day.dayNumber;
+    if (active && !isSameSession) {
+      setConflict(active.pointer);
+      return;
+    }
+    setLocation(`/log?day=${day.dayNumber}`);
+  }
+
+  // The pointer can name a day of the *other* lineage's program, which this
+  // page can't label - fall back to something generic rather than guessing.
+  const conflictLabel =
+    conflict && String(conflict.programId) === String(program.id)
+      ? days.find((d) => d.dayNumber === conflict.dayNumber)?.label ?? "your other workout"
+      : "your other workout";
+
+  const startWorkoutButton = (
     <button
-      onClick={() => setLockDialogOpen(true)}
+      ref={tourStartWorkoutRef}
+      onClick={handleStartWorkout}
       className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
       data-testid="button-start-workout-program"
     >
       Start workout
     </button>
-  ) : (
-    <Link href={`/log?day=${day?.dayNumber}`} className="block">
-      <button
-        ref={tourStartWorkoutRef}
-        className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
-        data-testid="button-start-workout-program"
-      >
-        Start workout
-      </button>
-    </Link>
   );
 
   return (
@@ -958,6 +988,26 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         open={lockDialogOpen}
         programId={program.id}
         onCancel={() => setLockDialogOpen(false)}
+      />
+
+      <DiscardSessionDialog
+        open={!!conflict}
+        inProgressLabel={conflictLabel}
+        targetLabel={day?.label ?? "this day"}
+        onDismiss={() => setConflict(null)}
+        // Bare `/log`, not `?day=`: the log page re-resolves the active session
+        // against the mode's current program and lands on the right day with
+        // its resume banner - which stays correct even when the session belongs
+        // to the other lineage's program.
+        onKeep={() => {
+          setConflict(null);
+          setLocation("/log");
+        }}
+        onDiscard={() => {
+          if (user?.id) discardActiveSession(user.id);
+          setConflict(null);
+          if (day) setLocation(`/log?day=${day.dayNumber}`);
+        }}
       />
     </div>
   );

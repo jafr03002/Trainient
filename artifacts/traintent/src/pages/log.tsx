@@ -7,114 +7,22 @@ import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
+import {
+  type LoggedExercise,
+  type ActiveSessionPointer,
+  draftKey,
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  saveActiveSession,
+  clearActiveSession,
+  resolveActiveSession,
+} from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
 
-type LoggedSet = {
-  setNumber: number;
-  weight: number;
-  reps: number;
-  repsLeft: number;
-  repsRight: number;
-  completed: boolean;
-  isNewPr: boolean;
-};
-
-type LoggedExercise = {
-  name: string;
-  muscle: string;
-  isUnilateral: boolean;
-  sets: LoggedSet[];
-  targetSets: number;
-  targetReps: string;
-  notes: string;
-  showNotes: boolean;
-};
-
 type PrFlash = { id: number; exercise: string; weight: number };
-
-type WorkoutDraft = {
-  logs: LoggedExercise[];
-  savedAt: number;
-};
-
-type ActiveSessionPointer = {
-  programId: string | number;
-  dayNumber: number;
-};
-
-const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
-
-// Keyed on programId + day only - `weekNumber` is now a live calendar
-// calculation (see api-server's trainingWeek helper) that can roll over
-// mid-session, so it can't be used to identify a draft.
-function draftKey(userId: string, programId: string | number, dayNumber: number): string {
-  return `traintent:workout-draft:${userId}:${programId}:${dayNumber}`;
-}
-
-function activeSessionKey(userId: string): string {
-  return `traintent:workout-draft:active:${userId}`;
-}
-
-// In-progress workout data lives only in memory otherwise, so a lost network
-// connection (which triggers a page/data reload) wipes out everything the
-// user has logged so far. Mirror it to localStorage as they go and restore
-// it on the next mount so a reconnect never erases a session mid-workout.
-function loadDraft(key: string): WorkoutDraft | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as WorkoutDraft;
-    if (!parsed || !Array.isArray(parsed.logs)) return null;
-    if (Date.now() - (parsed.savedAt ?? 0) > DRAFT_MAX_AGE_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function saveDraft(key: string, logs: LoggedExercise[]) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify({ logs, savedAt: Date.now() } as WorkoutDraft));
-  } catch {
-    // localStorage unavailable (e.g. private browsing) - degrade to in-memory only
-  }
-}
-
-function clearDraft(key: string) {
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-function loadActiveSession(userId: string): ActiveSessionPointer | null {
-  try {
-    const raw = window.localStorage.getItem(activeSessionKey(userId));
-    if (!raw) return null;
-    return JSON.parse(raw) as ActiveSessionPointer;
-  } catch {
-    return null;
-  }
-}
-
-function saveActiveSession(userId: string, pointer: ActiveSessionPointer) {
-  try {
-    window.localStorage.setItem(activeSessionKey(userId), JSON.stringify(pointer));
-  } catch {
-    // ignore
-  }
-}
-
-function clearActiveSession(userId: string) {
-  try {
-    window.localStorage.removeItem(activeSessionKey(userId));
-  } catch {
-    // ignore
-  }
-}
 
 // A set with no real data (weight and all rep fields zero/empty) - e.g. an
 // abandoned/empty session - should not count as "last time" or as "started".
@@ -289,17 +197,22 @@ export default function Log() {
 
     let day = requestedDay;
 
-    const active = loadActiveSession(user.id);
-    if (active && (active.programId !== program.id || active.dayNumber !== requestedDay.dayNumber)) {
-      if (active.programId === program.id) {
-        const activeDraft = loadDraft(draftKey(user.id, active.programId, active.dayNumber));
-        const activeDayObj = (program.days as any[]).find((d) => d.dayNumber === active.dayNumber);
-        if (activeDraft && activeDayObj) {
-          day = activeDayObj;
-        } else {
-          clearActiveSession(user.id);
-        }
+    // `resolveActiveSession` already dropped the pointer if its draft is gone,
+    // so anything it returns is a live session on some day.
+    const active = resolveActiveSession(user.id);
+    if (
+      active &&
+      (String(active.pointer.programId) !== String(program.id) ||
+        active.pointer.dayNumber !== requestedDay.dayNumber)
+    ) {
+      const activeDayObj =
+        String(active.pointer.programId) === String(program.id)
+          ? (program.days as any[]).find((d) => d.dayNumber === active.pointer.dayNumber)
+          : undefined;
+      if (activeDayObj) {
+        day = activeDayObj;
       } else {
+        // Belongs to another program, or to a day this program no longer has.
         clearActiveSession(user.id);
       }
     }
@@ -463,29 +376,6 @@ export default function Log() {
     setLocation("/program");
   }
 
-  // Switch which program day the logger is showing. Only offered before the
-  // current sheet has any logged data (the day picker locks once a session is
-  // started - see `sessionStarted` below), so there is never an in-progress
-  // draft to orphan here. Re-seeds `logs` for the target day exactly like the
-  // mount effect, and syncs `?day=` so a reload lands on the same day.
-  function switchDay(targetNum: number) {
-    if (!program?.days || !user?.id) return;
-    if (targetNum === activeDay?.dayNumber) return;
-    const target = (program.days as any[]).find((d) => d.dayNumber === targetNum);
-    if (!target) return;
-
-    const key = draftKey(user.id, program.id, target.dayNumber);
-    initializedKeyRef.current = key;
-    currentDraftKeyRef.current = key;
-    activeSessionRef.current = { programId: program.id, dayNumber: target.dayNumber };
-
-    setActiveDay(target);
-    setResumedElsewhere(false);
-    const draft = loadDraft(key);
-    setLogs(draft ? draft.logs : buildFreshLogs(target));
-    setLocation(`/log?day=${target.dayNumber}`, { replace: true });
-  }
-
   if (program && isPreCalibrationLocked(program, new Date())) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
@@ -537,10 +427,6 @@ export default function Log() {
 
   const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
-  // Once any set is filled in, the day picker locks - switching would abandon
-  // the in-progress session, which the one-session-at-a-time model forbids.
-  const sessionStarted = hasLoggedData(logs);
-  const programDays = (program.days as any[]) ?? [];
   const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
   const logTourSteps: CoachmarkStep[] = [
     { target: tourSetRowRef, text: "Here you can track your weight and reps." },
@@ -604,41 +490,9 @@ export default function Log() {
         </div>
       </motion.div>
 
-      {/* Day picker - lets a user starting from the "Log Workout" nav choose
-          which split day to log instead of being forced onto day 1. Hidden for
-          single-day programs; locked once the current session has data. */}
-      {programDays.length > 1 && (
-        <div className="mt-4">
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="log-day-picker">
-            {programDays.map((d) => {
-              const isActive = d.dayNumber === day.dayNumber;
-              const locked = sessionStarted && !isActive;
-              return (
-                <button
-                  key={d.dayNumber}
-                  onClick={() => switchDay(d.dayNumber)}
-                  disabled={locked}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : locked
-                      ? "bg-secondary/20 text-muted-foreground/40 border-border/50 cursor-not-allowed"
-                      : "bg-secondary/20 text-muted-foreground border-border hover:text-foreground hover:border-border/80"
-                  }`}
-                  data-testid={`log-day-tab-${d.dayNumber}`}
-                >
-                  {d.label}
-                </button>
-              );
-            })}
-          </div>
-          {sessionStarted && (
-            <p className="text-[11px] text-muted-foreground/60 mt-1.5">
-              Finish or cancel this session to log a different day.
-            </p>
-          )}
-        </div>
-      )}
+      {/* No day picker here on purpose: the page logs exactly the one day named
+          above. Switching days happens on the program page, which prompts to
+          discard this session first (see DiscardSessionDialog). */}
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
