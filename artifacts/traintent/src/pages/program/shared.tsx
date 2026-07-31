@@ -4,6 +4,7 @@ import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, Grip
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
+  useGetCalendarColors,
   useCreateManualProgram,
   useUpdateProfile,
   customFetch,
@@ -14,6 +15,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
+import { buildDayColorOrder, dayColorAt, dayColorHex, dayTones } from "@/lib/dayColors";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
@@ -68,44 +70,14 @@ function muscleAccent(muscle: string): { solid: string; glow: string } | null {
   };
 }
 
-// Hero-card tint per training day: each muscle maps onto one of the Voltage
-// chart tokens so a Pull day washes violet, Legs green, Push stays electric
-// blue. Token *references* (not raw colors) so the wash always tracks the
-// theme palette.
-const MUSCLE_HERO_TOKEN: Record<string, string> = {
-  Chest: "var(--primary)",
-  Shoulders: "var(--chart-3)",
-  Biceps: "var(--chart-5)",
-  Triceps: "var(--chart-5)",
-  "Upper Back": "var(--chart-4)",
-  Lats: "var(--chart-4)",
-  Quads: "var(--chart-2)",
-  Hamstrings: "var(--chart-2)",
-  Glutes: "var(--chart-2)",
-  Calves: "var(--chart-2)",
-  Core: "var(--chart-2)",
-};
-
-// The day's dominant color = the token most of its primary muscles map to;
-// ties break toward the earliest exercise so the tint feels stable.
-function dayHeroToken(day: ProgramDay): string {
-  const counts = new Map<string, number>();
-  for (const ex of day.exercises) {
-    const token = MUSCLE_HERO_TOKEN[ex.muscle];
-    if (token) counts.set(token, (counts.get(token) ?? 0) + 1);
-  }
-  let best = "var(--primary)";
-  let bestCount = 0;
-  for (const ex of day.exercises) {
-    const token = MUSCLE_HERO_TOKEN[ex.muscle];
-    if (!token) continue;
-    const count = counts.get(token) ?? 0;
-    if (count > bestCount) {
-      best = token;
-      bestCount = count;
-    }
-  }
-  return best;
+// The user's own per-day colour picks from Settings, keyed by day label. The
+// calendar honours these, so every day-coloured surface here has to as well -
+// otherwise a day recoloured in Settings would only change on the calendar.
+function useDayColorOverrides(): Record<string, string> {
+  const colorsQuery = useGetCalendarColors();
+  const map: Record<string, string> = {};
+  (colorsQuery.data ?? []).forEach((c) => { map[c.dayLabel] = c.hexColor; });
+  return map;
 }
 
 function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
@@ -146,10 +118,7 @@ type EditExercise = {
   secondaryMuscle: string;
   isUnilateral: boolean;
 };
-// `accent` is the day's colour identity, not its position: it is assigned once
-// when the day is created and travels with the day when it's reordered, so
-// moving a day up or down doesn't repaint the whole list.
-type EditDay = { label: string; exercises: EditExercise[]; accent: number };
+type EditDay = { label: string; exercises: EditExercise[] };
 
 function newExercise(): EditExercise {
   // Section 1: default sets to 2 in the build-your-own flow.
@@ -158,8 +127,7 @@ function newExercise(): EditExercise {
 
 function programToEditDays(program: { days: unknown }): EditDay[] {
   const days = (program.days as ProgramDay[]) ?? [];
-  return days.map((d, i) => ({
-    accent: i,
+  return days.map((d) => ({
     label: d.label ?? "",
     exercises: (d.exercises ?? []).map((e) => ({
       name: e.name ?? "",
@@ -206,37 +174,14 @@ function findInvalidField(days: EditDay[]): FieldError | null {
   return null;
 }
 
-// Rotating per-day accent so days are easy to tell apart at a glance - cycles
-// if there are more days than colors. Exercises stay neutral/zebra-striped;
-// only days get real color, per the "bland gray blends together" complaint.
-const DAY_ACCENT_HUES: { h: number; s: number; l: number }[] = [
-  { h: 217, s: 91, l: 60 }, // blue
-  { h: 280, s: 68, l: 60 }, // purple
-  { h: 38, s: 92, l: 50 },  // gold
-  { h: 160, s: 84, l: 39 }, // teal
-  { h: 350, s: 75, l: 55 }, // pink-red
-  { h: 24, s: 90, l: 55 },  // orange
-  { h: 199, s: 89, l: 48 }, // cyan
-  { h: 142, s: 71, l: 45 }, // green
-];
-
-// Colour for a brand new day: the first hue nobody is using, so adding a day
-// never duplicates a colour until every hue is spoken for.
-function nextAccent(days: EditDay[]): number {
-  const taken = new Set(days.map((d) => d.accent % DAY_ACCENT_HUES.length));
-  for (let i = 0; i < DAY_ACCENT_HUES.length; i++) {
-    if (!taken.has(i)) return i;
-  }
-  return days.length % DAY_ACCENT_HUES.length;
-}
-
-function dayAccent(index: number) {
-  const { h, s, l } = DAY_ACCENT_HUES[index % DAY_ACCENT_HUES.length];
-  return {
-    solid: `hsl(${h}, ${s}%, ${l}%)`,
-    soft: `hsla(${h}, ${s}%, ${l}%, 0.14)`,
-    text: `hsl(${h}, ${Math.min(s, 80)}%, ${Math.max(l, 70)}%)`,
-  };
+// A day card's colour is its position in the program (day 1 = first palette
+// colour), which is exactly what /program and the calendar derive their colours
+// from once the program is saved - so what you see while editing is what you
+// get everywhere else. Reordering days therefore reshuffles the colours, by
+// design: the colour belongs to the slot, not to the card being dragged. A
+// label the user has recoloured in Settings keeps that colour instead.
+function editDayTones(day: EditDay, index: number, overrides: Record<string, string>) {
+  return dayTones(overrides[day.label.trim()] ?? dayColorAt(index));
 }
 
 type ProgramDraft = { programName: string; days: EditDay[]; savedAt: number };
@@ -256,12 +201,9 @@ export function loadProgramDraft(key: string): ProgramDraft | null {
     const parsed = JSON.parse(raw) as ProgramDraft;
     if (!parsed || !Array.isArray(parsed.days)) return null;
     if (Date.now() - (parsed.savedAt ?? 0) > PROGRAM_DRAFT_MAX_AGE_MS) return null;
-    // Drafts written before days carried an accent fall back to positional
-    // colours, which is exactly what they were being rendered with anyway.
-    return {
-      ...parsed,
-      days: parsed.days.map((d, i) => ({ ...d, accent: typeof d?.accent === "number" ? d.accent : i })),
-    };
+    // Drafts written while days carried their own accent index still restore
+    // fine - colour is positional now, so the stored field is simply ignored.
+    return parsed;
   } catch {
     return null;
   }
@@ -335,6 +277,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   const createManualProgram = useCreateManualProgram();
   const queryClient = useQueryClient();
   const { user } = useUser();
+  const colorOverrides = useDayColorOverrides();
   const draftKey = user?.id ? programDraftKey(user.id, editProgram?.id ?? "new") : null;
   // Captured once at mount - if the user's id weren't loaded yet on the very
   // first render, draftKey may still be null then even though it resolves a
@@ -348,7 +291,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   const [days, setDays] = useState<EditDay[]>(() =>
     initialDraft
       ? initialDraft.days
-      : editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()], accent: 0 }],
+      : editProgram ? programToEditDays(editProgram) : [{ label: "", exercises: [newExercise()] }],
   );
   const [dragDay, setDragDay] = useState<number | null>(null);
   // The one field currently blocking a save. Seeded from the restored draft (if
@@ -398,7 +341,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   }
 
   function addDay() {
-    setDays((d) => [...d, { label: "", exercises: [newExercise()], accent: nextAccent(d) }]);
+    setDays((d) => [...d, { label: "", exercises: [newExercise()] }]);
   }
 
   function removeDay(di: number) {
@@ -573,7 +516,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       </div>
 
       {days.map((day, di) => {
-        const accent = dayAccent(day.accent);
+        const accent = editDayTones(day, di, colorOverrides);
         return (
         <div
           key={di}
@@ -927,6 +870,7 @@ type ProgramWeekViewProps = {
 
 export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
+  const colorOverrides = useDayColorOverrides();
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const [activeDay, setActiveDay] = useState(0);
@@ -963,7 +907,12 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   ];
 
   const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
-  const heroToken = day ? dayHeroToken(day) : "var(--primary)";
+
+  // Each day's colour, from the same order the calendar and the editor use, so
+  // the day that's blue here is blue in its calendar pills and in its edit card.
+  const colorOrder = buildDayColorOrder(days.map((d) => d.label));
+  const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
+  const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
 
   // This page is the only way to pick which day to log - the log page itself
   // shows just the one day it is logging. Only one session can be in progress
@@ -998,7 +947,12 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     <button
       ref={tourStartWorkoutRef}
       onClick={handleStartWorkout}
-      className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
+      // The button is the biggest block of colour inside the hero, so leaving it
+      // primary blue made every day's card read blue no matter what the wash
+      // behind it was doing. It wears the day's colour too, with a foreground
+      // picked for that colour rather than assumed white.
+      style={{ backgroundColor: hero.solid, color: hero.on, boxShadow: `0 0 24px ${hero.glow}` }}
+      className="w-full mt-4 h-11 rounded-xl text-sm font-semibold transition-[filter] hover:brightness-110"
       data-testid="button-start-workout-program"
     >
       Start workout
@@ -1029,18 +983,21 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </div>
       </motion.div>
 
-      {/* Day hero - gradient wash + border tinted by the day's dominant muscle color */}
+      {/* Day hero - gradient wash + border tinted by the day's own color */}
       {day && (
         <motion.div
           key={`hero-${activeDay}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          style={{ "--hero": heroToken } as CSSProperties}
+          style={{ "--hero": hero.parts } as CSSProperties}
           className="relative overflow-hidden rounded-2xl border border-[hsl(var(--hero)/0.3)] bg-[radial-gradient(120%_140%_at_0%_0%,hsl(var(--hero)/0.20),transparent_55%),linear-gradient(135deg,hsl(var(--hero)/0.07),transparent_45%)] bg-card p-5"
           data-testid="program-day-hero"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--hero))]">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: hero.text }}
+          >
             Day {day.dayNumber}
           </p>
           <h2 className="font-display text-2xl font-bold text-foreground mt-1">{day.focus}</h2>
@@ -1064,21 +1021,26 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         className="flex gap-1.5 rounded-xl border border-border bg-secondary/60 p-1 overflow-x-auto"
         data-testid="program-day-tabs"
       >
-        {days.map((d, i) => (
-          <button
-            key={d.dayNumber}
-            onClick={() => setActiveDay(i)}
-            data-testid={`tab-day-${d.dayNumber}`}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              activeDay === i
-                ? "bg-primary text-primary-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground font-medium"
-            }`}
-          >
-            <span className={`text-xs mr-1 ${activeDay === i ? "opacity-80" : "opacity-60"}`}>{i + 1} ·</span>
-            {d.label}
-          </button>
-        ))}
+        {days.map((d, i) => {
+          const tone = dayTones(dayColor(d));
+          const isActive = activeDay === i;
+          return (
+            <button
+              key={d.dayNumber}
+              onClick={() => setActiveDay(i)}
+              data-testid={`tab-day-${d.dayNumber}`}
+              // The active tab wears the day's own colour rather than a blanket
+              // primary blue - a solid fill is out, since the palette runs light
+              // enough (amber, lime) that white-on-fill stops being readable.
+              style={isActive ? { backgroundColor: tone.soft, color: tone.text, boxShadow: `inset 0 0 0 1px ${tone.solid}` } : undefined}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                isActive ? "font-semibold" : "text-muted-foreground hover:text-foreground font-medium"
+              }`}
+            >
+              {d.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Exercise roster */}

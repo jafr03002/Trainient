@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListWorkouts,
   useGetCalendarColors,
+  useGetCurrentProgram,
   useDeleteWorkout,
   useListPrograms,
   useGetProfile,
@@ -20,6 +21,7 @@ import {
   getGetWorkoutsByDayLabelQueryKey,
 } from "@workspace/api-client-react";
 import { phaseSolid, phaseSoft, phaseLabel } from "@/lib/phaseColors";
+import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
 import {
   buildPhaseRanges,
   buildCalibrationGroups,
@@ -29,17 +31,6 @@ import {
   CALIBRATION_FAMILY,
 } from "@/lib/calibration";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
-
-const DEFAULT_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
-];
-
-function getColor(label: string, colorMap: Record<string, string>, allLabels: string[]): string {
-  if (colorMap[label]) return colorMap[label];
-  const idx = allLabels.indexOf(label);
-  return DEFAULT_COLORS[idx % DEFAULT_COLORS.length] ?? "#3b82f6";
-}
 
 type WorkoutLog = {
   id: number;
@@ -371,6 +362,7 @@ export default function Calendar() {
   const [dayAgenda, setDayAgenda] = useState<{ date: string; sessions: WorkoutLog[] } | null>(null);
   const workoutsQuery = useListWorkouts({ limit: 200 });
   const colorsQuery = useGetCalendarColors();
+  const currentProgramQuery = useGetCurrentProgram();
   const programsQuery = useListPrograms();
   const profileQuery = useGetProfile();
   const updateProfile = useUpdateProfile();
@@ -432,6 +424,15 @@ export default function Calendar() {
   (colorsQuery.data ?? []).forEach((c) => { colorMap[c.dayLabel] = c.hexColor; });
 
   const allLabels = [...new Set(workouts.map((w) => w.dayLabel).filter(Boolean))] as string[];
+
+  // A session's colour is the one its day wears on the program page and in the
+  // editor - so the order comes from the current program's days, not from the
+  // order sessions happen to have been logged in. Labels from older programs
+  // (or renamed days) fall in behind them, keeping their own stable colour.
+  const programLabels = ((currentProgramQuery.data?.days ?? []) as { label?: string | null }[])
+    .map((d) => d?.label);
+  const colorOrder = buildDayColorOrder(programLabels, allLabels);
+  const colorFor = (label: string) => dayColorHex(label, colorOrder, colorMap);
 
   const workoutsByDate: Record<string, WorkoutLog[]> = {};
   workouts.forEach((w) => {
@@ -568,7 +569,7 @@ export default function Calendar() {
                   <div className="hidden md:block space-y-0.5">
                     {sessions.map((session) => {
                       const label = session.dayLabel ?? "Workout";
-                      const color = getColor(label, colorMap, allLabels);
+                      const color = colorFor(label);
                       return (
                         <button
                           key={session.id}
@@ -593,7 +594,7 @@ export default function Calendar() {
                         <span
                           key={session.id}
                           className="w-2 h-2 rounded-full shrink-0"
-                          style={{ background: getColor(session.dayLabel ?? "Workout", colorMap, allLabels) }}
+                          style={{ background: colorFor(session.dayLabel ?? "Workout") }}
                         />
                       ))}
                       {sessions.length > 3 && (
@@ -630,7 +631,7 @@ export default function Calendar() {
         <div className="flex flex-wrap gap-3 pt-2">
           {allLabels.map((label) => (
             <div key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="w-3 h-3 rounded-sm" style={{ background: getColor(label, colorMap, allLabels) }} />
+              <div className="w-3 h-3 rounded-sm" style={{ background: colorFor(label) }} />
               {label}
             </div>
           ))}
@@ -654,7 +655,7 @@ export default function Calendar() {
         <DayAgendaSheet
           date={dayAgenda.date}
           sessions={dayAgenda.sessions}
-          colorFor={(label) => getColor(label, colorMap, allLabels)}
+          colorFor={colorFor}
           onSelect={(session) => {
             setSelectedSession(session);
             setDayAgenda(null);
@@ -668,7 +669,7 @@ export default function Calendar() {
         <SessionModal
           session={selectedSession}
           allWorkouts={workouts}
-          colorHex={getColor(selectedSession.dayLabel ?? "Workout", colorMap, allLabels)}
+          colorHex={colorFor(selectedSession.dayLabel ?? "Workout")}
           onClose={() => setSelectedSession(null)}
           closeButtonRef={showCalendarTour ? tourCloseSessionRef : undefined}
         />
