@@ -11,6 +11,7 @@ import {
   useCreateCheckoutSession,
   useCreatePortalSession,
   useGetCalendarColors,
+  useGetCurrentProgram,
   useUpsertCalendarColor,
   getGetProfileQueryKey,
   getGetSubscriptionQueryKey,
@@ -21,12 +22,9 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
+import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
 import { toast } from "@/hooks/use-toast";
 
-const DEFAULT_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
-];
 
 export default function Settings() {
   const { user } = useUser();
@@ -40,6 +38,7 @@ export default function Settings() {
   const createCheckout = useCreateCheckoutSession();
   const createPortal = useCreatePortalSession();
   const calendarColors = useGetCalendarColors();
+  const currentProgram = useGetCurrentProgram();
   const upsertColor = useUpsertCalendarColor();
 
   const [name, setName] = useState("");
@@ -168,8 +167,15 @@ export default function Settings() {
 
   const currentMode = profile.data?.mode ?? "ai";
 
-  // Unique day labels from calendar colors data
-  const knownLabels = calendarColors.data?.map((c) => c.dayLabel) ?? [];
+  // The days you can recolour: your current program's, in program order, plus
+  // any label you've already recoloured (an older program's day, say). Program
+  // days are listed even before they have a stored colour - the section used to
+  // hang off the stored rows alone, so a user who had never customised anything
+  // was shown nothing to customise.
+  const programLabels = ((currentProgram.data?.days ?? []) as { label?: string | null }[]).map((d) => d?.label);
+  const storedLabels = calendarColors.data?.map((c) => c.dayLabel) ?? [];
+  const colorOrder = buildDayColorOrder(programLabels, storedLabels);
+  const knownLabels = Object.keys(colorOrder);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
@@ -355,12 +361,14 @@ export default function Settings() {
         >
           <div>
             <h2 className="font-semibold text-foreground">Calendar colours</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Customise the colour for each training day label.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Each training day's colour, used on your calendar, your program page and in the editor.
+            </p>
           </div>
 
           <div className="space-y-3">
-            {knownLabels.map((label, i) => {
-              const currentColor = colorMap[label] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length] ?? "#3b82f6";
+            {knownLabels.map((label) => {
+              const currentColor = dayColorHex(label, colorOrder, colorMap);
               return (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">{label}</span>
