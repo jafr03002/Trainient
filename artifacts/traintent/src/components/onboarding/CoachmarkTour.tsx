@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CoachRobot } from "@/components/CoachRobot";
 
 // A single coachmark step.
@@ -31,6 +31,12 @@ function measure(el: HTMLElement): Rect {
 
 const BUBBLE_WIDTH = 320;
 
+// How long a freshly-opened step keeps re-measuring its target, in ms. Long
+// enough to outlast the entrance animation of anything a step points into (the
+// calendar's session sheet is the slowest at 220ms) with room for the frame the
+// step itself costs.
+const SETTLE_MS = 450;
+
 // Numbered, anchored coachmark sequence - points directly at a real element on
 // the page rather than explaining it in a separate full-screen deck. Shared by
 // the Dashboard, Program, Log and Calendar page first-time tours (see the *TourSeenAt
@@ -51,6 +57,7 @@ export function CoachmarkTour({
 }) {
   const [phase, setPhase] = useState<"intro" | "steps">(intro ? "intro" : "steps");
   const [step, setStep] = useState(0);
+  const [finished, setFinished] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [bubbleH, setBubbleH] = useState(160);
@@ -64,30 +71,45 @@ export function CoachmarkTour({
   const handsOff = current?.kind === "navClick" || current?.kind === "awaitAction";
   const dismissable = phase === "intro" || !handsOff;
 
+  // Ending the tour hides it here and now, rather than waiting for the caller's
+  // `onDone` to land. Callers persist a *TourSeenAt flag and only stop rendering
+  // us once the profile round-trip comes back, which used to leave the last
+  // bubble on screen in the gap - and on screen forever if the write failed,
+  // with no Next button (a hand-off step hides it) and a click-through scrim.
+  // The tour is over the moment the user finishes it, whatever the network does.
+  const end = useCallback(() => {
+    setFinished(true);
+    onDone();
+  }, [onDone]);
+
   // Escape always ends the tour, so a user who somehow can't reach Skip/Next
   // (an unusual viewport, a mispositioned bubble) is never trapped behind the
   // overlay.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone();
+      if (e.key === "Escape") end();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onDone]);
+  }, [end]);
 
   // An awaitAction step is advanced by the page rather than by a Next button:
   // the moment it reports the action done, move on (or end the tour if it was
   // the last step). Latched per step so a `done` that stays true - and an
   // `onDone` whose identity changes every parent render - can't fire twice.
+  // Runs before paint: the action that satisfies the step usually destroys the
+  // element the step points at (closing a dialog removes its close button), so
+  // deferring to a passive effect paints one frame of a bubble and ring stranded
+  // over whatever is underneath.
   const awaitDone = current?.kind === "awaitAction" && current.done;
   const settledStepRef = useRef<number | null>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (phase !== "steps" || !awaitDone) return;
     if (settledStepRef.current === step) return;
     settledStepRef.current = step;
-    if (isLast) onDone();
+    if (isLast) end();
     else setStep((s) => s + 1);
-  }, [awaitDone, step, isLast, onDone, phase]);
+  }, [awaitDone, step, isLast, end, phase]);
 
   useLayoutEffect(() => {
     if (phase !== "steps") return;
@@ -97,7 +119,16 @@ export function CoachmarkTour({
       setRect(null);
       return;
     }
-    const measureNow = () => setRect(measure(el));
+    // Commit only real movement: `rect` feeds the bubble's height measurement
+    // below, and handing it a fresh object per frame spins that into a render
+    // loop that starves the page.
+    let last: Rect | null = null;
+    const measureNow = () => {
+      const r = measure(el);
+      if (last && r.top === last.top && r.left === last.left && r.width === last.width && r.height === last.height) return;
+      last = r;
+      setRect(r);
+    };
     const bringIntoView = () => {
       // Instant (not smooth) so the measurement reflects the settled position
       // immediately instead of racing a scroll animation. Hand-off steps aren't
@@ -108,6 +139,22 @@ export function CoachmarkTour({
       measureNow();
     };
     bringIntoView();
+
+    // A target usually animates into its final place just after the step opens:
+    // the calendar's session sheet slides its panel up 40px over 220ms, carrying
+    // the close button the last step points at. A transform changes no box size
+    // and fires no scroll event, so neither the observer nor the listeners below
+    // would ever hear about it, and the ring would stay pinned 40px under the
+    // button. Re-measure each frame while the target settles - then stop, because
+    // an unbounded loop is a frame of work every frame for the whole tour.
+    let raf = 0;
+    const settleUntil = performance.now() + SETTLE_MS;
+    const settle = () => {
+      measureNow();
+      if (performance.now() < settleUntil) raf = requestAnimationFrame(settle);
+    };
+    raf = requestAnimationFrame(settle);
+
     // The dashboard opens the tour before its data has loaded, so the page grows
     // taller underneath the target after the first measurement - which is
     // exactly how a user ends up stranded with the highlight far below the fold.
@@ -119,6 +166,7 @@ export function CoachmarkTour({
     window.addEventListener("resize", measureNow);
     window.addEventListener("scroll", measureNow, true);
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener("resize", measureNow);
       window.removeEventListener("scroll", measureNow, true);
@@ -140,7 +188,7 @@ export function CoachmarkTour({
     <div
       className={`fixed inset-0 z-[60] bg-black/60 ${dismissable ? "" : "pointer-events-none"}`}
       aria-hidden
-      onClick={dismissable ? onDone : undefined}
+      onClick={dismissable ? end : undefined}
     />
   );
 
@@ -155,11 +203,13 @@ export function CoachmarkTour({
     />
   );
 
+  if (finished) return null;
+
   if (phase === "intro" && intro) {
     return (
       <>
         {scrim}
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onDone}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={end}>
           <div
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-sm p-5 rounded-xl bg-primary text-primary-foreground shadow-xl"
@@ -170,7 +220,7 @@ export function CoachmarkTour({
             <p className="text-sm font-medium mt-1 leading-relaxed">{intro.text}</p>
             <div className="flex items-center gap-2 mt-3">
               <button
-                onClick={onDone}
+                onClick={end}
                 className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity"
                 data-testid={`${testIdPrefix}-intro-skip`}
               >
@@ -205,7 +255,7 @@ export function CoachmarkTour({
       <p className="text-sm font-medium mt-1 leading-relaxed">{current.text}</p>
       <div className="flex items-center gap-2 mt-3">
         <button
-          onClick={onDone}
+          onClick={end}
           className="text-xs font-medium opacity-80 hover:opacity-100 transition-opacity"
           data-testid={`${testIdPrefix}-skip`}
         >
@@ -214,7 +264,7 @@ export function CoachmarkTour({
         <div className="flex-1" />
         {!handsOff && (
           <button
-            onClick={() => (isLast ? onDone() : setStep((s) => s + 1))}
+            onClick={() => (isLast ? end() : setStep((s) => s + 1))}
             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-foreground text-primary hover:opacity-90 transition-opacity"
             data-testid={`${testIdPrefix}-next`}
           >
@@ -231,7 +281,7 @@ export function CoachmarkTour({
         {scrim}
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-          onClick={dismissable ? onDone : undefined}
+          onClick={dismissable ? end : undefined}
         >
           <div
             onClick={(e) => e.stopPropagation()}
