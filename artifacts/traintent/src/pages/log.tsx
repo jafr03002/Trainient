@@ -435,7 +435,7 @@ export default function Log() {
   ];
 
   return (
-    <div className="p-6 max-w-3xl mx-auto pb-48 md:pb-32">
+    <div className="p-6 max-w-3xl mx-auto pb-12">
       {/* PR Toast Stack */}
       <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
         <AnimatePresence>
@@ -682,25 +682,29 @@ export default function Log() {
         );})}
       </div>
 
-      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border z-40">
-        <div className="max-w-3xl mx-auto">
-          <button
-            ref={tourFinishRef}
-            onClick={handleFinishClick}
-            disabled={createWorkout.isPending}
-            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-            data-testid="button-finish-workout"
-          >
-            {createWorkout.isPending ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
-            ) : sessionPrCount > 0 ? (
-              <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
-            ) : (
-              "Finish workout"
-            )}
-          </button>
-        </div>
-      </div>
+      {/* Finishing lives at the end of the list, in normal flow - not in a bar
+          pinned to the bottom. On a phone that bar sat above the tab nav, and
+          the keyboard pushed both up over the set rows the user was typing
+          into; a full-width primary button in the scrolling thumb's path also
+          made ending the session an easy mis-tap. Scrolling past the last
+          exercise is the natural end of a session, so the button waits there.
+          The tour scrolls this into view for its final step (CoachmarkTour
+          calls scrollIntoView on each anchored target). */}
+      <button
+        ref={tourFinishRef}
+        onClick={handleFinishClick}
+        disabled={createWorkout.isPending}
+        className="w-full h-12 mt-8 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        data-testid="button-finish-workout"
+      >
+        {createWorkout.isPending ? (
+          <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+        ) : sessionPrCount > 0 ? (
+          <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+        ) : (
+          "Finish workout"
+        )}
+      </button>
 
       {showLogTour && <CoachmarkTour steps={logTourSteps} onDone={finishLogTour} testIdPrefix="log-tour" />}
 
