@@ -1033,15 +1033,10 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
               // primary blue - a solid fill is out, since the palette runs light
               // enough (amber, lime) that white-on-fill stops being readable.
               style={isActive ? { backgroundColor: tone.soft, color: tone.text, boxShadow: `inset 0 0 0 1px ${tone.solid}` } : undefined}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors flex items-center gap-1.5 ${
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 isActive ? "font-semibold" : "text-muted-foreground hover:text-foreground font-medium"
               }`}
             >
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: tone.solid, opacity: isActive ? 1 : 0.6 }}
-              />
-              <span className={`text-xs ${isActive ? "opacity-80" : "opacity-60"}`}>{i + 1} ·</span>
               {d.label}
             </button>
           );
