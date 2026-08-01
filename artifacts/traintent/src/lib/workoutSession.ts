@@ -5,6 +5,8 @@
 // starting a different day) read through here, so the key format and the
 // staleness rules live in exactly one place.
 
+import type { ChecklistCategory } from "@/lib/checklistItems";
+
 export type LoggedSet = {
   setNumber: number;
   weight: number;
@@ -24,6 +26,28 @@ export type LoggedExercise = {
   targetReps: string;
   notes: string;
   showNotes: boolean;
+  // Checklist items (see lib/checklistItems.ts). A checklist item has NO sets -
+  // its `sets` array stays empty so it can never reach the volume/e1RM/PR maths,
+  // which only counts sets carrying weight or reps.
+  kind: "lift" | "checklist";
+  targetType: string | null;
+  targetSeconds: number | null;
+  targetValue: number | null;
+  targetUnit: string | null;
+  category: ChecklistCategory | null;
+  /** Rounds ticked off so far, 0..targetRounds. */
+  completedRounds: number;
+  targetRounds: number;
+  /**
+   * Wall-clock ms at which the running countdown expires - NOT a decrementing
+   * counter. The whole session is mirrored to localStorage on every change and
+   * mobile browsers throttle or freeze timers in a backgrounded tab, so a
+   * counter would drift or stall exactly when a 5-minute hold is running and the
+   * screen is locked. Null when idle or paused.
+   */
+  timerEndsAt: number | null;
+  /** Seconds left while paused, so Resume picks up where Pause left off. */
+  timerPausedRemaining: number | null;
 };
 
 export type WorkoutDraft = {

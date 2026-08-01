@@ -1,13 +1,16 @@
 import { motion } from "framer-motion";
 import { MUSCLE_COLORS } from "@/lib/muscles";
 
-type Exercise = { sets: number; muscle: string };
+type Exercise = { sets: number; muscle: string; kind?: string | null };
 type ProgramDay = { exercises: Exercise[] };
 
 function computeWeeklyVolume(days: ProgramDay[]): { muscle: string; sets: number }[] {
   const totals = new Map<string, number>();
   for (const day of days) {
     for (const ex of day.exercises) {
+      // Checklist items carry no muscle and their `sets` is a round count, not
+      // training volume - including them would add an empty-labelled bar.
+      if (ex.kind === "checklist" || !ex.muscle) continue;
       totals.set(ex.muscle, (totals.get(ex.muscle) ?? 0) + ex.sets);
     }
   }

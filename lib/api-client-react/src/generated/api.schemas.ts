@@ -224,6 +224,53 @@ export interface UserProfileUpdate {
   calendarTourSeenAt?: string | null;
 }
 
+export type ExerciseKind = typeof ExerciseKind[keyof typeof ExerciseKind];
+
+
+export const ExerciseKind = {
+  lift: 'lift',
+  checklist: 'checklist',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseTargetType = typeof ExerciseTargetType[keyof typeof ExerciseTargetType] | null;
+
+
+export const ExerciseTargetType = {
+  duration: 'duration',
+  count: 'count',
+  distance: 'distance',
+  none: 'none',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseTargetUnit = typeof ExerciseTargetUnit[keyof typeof ExerciseTargetUnit] | null;
+
+
+export const ExerciseTargetUnit = {
+  reps: 'reps',
+  m: 'm',
+  km: 'km',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseCategory = typeof ExerciseCategory[keyof typeof ExerciseCategory] | null;
+
+
+export const ExerciseCategory = {
+  stretch: 'stretch',
+  mobility: 'mobility',
+  core: 'core',
+  breathing: 'breathing',
+  other: 'other',
+} as const;
+
 export interface Exercise {
   /** @maxLength 80 */
   name: string;
@@ -244,6 +291,25 @@ export interface Exercise {
   /** @nullable */
   secondaryMuscle?: string | null;
   isUnilateral?: boolean;
+  kind?: ExerciseKind;
+  /** @nullable */
+  targetType?: ExerciseTargetType;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
+  targetValue?: number | null;
+  /** @nullable */
+  targetUnit?: ExerciseTargetUnit;
+  /** @nullable */
+  category?: ExerciseCategory;
 }
 
 export interface ProgramDay {
@@ -432,11 +498,53 @@ export interface LoggedSet {
   isNewPr?: boolean | null;
 }
 
+export type LoggedExerciseKind = typeof LoggedExerciseKind[keyof typeof LoggedExerciseKind];
+
+
+export const LoggedExerciseKind = {
+  lift: 'lift',
+  checklist: 'checklist',
+} as const;
+
+/**
+ * @nullable
+ */
+export type LoggedExerciseCategory = typeof LoggedExerciseCategory[keyof typeof LoggedExerciseCategory] | null;
+
+
+export const LoggedExerciseCategory = {
+  stretch: 'stretch',
+  mobility: 'mobility',
+  core: 'core',
+  breathing: 'breathing',
+  other: 'other',
+} as const;
+
 export interface LoggedExercise {
   /** @maxLength 80 */
   name: string;
   muscle: string;
   sets: LoggedSet[];
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+  kind?: LoggedExerciseKind;
+  /**
+     * @minimum 0
+     * @maximum 50
+     * @nullable
+     */
+  completedRounds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /** @nullable */
+  category?: LoggedExerciseCategory;
 }
 
 /**

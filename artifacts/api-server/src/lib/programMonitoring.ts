@@ -9,10 +9,17 @@ export function longTermPhaseFor(goal: string): "gain_weight" | "lose_weight" | 
   return "maintain";
 }
 
-export function trainingWorkloadFor(days: { exercises: { sets: number }[] }[]) {
+// Checklist items are excluded from the set count: on those rows `sets` is a round
+// count for something like a stretch hold, not training volume, so counting them
+// would inflate the workload figure the AI coach reads at check-in.
+export function trainingWorkloadFor(days: { exercises: { sets: number; kind?: string | null }[] }[]) {
   return {
     daysTrained: days.length,
-    totalVolumeSets: days.reduce((sum, d) => sum + d.exercises.reduce((s, e) => s + e.sets, 0), 0),
+    totalVolumeSets: days.reduce(
+      (sum, d) =>
+        sum + d.exercises.reduce((s, e) => (e.kind === "checklist" ? s : s + e.sets), 0),
+      0,
+    ),
   };
 }
 

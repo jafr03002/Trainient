@@ -319,3 +319,18 @@
   .coach-robot .coach-sway,
   .coach-robot .coach-eye { animation: none; }
 }
+
+/* The swipe affordance on a timed checklist item: three chevrons that nudge
+   about every two seconds - findable if you look for it, ignorable if you
+   aren't. The progress fill itself carries no animation; it is a plain gradient
+   whose width is set from the wall clock. */
+.timer-hint-chev { animation: timer-nudge 1.9s ease-in-out infinite; opacity: .3; }
+.timer-hint-chev:nth-child(2) { animation-delay: .12s; }
+.timer-hint-chev:nth-child(3) { animation-delay: .24s; }
+@keyframes timer-nudge {
+  0%, 70%, 100% { opacity: .25; transform: none; }
+  35% { opacity: .9; transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-hint-chev { animation: none; opacity: .5; }
+}
