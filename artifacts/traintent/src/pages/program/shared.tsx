@@ -26,6 +26,7 @@ import {
 } from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { DiscardSessionDialog } from "@/components/workout/DiscardSessionDialog";
+import { ExerciseNamePicker } from "@/components/program/ExerciseNamePicker";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -378,18 +379,27 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }));
   }
 
-  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean) {
+  // Several fields at once, for the library picker - choosing an exercise sets
+  // its name and primary muscle together, which as two updateExercise calls
+  // would have the second overwrite the first's stale copy of the day.
+  function patchExercise(di: number, ei: number, patch: Partial<EditExercise>) {
     setDays((d) => d.map((day, i) =>
       i === di
-        ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, [field]: value } : ex) }
+        ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, ...patch } : ex) }
         : day
     ));
     // Clear the flag as soon as the offending field is made valid, so the red
     // border tracks the fix instead of waiting for another Save click.
-    if (fieldError?.day !== di || fieldError.exercise !== ei || field !== fieldError.field) return;
-    if (typeof value !== "string") return;
-    if (field === "name" && value.trim()) setFieldError(null);
-    if (field === "sets" && value.trim() && !rangeError(value, FIELD_LIMITS.sets)) setFieldError(null);
+    if (fieldError?.day !== di || fieldError.exercise !== ei) return;
+    if (fieldError.field === "label") return;
+    const fixed = patch[fieldError.field];
+    if (typeof fixed !== "string") return;
+    if (fieldError.field === "name" && fixed.trim()) setFieldError(null);
+    if (fieldError.field === "sets" && fixed.trim() && !rangeError(fixed, FIELD_LIMITS.sets)) setFieldError(null);
+  }
+
+  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean) {
+    patchExercise(di, ei, { [field]: value } as Partial<EditExercise>);
   }
 
   async function performSave() {
@@ -605,18 +615,18 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                   <span className="shrink-0 w-5 h-5 rounded-full bg-secondary/60 text-muted-foreground text-[11px] font-medium flex items-center justify-center">
                     {ei + 1}
                   </span>
-                  <input
-                    type="text"
+                  <ExerciseNamePicker
                     value={ex.name}
-                    onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
-                    maxLength={MAX_EXERCISE_NAME}
-                    placeholder="Exercise name"
-                    className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
+                    onChange={(name) => updateExercise(di, ei, "name", name)}
+                    // Picking from the library is a deliberate statement about
+                    // the exercise, so it overwrites the primary muscle. The
+                    // secondary muscle is left exactly as the user set it.
+                    onPick={({ name, muscle }) => patchExercise(di, ei, { name, muscle })}
+                    invalid={
                       fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
-                        ? "border-destructive"
-                        : "border-border"
-                    }`}
-                    data-testid={`exercise-name-input-${di}-${ei}`}
+                    }
+                    maxLength={MAX_EXERCISE_NAME}
+                    testId={`exercise-name-input-${di}-${ei}`}
                   />
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
