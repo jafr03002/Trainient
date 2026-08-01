@@ -53,6 +53,15 @@ export type LoggedExercise = {
 export type WorkoutDraft = {
   logs: LoggedExercise[];
   savedAt: number;
+  /**
+   * Epoch ms when the session clock started - when the log page opened, not
+   * when the first set was logged. Persisted so the elapsed time survives a
+   * refresh or a backgrounded tab: the clock is always derived from
+   * `Date.now() - startedAt`, never from a counter that would stop while the
+   * tab is throttled. Optional because drafts written before session timing
+   * existed don't carry one.
+   */
+  startedAt?: number;
 };
 
 export type ActiveSessionPointer = {
@@ -90,9 +99,12 @@ export function loadDraft(key: string): WorkoutDraft | null {
   }
 }
 
-export function saveDraft(key: string, logs: LoggedExercise[]) {
+export function saveDraft(key: string, logs: LoggedExercise[], startedAt?: number) {
   try {
-    window.localStorage.setItem(key, JSON.stringify({ logs, savedAt: Date.now() } as WorkoutDraft));
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ logs, savedAt: Date.now(), startedAt } as WorkoutDraft)
+    );
   } catch {
     // localStorage unavailable (e.g. private browsing) - degrade to in-memory only
   }

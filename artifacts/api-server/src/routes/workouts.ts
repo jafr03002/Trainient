@@ -5,6 +5,11 @@ import { requireAuth, getUserId } from "../lib/auth";
 import { CreateWorkoutBody, ListWorkoutsQueryParams } from "@workspace/api-zod";
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { logDateError } from "../lib/dateWindow";
+import {
+  AVERAGE_WINDOW,
+  MAX_STORABLE_SECONDS,
+  countsTowardAverage,
+} from "../lib/sessionDuration";
 
 const router = Router();
 
@@ -13,7 +18,28 @@ function serializeLog(w: typeof workoutLogsTable.$inferSelect) {
     ...w,
     exercisesLogged: w.exercisesLogged as object[],
     createdAt: w.createdAt.toISOString(),
+    startedAt: w.startedAt?.toISOString() ?? null,
   };
+}
+
+/**
+ * The session clock runs on the user's device, so the submitted elapsed time is
+ * only as honest as their system clock. When we also have a start timestamp,
+ * prefer the span it implies and treat the client's number as a cross-check -
+ * the same reason weekNumber and mode are recomputed server-side below.
+ *
+ * Implausible values are deliberately NOT rejected or clamped to a "nice"
+ * number: a session that ran overnight is stored as it happened and simply
+ * fails the plausibility band when averages are computed.
+ */
+function resolveDurationSeconds(startedAt: Date | null, submitted: number | null): number | null {
+  const fromTimestamps = startedAt ? Math.round((Date.now() - startedAt.getTime()) / 1000) : null;
+  const chosen =
+    fromTimestamps != null && (submitted == null || Math.abs(fromTimestamps - submitted) > 60)
+      ? fromTimestamps
+      : submitted;
+  if (chosen == null || !Number.isFinite(chosen)) return null;
+  return Math.min(Math.max(Math.round(chosen), 0), MAX_STORABLE_SECONDS);
 }
 
 router.get("/workouts", requireAuth, async (req, res) => {
@@ -51,9 +77,10 @@ router.post("/workouts", requireAuth, async (req, res) => {
   // Mode is stamped from the profile at logging time, not the client, so a
   // session's recorded mode reflects what the user was actually in.
   const mode = profile?.mode ?? "ai";
+  const durationSeconds = resolveDurationSeconds(parsed.data.startedAt ?? null, parsed.data.durationSeconds ?? null);
   const [log] = await db
     .insert(workoutLogsTable)
-    .values({ userId, ...parsed.data, weekNumber, mode })
+    .values({ userId, ...parsed.data, durationSeconds, weekNumber, mode })
     .returning();
   res.status(201).json(serializeLog(log));
 });
@@ -99,6 +126,39 @@ router.get("/workouts/stats", requireAuth, async (req, res) => {
   }
 
   res.json({ currentWeek, totalLogged, lastSessionDate, streakDays });
+});
+
+// Average session length per session type, for the program page's day hero.
+// "Session type" is the day label (falling back to the day number when a log has
+// none), matching how /workouts/by-day-label already groups a day's history -
+// dayNumber alone isn't stable identity once a program is edited.
+router.get("/workouts/duration-stats", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const logs = await db.query.workoutLogsTable.findMany({
+    where: eq(workoutLogsTable.userId, userId),
+    orderBy: [desc(workoutLogsTable.date), desc(workoutLogsTable.createdAt)],
+  });
+
+  const groups = new Map<string, { dayLabel: string | null; dayNumber: number; seconds: number[] }>();
+  for (const log of logs) {
+    if (!countsTowardAverage(log)) continue;
+    const key = log.dayLabel ?? `#${log.dayNumber}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { dayLabel: log.dayLabel, dayNumber: log.dayNumber, seconds: [] };
+      groups.set(key, group);
+    }
+    // Logs arrive newest-first, so this keeps the most recent N per group.
+    if (group.seconds.length < AVERAGE_WINDOW) group.seconds.push(log.durationSeconds!);
+  }
+
+  const stats = [...groups.values()].map((g) => ({
+    dayLabel: g.dayLabel,
+    dayNumber: g.dayNumber,
+    averageSeconds: Math.round(g.seconds.reduce((a, b) => a + b, 0) / g.seconds.length),
+    sampleCount: g.seconds.length,
+  }));
+  res.json({ stats });
 });
 
 router.get("/workouts/by-day-label", requireAuth, async (req, res) => {

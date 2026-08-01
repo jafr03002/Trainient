@@ -19,6 +19,10 @@ export type WorkoutLogRow = {
   weekNumber: number;
   createdAt: Date;
   exercisesLogged: unknown;
+  dayLabel?: string | null;
+  dayNumber?: number;
+  /** Wall-clock session length. Null on sessions logged before timing existed. */
+  durationSeconds?: number | null;
 };
 
 // A set counts once it has any logged data - we do NOT require the user to have

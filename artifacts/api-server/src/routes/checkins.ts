@@ -225,6 +225,7 @@ router.post("/checkins", requireAuth, async (req, res) => {
     workoutLogs,
     adherence,
     missedSessionReason,
+    programDays: (currentProgram.days as { label?: string; estimatedDurationMinutes?: number | null }[]) ?? [],
   });
 
   // The AI never picks the next short-term phase directly (see
@@ -257,7 +258,7 @@ ${checkInEngineKnowledge}
 
 How to apply it:
 - Compare THIS week's questionnaire answers to the previous weeks' answers (provided below) to detect patterns before acting - a one-off is not a trend.
-- Weigh the questionnaire together with the logged evidence variables (averageWeight vs last week, caloriesPerDay, stepCounts, cardioCompleted, sessions logged vs planned, progressionAcrossSets, sessionComments), all provided below.
+- Weigh the questionnaire together with the logged evidence variables (averageWeight vs last week, caloriesPerDay, stepCounts, cardioCompleted, sessions logged vs planned, progressionAcrossSets, sessionDuration, sessionComments), all provided below.
 - Session adherence is DERIVED from what the client logged, not self-reported. It counts sessions LOGGED, which is not the same as sessions trained: if the client says they trained a session but forgot to log it, treat that session as trained and the shortfall as a logging problem - do not cut training volume for it. Only a genuine skip is an adherence problem.
 - Off-day deviation: if the client deviated from their calorie intake and did NOT log it, treat this week's calorie/bodyweight data as unreliable - do not change calories off it; keep calories and attribute the miss to discipline, not the plan.
 - Hunger/appetite + phase: apply the document's phase-specific IF/THEN calorie guidance using the client's CURRENT phase (given below) and the week-over-week averageWeight change.
@@ -275,10 +276,11 @@ Server-enforced constraints (always apply):
 - Set short_term_goal_weight consistent with the recommended phase (bulk/diet/mini_cut target a specific bodyweight bound); for calibration/maintenance/deload return null.
 - Recalibrate daily_calorie_target and daily_step_target from the same evidence per the document. If off-day deviation makes the data unreliable, or there isn't enough bodyweight data yet, keep last week's numbers roughly unchanged rather than guessing.
 - Keep program_name plain-language (no method jargon); produce exactly 2 program_highlights.
+- Set estimated_duration_minutes on every day, and reconcile it with the sessionDuration evidence below. If a session type consistently runs well over what was planned, that is a real constraint on the client's life, not just a mis-estimate: prefer trimming volume or tightening rest over letting the session sprawl, and only raise the estimate when the length is genuinely intended. If sessions consistently finish well under, there is room to add work. With no measured data yet, estimate honestly from the sets and rest you prescribed.
 
 Return ONLY valid JSON (no markdown) matching the required schema:
 { "message": "...", "updated_program": { "program_name": "...", "split_type": "...",
-  "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [ { "day_number": 1, "label": "...", "focus": "...", "exercises": [ { "name": "...", "sets": 4, "reps": "8-10", "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
+  "program_highlights": [ { "title": "...", "detail": "..." } ], "days": [ { "day_number": 1, "label": "...", "focus": "...", "estimated_duration_minutes": 55, "exercises": [ { "name": "...", "sets": 4, "reps": "8-10", "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
   "phase_progress": { "reasoning": "...", "recommendation": "stay" }, "short_term_goal_weight": null,
   "daily_step_target": 8000, "daily_calorie_target": 1900,
   "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "..." } } }`;
@@ -332,6 +334,7 @@ ${evidence.text}`;
     dayNumber: d.day_number ?? d.dayNumber,
     label: d.label,
     focus: d.focus,
+    estimatedDurationMinutes: d.estimated_duration_minutes ?? d.estimatedDurationMinutes ?? null,
     exercises: (d.exercises ?? []).map((e: any) => ({
       name: e.name,
       sets: e.sets,

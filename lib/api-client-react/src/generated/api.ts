@@ -49,6 +49,7 @@ import type {
   Program,
   ProgramStartDateUpdate,
   SessionAdherence,
+  SessionDurationStats,
   StrengthPoint,
   Subscription,
   UserProfile,
@@ -1183,6 +1184,83 @@ export function useGetWorkoutStats<TData = Awaited<ReturnType<typeof getWorkoutS
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetWorkoutStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSessionDurationStatsUrl = () => {
+
+
+
+
+  return `/api/workouts/duration-stats`
+}
+
+/**
+ * @summary Average session duration per session type, over sessions eligible to be averaged
+ */
+export const getSessionDurationStats = async ( options?: RequestInit): Promise<SessionDurationStats> => {
+
+  return customFetch<SessionDurationStats>(getGetSessionDurationStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSessionDurationStatsQueryKey = () => {
+    return [
+    `/api/workouts/duration-stats`
+    ] as const;
+    }
+
+
+export const getGetSessionDurationStatsQueryOptions = <TData = Awaited<ReturnType<typeof getSessionDurationStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionDurationStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSessionDurationStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionDurationStats>>> = ({ signal }) => getSessionDurationStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionDurationStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSessionDurationStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionDurationStats>>>
+export type GetSessionDurationStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Average session duration per session type, over sessions eligible to be averaged
+ */
+
+export function useGetSessionDurationStats<TData = Awaited<ReturnType<typeof getSessionDurationStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionDurationStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSessionDurationStatsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

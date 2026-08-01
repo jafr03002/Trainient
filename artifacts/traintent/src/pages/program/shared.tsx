@@ -1,17 +1,19 @@
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
   useGetCalendarColors,
   useCreateManualProgram,
   useUpdateProfile,
+  useGetSessionDurationStats,
   customFetch,
   getGetCurrentProgramQueryKey,
   getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
+import { formatSessionLength, estimateDurationSeconds } from "@/lib/sessionDuration";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
@@ -85,6 +87,8 @@ export type ProgramDay = {
   dayNumber: number;
   label: string;
   focus: string;
+  /** The AI's predicted session length. Absent for Independent-mode days. */
+  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 };
 
@@ -1249,6 +1253,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     !isPreCalibrationLocked(program, new Date());
   useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
+  const durationStats = useGetSessionDurationStats();
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
@@ -1280,6 +1285,26 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const colorOrder = buildDayColorOrder(days.map((d) => d.label));
   const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
   const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
+
+  // How long this session takes, in descending order of how much we actually
+  // know. A measured average beats the AI's guess, which beats arithmetic - and
+  // the label says which one the user is looking at rather than passing an
+  // estimate off as a measurement. Tier 3 is what every Independent-mode day
+  // shows, since no AI ever sized those.
+  const sessionDuration = (() => {
+    if (!day) return null;
+    const measured = durationStats.data?.stats.find(
+      (s) => (s.dayLabel != null ? s.dayLabel === day.label : s.dayNumber === day.dayNumber)
+    );
+    if (measured && measured.sampleCount >= 1) {
+      return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration", measured: true };
+    }
+    if (day.estimatedDurationMinutes) {
+      return { text: formatSessionLength(day.estimatedDurationMinutes * 60), label: "Est. duration", measured: false };
+    }
+    const seconds = estimateDurationSeconds(day.exercises);
+    return seconds ? { text: formatSessionLength(seconds), label: "Est. duration", measured: false } : null;
+  })();
 
   // This page is the only way to pick which day to log - the log page itself
   // shows just the one day it is logging. Only one session can be in progress
@@ -1382,6 +1407,17 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
                 <p className="font-display text-xl font-bold text-foreground">{checklistCount}</p>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
                   Checklist
+                </p>
+              </div>
+            )}
+            {sessionDuration && (
+              <div className="flex-1 min-w-0 border-l border-border pl-4" data-testid="stat-session-duration">
+                <p className="font-display text-xl font-bold text-foreground flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{sessionDuration.text}</span>
+                </p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
+                  {sessionDuration.label}
                 </p>
               </div>
             )}

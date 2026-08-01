@@ -197,6 +197,8 @@ export const getCurrentProgramResponseDaysItemLabelMax = 60;
 
 export const getCurrentProgramResponseDaysItemFocusMax = 60;
 
+export const getCurrentProgramResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const getCurrentProgramResponseDaysItemExercisesItemNameMax = 80;
 
 export const getCurrentProgramResponseDaysItemExercisesItemSetsMax = 50;
@@ -227,6 +229,7 @@ export const GetCurrentProgramResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(getCurrentProgramResponseDaysItemLabelMax),
   "focus": zod.string().max(getCurrentProgramResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(getCurrentProgramResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(getCurrentProgramResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(getCurrentProgramResponseDaysItemExercisesItemSetsMax),
@@ -275,6 +278,8 @@ export const listProgramsResponseDaysItemLabelMax = 60;
 
 export const listProgramsResponseDaysItemFocusMax = 60;
 
+export const listProgramsResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const listProgramsResponseDaysItemExercisesItemNameMax = 80;
 
 export const listProgramsResponseDaysItemExercisesItemSetsMax = 50;
@@ -305,6 +310,7 @@ export const ListProgramsResponseItem = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(listProgramsResponseDaysItemLabelMax),
   "focus": zod.string().max(listProgramsResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(listProgramsResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(listProgramsResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(listProgramsResponseDaysItemExercisesItemSetsMax),
@@ -358,6 +364,8 @@ export const createManualProgramBodyDaysItemLabelMax = 60;
 
 export const createManualProgramBodyDaysItemFocusMax = 60;
 
+export const createManualProgramBodyDaysItemEstimatedDurationMinutesMax = 300;
+
 export const createManualProgramBodyDaysItemExercisesItemNameMax = 80;
 
 export const createManualProgramBodyDaysItemExercisesItemSetsMax = 50;
@@ -380,6 +388,7 @@ export const CreateManualProgramBody = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(createManualProgramBodyDaysItemLabelMax),
   "focus": zod.string().max(createManualProgramBodyDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(createManualProgramBodyDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(createManualProgramBodyDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(createManualProgramBodyDaysItemExercisesItemSetsMax),
@@ -427,6 +436,8 @@ export const updateProgramBodyDaysItemLabelMax = 60;
 
 export const updateProgramBodyDaysItemFocusMax = 60;
 
+export const updateProgramBodyDaysItemEstimatedDurationMinutesMax = 300;
+
 export const updateProgramBodyDaysItemExercisesItemNameMax = 80;
 
 export const updateProgramBodyDaysItemExercisesItemSetsMax = 50;
@@ -449,6 +460,7 @@ export const UpdateProgramBody = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(updateProgramBodyDaysItemLabelMax),
   "focus": zod.string().max(updateProgramBodyDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(updateProgramBodyDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(updateProgramBodyDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(updateProgramBodyDaysItemExercisesItemSetsMax),
@@ -472,6 +484,8 @@ export const UpdateProgramBody = zod.object({
 export const updateProgramResponseDaysItemLabelMax = 60;
 
 export const updateProgramResponseDaysItemFocusMax = 60;
+
+export const updateProgramResponseDaysItemEstimatedDurationMinutesMax = 300;
 
 export const updateProgramResponseDaysItemExercisesItemNameMax = 80;
 
@@ -503,6 +517,7 @@ export const UpdateProgramResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(updateProgramResponseDaysItemLabelMax),
   "focus": zod.string().max(updateProgramResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(updateProgramResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(updateProgramResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(updateProgramResponseDaysItemExercisesItemSetsMax),
@@ -559,6 +574,8 @@ export const setProgramStartDateResponseDaysItemLabelMax = 60;
 
 export const setProgramStartDateResponseDaysItemFocusMax = 60;
 
+export const setProgramStartDateResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const setProgramStartDateResponseDaysItemExercisesItemNameMax = 80;
 
 export const setProgramStartDateResponseDaysItemExercisesItemSetsMax = 50;
@@ -589,6 +606,7 @@ export const SetProgramStartDateResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(setProgramStartDateResponseDaysItemLabelMax),
   "focus": zod.string().max(setProgramStartDateResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(setProgramStartDateResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(setProgramStartDateResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(setProgramStartDateResponseDaysItemExercisesItemSetsMax),
@@ -698,6 +716,8 @@ export const ListWorkoutsResponseItem = zod.object({
   "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const ListWorkoutsResponse = zod.array(ListWorkoutsResponseItem)
@@ -738,6 +758,9 @@ export const createWorkoutBodyExercisesLoggedItemTargetSecondsMax = 86400;
 
 export const createWorkoutBodyNotesMax = 2000;
 
+export const createWorkoutBodyDurationSecondsMin = 0;
+export const createWorkoutBodyDurationSecondsMax = 86400;
+
 
 
 export const CreateWorkoutBody = zod.object({
@@ -764,7 +787,9 @@ export const CreateWorkoutBody = zod.object({
   "targetSeconds": zod.number().min(createWorkoutBodyExercisesLoggedItemTargetSecondsMin).max(createWorkoutBodyExercisesLoggedItemTargetSecondsMax).nullish(),
   "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
-  "notes": zod.string().max(createWorkoutBodyNotesMax).nullish()
+  "notes": zod.string().max(createWorkoutBodyNotesMax).nullish(),
+  "startedAt": zod.coerce.date().nullish(),
+  "durationSeconds": zod.number().min(createWorkoutBodyDurationSecondsMin).max(createWorkoutBodyDurationSecondsMax).nullish()
 })
 
 
@@ -828,6 +853,8 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const GetRecentWorkoutsResponse = zod.array(GetRecentWorkoutsResponseItem)
@@ -841,6 +868,19 @@ export const GetWorkoutStatsResponse = zod.object({
   "totalLogged": zod.number(),
   "lastSessionDate": zod.string().nullable(),
   "streakDays": zod.number()
+})
+
+
+/**
+ * @summary Average session duration per session type, over sessions eligible to be averaged
+ */
+export const GetSessionDurationStatsResponse = zod.object({
+  "stats": zod.array(zod.object({
+  "dayLabel": zod.string().nullable(),
+  "dayNumber": zod.number(),
+  "averageSeconds": zod.number(),
+  "sampleCount": zod.number().describe('How many eligible sessions the average is drawn from.')
+}))
 })
 
 
@@ -908,6 +948,8 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const GetWorkoutsByDayLabelResponse = zod.array(GetWorkoutsByDayLabelResponseItem)

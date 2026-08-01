@@ -59,6 +59,8 @@ export * from './programShortTermPhase';
 export * from './programStartDateUpdate';
 export * from './programTrainingWorkload';
 export * from './sessionAdherence';
+export * from './sessionDurationStat';
+export * from './sessionDurationStats';
 export * from './strengthPoint';
 export * from './subscription';
 export * from './userProfile';

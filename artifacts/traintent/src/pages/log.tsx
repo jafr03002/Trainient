@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell, Check } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell, Check, Clock } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/checklistItems";
 import { ChecklistLogCard } from "@/components/ChecklistLogCard";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
+import { formatClock } from "@/lib/sessionDuration";
 import {
   type LoggedExercise,
   type ActiveSessionPointer,
@@ -184,6 +185,10 @@ export default function Log() {
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Epoch ms the session clock started, and the seconds since, recomputed each
+  // tick. Null until the user logs their first real set.
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
   const flashIdRef = useRef(0);
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
@@ -346,11 +351,32 @@ export default function Log() {
     const draft = loadDraft(key);
     if (draft) {
       setLogs(reconcileDraftLogs(draft.logs, day));
+      // Resume the original clock rather than restarting it - a refresh or a
+      // reconnect mid-session must not reset the elapsed time to zero. Drafts
+      // written before session timing existed have no start, so adopt now.
+      setStartedAt(draft.startedAt ?? Date.now());
       return;
     }
 
     setLogs(buildFreshLogs(day));
+    // The clock runs from the moment the session opens, not from the first
+    // logged set - the user is here to train, and a timer that stays blank
+    // until they type reads as broken.
+    setStartedAt(Date.now());
   }, [program, user?.id]);
+
+  // The session clock. Recomputed from the start timestamp on every tick rather
+  // than incremented, so a throttled background tab can't make it drift.
+  useEffect(() => {
+    if (startedAt == null) {
+      setElapsedSeconds(null);
+      return;
+    }
+    const update = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
 
   // Mirror every change to localStorage so a reconnect/reload can restore the
   // in-progress session instead of losing it. Only once real data has been
@@ -358,7 +384,10 @@ export default function Log() {
   useEffect(() => {
     const key = currentDraftKeyRef.current;
     if (!key || logs.length === 0 || !hasLoggedData(logs)) return;
-    saveDraft(key, logs);
+    // Persist the running clock alongside the logs so a refresh resumes the
+    // same start. The draft is still only written once there's real data, so
+    // opening the page and backing out leaves nothing behind.
+    saveDraft(key, logs, startedAt ?? Date.now());
     if (user?.id && activeSessionRef.current) {
       saveActiveSession(user.id, activeSessionRef.current);
     }
@@ -526,6 +555,11 @@ export default function Log() {
           dayNumber: activeDay?.dayNumber ?? 1,
           weekNumber: program?.weekNumber ?? 1,
           dayLabel: activeDay?.label ?? null,
+          // Sent exactly as recorded, however implausible - an overnight session
+          // is stored honestly and simply fails the plausibility band when
+          // averages are computed. The user is never asked about the clock.
+          startedAt: startedAt ? new Date(startedAt).toISOString() : null,
+          durationSeconds: startedAt ? Math.round((Date.now() - startedAt) / 1000) : null,
           exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => {
             if (ex.kind === "checklist") {
               return {
@@ -689,6 +723,18 @@ export default function Log() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
+            {/* Ambient information, not an achievement - deliberately not given
+                the PR pill's treatment, and kept out of the corner the PR badge
+                and "Cancel workout" already share. */}
+            {elapsedSeconds != null && (
+              <div
+                className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5"
+                data-testid="text-session-duration"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span className="font-medium tabular-nums">{formatClock(elapsedSeconds)}</span>
+              </div>
+            )}
             {resumedElsewhere && (
               <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
                 Resuming your in-progress session - finish it before starting a new one.
