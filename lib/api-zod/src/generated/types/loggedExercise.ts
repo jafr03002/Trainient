@@ -5,6 +5,8 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { LoggedExerciseCategory } from './loggedExerciseCategory';
+import type { LoggedExerciseKind } from './loggedExerciseKind';
 import type { LoggedSet } from './loggedSet';
 
 export interface LoggedExercise {
@@ -12,4 +14,24 @@ export interface LoggedExercise {
   name: string;
   muscle: string;
   sets: LoggedSet[];
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+  kind?: LoggedExerciseKind;
+  /**
+     * @minimum 0
+     * @maximum 50
+     * @nullable
+     */
+  completedRounds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /** @nullable */
+  category?: LoggedExerciseCategory;
 }

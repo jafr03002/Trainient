@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
@@ -16,6 +16,21 @@ import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
 import { buildDayColorOrder, dayColorAt, dayColorHex, dayTones } from "@/lib/dayColors";
+import {
+  CHECKLIST_ACCENT,
+  CHECKLIST_CATEGORIES,
+  DISTANCE_UNITS,
+  MAX_WHEEL_SECONDS,
+  TARGET_TYPE_OPTIONS,
+  categoryMeta,
+  clampTargetValue,
+  describeTarget,
+  describeTargetWithRounds,
+  formatDuration,
+  type ItemKind,
+  type TargetType,
+} from "@/lib/checklistItems";
+import { DurationWheel } from "@/components/DurationWheel";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
@@ -50,7 +65,21 @@ export type Exercise = {
   muscle: string;
   secondaryMuscle?: string | null;
   isUnilateral?: boolean;
+  // Checklist items (see lib/checklistItems.ts). All optional: a row written before
+  // this feature existed has none of them and is a lift by default. On a checklist
+  // row `sets` carries the round count and `reps` the display target.
+  kind?: ItemKind;
+  targetType?: TargetType | null;
+  targetSeconds?: number | null;
+  targetValue?: number | null;
+  targetUnit?: string | null;
+  category?: string | null;
 };
+
+/** Legacy rows have no `kind`, so absent means lift. */
+export function isChecklist(ex: { kind?: string | null }): boolean {
+  return ex.kind === "checklist";
+}
 
 export type ProgramDay = {
   dayNumber: number;
@@ -82,6 +111,37 @@ function useDayColorOverrides(): Record<string, string> {
 }
 
 function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
+  // A checklist row has no muscle and no sets×reps, so it gets its own line-up:
+  // the category colour on the edge bar, the category name where the muscle would
+  // be, and the target ("2:30", "× 20") where the set count would be.
+  if (isChecklist(ex)) {
+    const meta = categoryMeta(ex.category);
+    const barColor = meta?.token ?? CHECKLIST_ACCENT;
+    const target = describeTargetWithRounds({ ...ex, rounds: ex.sets });
+    return (
+      <div className="flex items-center gap-3 py-3 pl-2.5 pr-4 min-w-0">
+        <div
+          className="w-1 self-stretch rounded-full shrink-0"
+          style={{ backgroundColor: barColor, boxShadow: `0 0 8px ${barColor}` }}
+        />
+        <ListChecks className="w-3.5 h-3.5 shrink-0" style={{ color: barColor }} />
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm text-foreground truncate">{ex.name}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+            <span className="font-medium" style={{ color: barColor }}>
+              {meta ? meta.label : "Checklist"}
+            </span>
+          </p>
+        </div>
+        {target && (
+          <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
+            {target}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   const accent = muscleAccent(ex.muscle);
   const barColor = accent?.solid ?? "hsl(var(--primary))";
   const barGlow = accent?.glow ?? "hsl(var(--primary) / 0.55)";
@@ -118,12 +178,43 @@ type EditExercise = {
   muscle: string;
   secondaryMuscle: string;
   isUnilateral: boolean;
+  // Checklist fields. `kind` decides which row shape renders and which validation
+  // applies; the rest are only read when kind === "checklist".
+  kind: ItemKind;
+  targetType: TargetType;
+  /** Seconds, straight from the min/sec wheel - the same unit the API stores. */
+  durationSeconds: number;
+  targetValue: string;
+  targetUnit: string;
+  category: string;
 };
 type EditDay = { label: string; exercises: EditExercise[] };
 
+const CHECKLIST_DEFAULTS = {
+  kind: "checklist" as ItemKind,
+  targetType: "none" as TargetType,
+  durationSeconds: 0,
+  targetValue: "",
+  targetUnit: "m",
+  category: "",
+};
+
 function newExercise(): EditExercise {
   // Section 1: default sets to 2 in the build-your-own flow.
-  return { name: "", sets: "2", reps: "8-12", muscle: "", secondaryMuscle: "", isUnilateral: false };
+  return {
+    name: "", sets: "2", reps: "8-12", muscle: "", secondaryMuscle: "", isUnilateral: false,
+    ...CHECKLIST_DEFAULTS,
+    kind: "lift",
+  };
+}
+
+// Starts as a plain tick-off: targetType "none", one round, no category. Every
+// target field is optional by design, so typing a name is the whole minimum.
+function newChecklistItem(): EditExercise {
+  return {
+    name: "", sets: "1", reps: "", muscle: "", secondaryMuscle: "", isUnilateral: false,
+    ...CHECKLIST_DEFAULTS,
+  };
 }
 
 function programToEditDays(program: { days: unknown }): EditDay[] {
@@ -132,11 +223,20 @@ function programToEditDays(program: { days: unknown }): EditDay[] {
     label: d.label ?? "",
     exercises: (d.exercises ?? []).map((e) => ({
       name: e.name ?? "",
-      sets: String(e.sets ?? 2),
+      // A checklist item defaults to a single round; a lift keeps the old default.
+      sets: String(e.sets ?? (isChecklist(e) ? 1 : 2)),
       reps: e.reps ?? "",
       muscle: e.muscle ?? "",
       secondaryMuscle: e.secondaryMuscle ?? "",
       isUnilateral: !!e.isUnilateral,
+      kind: isChecklist(e) ? "checklist" : "lift",
+      targetType: (e.targetType ?? "none") as TargetType,
+      // Clamped to what the wheel can express, so a legacy row storing more than
+      // an hour doesn't land on a position the picker can't scroll back to.
+      durationSeconds: Math.min(Math.max(0, e.targetSeconds ?? 0), MAX_WHEEL_SECONDS),
+      targetValue: e.targetValue != null ? String(e.targetValue) : "",
+      targetUnit: e.targetUnit ?? "m",
+      category: e.category ?? "",
     })),
   }));
 }
@@ -164,6 +264,15 @@ function findInvalidField(days: EditDay[]): FieldError | null {
     for (let ei = 0; ei < days[di].exercises.length; ei++) {
       const ex = days[di].exercises[ei];
       if (!ex.name.trim()) return { day: di, exercise: ei, field: "name", message: MISSING_FIELD_MESSAGE };
+      // A checklist item requires nothing beyond its name. Its target fields are
+      // optional on purpose - a blank duration just means "plain tick-off", not an
+      // error - and its round count is picked from a bounded select, so neither can
+      // be out of range. Rounds is still range-checked below via the shared path.
+      if (ex.kind === "checklist") {
+        const roundsMessage = ex.sets.trim() ? rangeError(ex.sets, FIELD_LIMITS.sets) : null;
+        if (roundsMessage) return { day: di, exercise: ei, field: "sets", message: roundsMessage };
+        continue;
+      }
       // Blank is an error here, unlike the optional profile fields rangeError is
       // usually pointing at - an exercise has to have a set count.
       const setsMessage = ex.sets.trim()
@@ -362,6 +471,15 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     ));
   }
 
+  // Appends to the same `exercises` array as addExercise, so a checklist item is
+  // reorderable against the lifts with the existing arrows rather than living in a
+  // separate list that could only sit before or after them.
+  function addChecklistItem(di: number) {
+    setDays((d) => d.map((day, i) =>
+      i === di ? { ...day, exercises: [...day.exercises, newChecklistItem()] } : day
+    ));
+  }
+
   function removeExercise(di: number, ei: number) {
     setDays((d) => d.map((day, i) =>
       i === di ? { ...day, exercises: day.exercises.filter((_, j) => j !== ei) } : day
@@ -398,8 +516,17 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     if (fieldError.field === "sets" && fixed.trim() && !rangeError(fixed, FIELD_LIMITS.sets)) setFieldError(null);
   }
 
-  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean) {
-    patchExercise(di, ei, { [field]: value } as Partial<EditExercise>);
+  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean | number) {
+    const patch = { [field]: value } as Partial<EditExercise>;
+    // Switching how an item is measured clears the previous measure's value, so
+    // a duration left over from an earlier choice can't be saved against a
+    // "distance" item and quietly arm a timer. Done here rather than in
+    // patchExercise, which is a plain multi-field write with no rules of its own.
+    if (field === "targetType") {
+      if (value !== "duration") patch.durationSeconds = 0;
+      if (value !== "count" && value !== "distance") patch.targetValue = "";
+    }
+    patchExercise(di, ei, patch);
   }
 
   async function performSave() {
@@ -407,20 +534,58 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       dayNumber: i + 1,
       label: d.label.trim(),
       focus: d.label.trim(),
-      exercises: d.exercises.map((e) => ({
-        name: e.name.trim(),
-        // Safe to parse bare: handleSave/findInvalidField already rejected anything
-        // that isn't a whole number in range, so there's no fallback to hide a 0
-        // behind any more.
-        sets: parseInt(e.sets, 10),
-        reps: e.reps,
-        rpe: null,
-        restSeconds: null,
-        cue: null,
-        muscle: e.muscle,
-        secondaryMuscle: e.secondaryMuscle || null,
-        isUnilateral: e.isUnilateral,
-      })),
+      exercises: d.exercises.map((e) => {
+        if (e.kind === "checklist") {
+          const targetSeconds = e.targetType === "duration" ? e.durationSeconds : null;
+          const rounds = parseInt(e.sets, 10) || 1;
+          const targetValue =
+            (e.targetType === "count" || e.targetType === "distance") && e.targetValue.trim()
+              ? clampTargetValue(Number(e.targetValue), e.targetType)
+              : null;
+          return {
+            name: e.name.trim(),
+            // `sets` is the round count and `reps` the display target on a
+            // checklist row - reusing the required lift fields is what lets this
+            // ship without changing Exercise's required set.
+            sets: rounds,
+            reps: describeTarget({
+              targetType: e.targetType,
+              targetSeconds,
+              targetValue,
+              targetUnit: e.targetUnit,
+            }) ?? "",
+            rpe: null,
+            restSeconds: null,
+            cue: null,
+            // Deliberately blank: muscleKeyOf("") returns null, so the
+            // muscle-volume breakdown and the day's hero tint both skip this row.
+            muscle: "",
+            secondaryMuscle: null,
+            isUnilateral: false,
+            kind: "checklist" as const,
+            targetType: e.targetType,
+            targetSeconds,
+            targetValue,
+            targetUnit: e.targetType === "distance" ? e.targetUnit : e.targetType === "count" ? "reps" : null,
+            category: e.category || null,
+          };
+        }
+        return {
+          name: e.name.trim(),
+          // Safe to parse bare: handleSave/findInvalidField already rejected anything
+          // that isn't a whole number in range, so there's no fallback to hide a 0
+          // behind any more.
+          sets: parseInt(e.sets, 10),
+          reps: e.reps,
+          rpe: null,
+          restSeconds: null,
+          cue: null,
+          muscle: e.muscle,
+          secondaryMuscle: e.secondaryMuscle || null,
+          isUnilateral: e.isUnilateral,
+          kind: "lift" as const,
+        };
+      }),
     }));
 
     const body = {
@@ -485,7 +650,11 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }
     setFieldError(null);
 
-    const hasUnsetMuscle = days.some((d) => d.exercises.some((e) => e.name.trim() && !e.muscle));
+    // Checklist items are excluded: they have no muscle by design, so counting them
+    // here would raise the reminder on every save of a program that has one.
+    const hasUnsetMuscle = days.some((d) =>
+      d.exercises.some((e) => e.kind !== "checklist" && e.name.trim() && !e.muscle),
+    );
     if (hasUnsetMuscle) {
       setShowMuscleConfirm(true);
       return;
@@ -604,7 +773,175 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
           </div>
 
           <div className="space-y-3">
-            {day.exercises.map((ex, ei) => (
+            {day.exercises.map((ex, ei) => ex.kind === "checklist" ? (
+              // A checklist row is deliberately a different shape from a lift row - no
+              // muscle/sets/reps grid - so the two never blur together in a mixed
+              // day. The reorder and delete controls are the same ones the lift
+              // rows use. Background stays the same neutral fill as a lift row;
+              // the accent border and pill carry the distinction on their own.
+              <div
+                key={ei}
+                className="rounded-lg border border-chart-4/30 p-3 space-y-2 bg-secondary/10"
+                data-testid={`checklist-item-${di}-${ei}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-chart-4/15 text-chart-4 text-[11px] font-medium flex items-center justify-center">
+                    {ei + 1}
+                  </span>
+                  <span className="shrink-0 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-chart-4 border border-chart-4/30 bg-chart-4/10 rounded-full px-2 py-0.5">
+                    <ListChecks className="w-3 h-3" />
+                    <span className="hidden sm:inline">Checklist</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={ex.name}
+                    onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
+                    maxLength={MAX_EXERCISE_NAME}
+                    placeholder="e.g. Couch stretch"
+                    className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
+                      fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
+                        ? "border-destructive"
+                        : "border-border"
+                    }`}
+                    data-testid={`checklist-name-input-${di}-${ei}`}
+                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveExercise(di, ei, -1)}
+                      disabled={ei === 0}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move up"
+                      data-testid={`checklist-move-up-${di}-${ei}`}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveExercise(di, ei, 1)}
+                      disabled={ei === day.exercises.length - 1}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move down"
+                      data-testid={`checklist-move-down-${di}-${ei}`}
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeExercise(di, ei)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      data-testid={`checklist-remove-${di}-${ei}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* items-start because the duration wheel is taller than a text
+                    input, and without it every other field on the line would be
+                    stretched to match. */}
+                <div className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-6 sm:col-span-5">
+                    <label className="text-[11px] text-muted-foreground block mb-1">Track by</label>
+                    <select
+                      value={ex.targetType}
+                      onChange={(e) => updateExercise(di, ei, "targetType", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary"
+                      data-testid={`checklist-tracktype-${di}-${ei}`}
+                    >
+                      {TARGET_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+
+                    {/* The wheel lives inside the Track by cell, directly under
+                        the select that summons it, rather than in a band of its
+                        own further down the card. Same column means it reads as
+                        this selector's value, and it lays out identically on
+                        mobile and desktop - the column is the only thing that
+                        needs to be wide enough for it. */}
+                    {ex.targetType === "duration" && (
+                      <div className="mt-1.5">
+                        <DurationWheel
+                          seconds={ex.durationSeconds}
+                          onChange={(s) => updateExercise(di, ei, "durationSeconds", s)}
+                          accent="hsl(var(--chart-4))"
+                          testId={`checklist-duration-${di}-${ei}`}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {(ex.targetType === "count" || ex.targetType === "distance") && (
+                    <div className={ex.targetType === "distance" ? "col-span-3 sm:col-span-2" : "col-span-3 sm:col-span-4"}>
+                      <label className="text-[11px] text-muted-foreground block mb-1 text-center">Amount</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ex.targetValue}
+                        onChange={(e) => updateExercise(di, ei, "targetValue", e.target.value.replace(/[^\d.]/g, ""))}
+                        placeholder={ex.targetType === "count" ? "20" : "400"}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
+                        data-testid={`checklist-amount-input-${di}-${ei}`}
+                      />
+                    </div>
+                  )}
+
+                  {ex.targetType === "distance" && (
+                    <div className="col-span-3 sm:col-span-2">
+                      <label className="text-[11px] text-muted-foreground block mb-1 text-center">Unit</label>
+                      <select
+                        value={ex.targetUnit}
+                        onChange={(e) => updateExercise(di, ei, "targetUnit", e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary"
+                        data-testid={`checklist-unit-${di}-${ei}`}
+                      >
+                        {DISTANCE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className={ex.targetType === "count" || ex.targetType === "distance" ? "col-span-3" : "col-span-6 sm:col-span-3"}>
+                    <label className="text-[11px] text-muted-foreground block mb-1 text-center">Rounds</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={ex.sets}
+                      onChange={(e) => updateExercise(di, ei, "sets", e.target.value)}
+                      placeholder="1"
+                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary ${
+                        fieldError?.field === "sets" && fieldError.day === di && fieldError.exercise === ei
+                          ? "border-destructive"
+                          : "border-border"
+                      }`}
+                      data-testid={`checklist-rounds-input-${di}-${ei}`}
+                    />
+                  </div>
+
+                  <div className="col-span-12 sm:col-span-6">
+                    <label className="text-[11px] text-muted-foreground block mb-1">Category (optional)</label>
+                    <select
+                      value={ex.category}
+                      onChange={(e) => updateExercise(di, ei, "category", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border/70 bg-secondary/10 text-foreground text-sm focus:outline-none focus:border-primary"
+                      data-testid={`checklist-category-${di}-${ei}`}
+                    >
+                      <option value="">None</option>
+                      {CHECKLIST_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Confirms what the wheel actually arms, in words. Kept out of the
+                    grid so it reads as a statement about the row rather than a
+                    fourth field, and so it can appear and disappear without
+                    reflowing the fields above it. */}
+                {ex.targetType === "duration" && ex.durationSeconds > 0 && (
+                  <span
+                    className="flex items-center gap-1 text-[11px] font-semibold text-chart-4"
+                    data-testid={`checklist-timer-hint-${di}-${ei}`}
+                  >
+                    <Timer className="w-3 h-3" />
+                    Shows a {formatDuration(ex.durationSeconds)} timer when logging
+                  </span>
+                )}
+              </div>
+            ) : (
               <div
                 key={ei}
                 className={`rounded-lg border border-border/60 p-3 space-y-2 ${
@@ -718,13 +1055,27 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
             ))}
           </div>
 
-          <button
-            onClick={() => addExercise(di)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add exercise
-          </button>
+          {/* Two explicit buttons rather than one "Add item" that opens a type
+              menu: the menu would cost a tap on every add and hide the checklist
+              feature behind a control you'd have to already know about. */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <button
+              onClick={() => addExercise(di)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`add-exercise-${di}`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add exercise
+            </button>
+            <button
+              onClick={() => addChecklistItem(di)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`add-checklist-item-${di}`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add checklist item
+            </button>
+          </div>
         </div>
         );
       })}
@@ -916,7 +1267,13 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
-  const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
+  // Checklist items are counted separately, not folded into either figure: their
+  // `sets` is a round count for something like a stretch hold, so adding it to
+  // "Sets" would overstate the day's training volume, and counting them under
+  // "Exercises" would misdescribe them.
+  const liftExercises = day ? day.exercises.filter((ex) => !isChecklist(ex)) : [];
+  const checklistCount = day ? day.exercises.length - liftExercises.length : 0;
+  const totalSets = liftExercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
 
   // Each day's colour, from the same order the calendar and the editor use, so
   // the day that's blue here is blue in its calendar pills and in its edit card.
@@ -1013,13 +1370,21 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           <h2 className="font-display text-2xl font-bold text-foreground mt-1">{day.focus}</h2>
           <div className="flex mt-4 pt-3 border-t border-border">
             <div className="flex-1 min-w-0">
-              <p className="font-display text-xl font-bold text-foreground">{day.exercises.length}</p>
+              <p className="font-display text-xl font-bold text-foreground">{liftExercises.length}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Exercises</p>
             </div>
             <div className="flex-1 min-w-0 border-l border-border pl-4">
               <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
             </div>
+            {checklistCount > 0 && (
+              <div className="flex-1 min-w-0 border-l border-border pl-4">
+                <p className="font-display text-xl font-bold text-foreground">{checklistCount}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
+                  Checklist
+                </p>
+              </div>
+            )}
           </div>
           {startWorkoutButton}
         </motion.div>
@@ -1062,9 +1427,15 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           transition={{ duration: 0.2 }}
           className="rounded-2xl border border-border bg-card divide-y divide-border/60 overflow-hidden"
         >
-          {day.exercises.map((ex, i) => (
-            <RosterRow key={ex.name} ex={ex} index={i} />
-          ))}
+          {/* Numbering counts lifts only, so a checklist item sitting between two
+              exercises doesn't consume a number and leave a gap ("...5, 7"). */}
+          {(() => {
+            let liftIndex = -1;
+            return day.exercises.map((ex, i) => {
+              if (!isChecklist(ex)) liftIndex++;
+              return <RosterRow key={`${ex.name}-${i}`} ex={ex} index={liftIndex} />;
+            });
+          })()}
         </motion.div>
       )}
 

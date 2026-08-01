@@ -1,6 +1,6 @@
 import { useRef, useState, type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2, Check, ListChecks } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListWorkouts,
@@ -20,6 +20,7 @@ import {
   getGetMuscleVolumeBreakdownQueryKey,
   getGetWorkoutsByDayLabelQueryKey,
 } from "@workspace/api-client-react";
+import { CHECKLIST_ACCENT, categoryMeta, formatDuration } from "@/lib/checklistItems";
 import { phaseSolid, phaseSoft, phaseLabel } from "@/lib/phaseColors";
 import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
 import {
@@ -169,6 +170,36 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef 
           {/* Exercise list */}
           <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-8 space-y-6">
             {exercises.map((ex: any, i: number) => {
+              // A logged checklist item has no sets and no muscle, so it gets a
+              // compact line of its own rather than an empty muscle pill above an
+              // empty set list.
+              if (ex.kind === "checklist") {
+                const meta = categoryMeta(ex.category);
+                const accent = meta?.token ?? CHECKLIST_ACCENT;
+                const done = (ex.completedRounds ?? 0) > 0;
+                return (
+                  <div key={i} className="flex items-center gap-3 min-w-0" data-testid={`session-checklist-${i}`}>
+                    <span
+                      className={`shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center ${
+                        done ? "bg-chart-2/15 border-chart-2/50 text-chart-2" : "bg-secondary/30 border-border text-muted-foreground/50"
+                      }`}
+                    >
+                      {done ? <Check className="w-3.5 h-3.5" /> : <ListChecks className="w-3 h-3" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className={`font-semibold text-foreground truncate ${done ? "" : "opacity-60"}`}>{ex.name}</h3>
+                      <p className="text-xs text-muted-foreground truncate">
+                        <span className="font-medium" style={{ color: accent }}>
+                          {meta ? meta.label : "Checklist"}
+                        </span>
+                        {(ex.targetSeconds ?? 0) > 0 && <> · {formatDuration(ex.targetSeconds)}</>}
+                        {(ex.completedRounds ?? 0) > 1 && <> · {ex.completedRounds} rounds</>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               const prevSets = findPrevExerciseSets(ex.name);
 
               return (

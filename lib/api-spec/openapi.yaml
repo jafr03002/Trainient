@@ -782,6 +782,16 @@ components:
     # The sets/reps ceilings are absurdity backstops (a set count of 99999 is a typo,
     # not a workout), not programming advice - hence the generous 50. Length caps keep
     # a pasted essay out of the exercise row, which has nowhere to put it.
+    # A day's items are a mixed list: `kind` discriminates a weight-training row
+    # from a checklist row (stretching, a plank hold, breathing work). Checklist
+    # rows deliberately reuse the lift fields rather than adding required ones -
+    # `sets` is the round count and `reps` is the human-readable target ("2:30") -
+    # so every pre-existing row and client keeps validating unchanged. They also
+    # carry muscle:"" so the muscle-volume maths skips them.
+    #
+    # A checklist row never carries weight or reps data when logged, which is what
+    # keeps it out of volume/e1RM/PR analysis for free (see workoutAnalysis.ts's
+    # isPerformed). Nothing may synthesise fake sets to represent a tick.
     Exercise:
       type: object
       required: [name, sets, reps, muscle]
@@ -795,6 +805,25 @@ components:
         muscle:          { type: string }
         secondaryMuscle: { type: ["string", "null"] }
         isUnilateral:    { type: boolean }
+        # Absent on every row written before checklist items existed, hence the
+        # default rather than a required field.
+        kind:            { type: string, enum: [lift, checklist], default: lift }
+        # How a checklist row is measured. "none" (or null) is a plain tick-off,
+        # which is the default a new item starts as - the target fields below are
+        # all optional by design, so an item is usable with just a name.
+        targetType:      { type: ["string", "null"], enum: [duration, count, distance, none, null] }
+        # Duration is stored ONLY as a canonical second count - the builder's
+        # min/sec wheel is a view concern. A 5-minute item and a 300-second item are the
+        # same row, so nothing downstream ever converts units. 86400 = 24h, an
+        # absurdity backstop rather than programming advice.
+        targetSeconds:   { type: ["integer", "null"], minimum: 0, maximum: 86400 }
+        # Used by targetType count/distance only; duration uses targetSeconds.
+        targetValue:     { type: ["number", "null"], minimum: 0, maximum: 100000 }
+        targetUnit:      { type: ["string", "null"], enum: [reps, m, km, null] }
+        # Drives the item's accent colour. Cardio is deliberately absent:
+        # it already lives in daily_logs.cardioMinutes and Program.cardioIntensity,
+        # and a third home for it would fragment the data.
+        category:        { type: ["string", "null"], enum: [stretch, mobility, core, breathing, other, null] }
 
     ProgramDay:
       type: object
@@ -926,6 +955,21 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LoggedSet"
+        # The log page has always sent this and three consumers read it back
+        # (calendar.tsx, log.tsx's "last time" hint, and checkinData.ts's AI
+        # prompt) - but it was missing here, so zod's default strip silently
+        # dropped it before insert and every one of those reads found nothing.
+        notes:  { type: ["string", "null"], maxLength: 2000 }
+        # A logged checklist item: no weight, no reps, just how many of its rounds
+        # were ticked. Kept out of `sets` on purpose - a fake set would land in the
+        # volume and PR maths.
+        kind:            { type: string, enum: [lift, checklist], default: lift }
+        completedRounds: { type: ["integer", "null"], minimum: 0, maximum: 50 }
+        # Both copied from the program row so history renders "🤸 Mobility · 2:30"
+        # without looking the program up - and still reads correctly after the
+        # program is edited, which is the point of snapshotting them here.
+        targetSeconds:   { type: ["integer", "null"], minimum: 0, maximum: 86400 }
+        category:        { type: ["string", "null"], enum: [stretch, mobility, core, breathing, other, null] }
 
     WorkoutLog:
       type: object

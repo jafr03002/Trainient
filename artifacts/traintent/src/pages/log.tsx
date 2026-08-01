@@ -2,10 +2,18 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell, Check } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
+import {
+  CHECKLIST_ACCENT,
+  categoryMeta,
+  describeTarget,
+  parseCategory,
+  type ChecklistCategory,
+} from "@/lib/checklistItems";
+import { ChecklistLogCard } from "@/components/ChecklistLogCard";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import {
   type LoggedExercise,
@@ -31,29 +39,114 @@ function isEmptySet(s: any): boolean {
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
 }
 
+// A ticked checklist item counts as real data. Without this a mobility-only session
+// reads as empty: the day picker would stay unlocked mid-session and the draft could
+// be discarded out from under the user.
 function hasLoggedData(logs: LoggedExercise[]): boolean {
-  return logs.some((ex) => ex.notes.trim() !== "" || ex.sets.some((s) => !isEmptySet(s)));
+  return logs.some(
+    (ex) => ex.notes.trim() !== "" || (ex.completedRounds ?? 0) > 0 || ex.sets.some((s) => !isEmptySet(s)),
+  );
+}
+
+/**
+ * Rebuilds the session from the CURRENT program day, then folds the user's entered
+ * work back in by exercise name.
+ *
+ * A draft is just a JSON blob in localStorage with a 24h life, so it can easily
+ * predate the shape the app now expects - a session left open across the release
+ * that added checklist items restores entries with no `kind`, which then render as
+ * lift cards with an empty muscle chip and a nonsense "Target: 1 x". Taking the
+ * structure from the program and only the DATA from the draft fixes that, and as a
+ * side effect also handles the program being edited mid-session (an added or
+ * removed exercise no longer leaves the logger showing a stale list).
+ */
+/**
+ * Identifies the shape of a day's exercise list - what is in it and how much of
+ * each - so an edit to the program can be told apart from a plain refetch of it.
+ * Deliberately ignores anything the logger doesn't build its rows from (muscle,
+ * cue, category), since a change there shouldn't disturb an open session.
+ */
+function dayStructureKey(day: any): string {
+  return ((day?.exercises as any[]) ?? [])
+    .map((ex) => `${ex?.kind ?? "lift"}:${ex?.name ?? ""}:${ex?.sets ?? ""}:${ex?.reps ?? ""}:${ex?.targetSeconds ?? ""}`)
+    .join("|");
+}
+
+function reconcileDraftLogs(draftLogs: LoggedExercise[], day: any): LoggedExercise[] {
+  const byName = new Map<string, LoggedExercise>();
+  for (const entry of draftLogs ?? []) {
+    if (entry?.name) byName.set(entry.name.toLowerCase(), entry);
+  }
+
+  return buildFreshLogs(day).map((fresh) => {
+    const saved = byName.get(fresh.name.toLowerCase());
+    if (!saved) return fresh;
+
+    if (fresh.kind === "checklist") {
+      return {
+        ...fresh,
+        notes: saved.notes ?? "",
+        showNotes: !!saved.showNotes,
+        // Clamp: the program's round count may have been lowered since.
+        completedRounds: Math.min(fresh.targetRounds, saved.completedRounds ?? 0),
+        // A countdown is only restored while it is still in the future; one that
+        // expired while the tab was closed is dropped rather than replayed.
+        timerEndsAt: saved.timerEndsAt != null && saved.timerEndsAt > Date.now() ? saved.timerEndsAt : null,
+        timerPausedRemaining: saved.timerPausedRemaining ?? null,
+      };
+    }
+
+    return {
+      ...fresh,
+      notes: saved.notes ?? "",
+      showNotes: !!saved.showNotes,
+      // Keep the fresh row count (the program is the authority on how many sets
+      // are prescribed) and copy across whatever the user actually logged.
+      sets: fresh.sets.map((s, i) => {
+        const savedSet = saved.sets?.[i];
+        return savedSet ? { ...s, ...savedSet, setNumber: s.setNumber } : s;
+      }),
+    };
+  });
 }
 
 function buildFreshLogs(day: any): LoggedExercise[] {
-  return day.exercises.map((ex: any) => ({
-    name: ex.name,
-    muscle: ex.muscle,
-    isUnilateral: !!ex.isUnilateral,
-    targetSets: ex.sets,
-    targetReps: ex.reps,
-    notes: "",
-    showNotes: false,
-    sets: Array.from({ length: ex.sets }, (_, i) => ({
-      setNumber: i + 1,
-      weight: 0,
-      reps: 0,
-      repsLeft: 0,
-      repsRight: 0,
-      completed: false,
-      isNewPr: false,
-    })),
-  }));
+  return day.exercises.map((ex: any) => {
+    const isChecklistItem = ex.kind === "checklist";
+    const targetRounds = Math.max(1, ex.sets ?? 1);
+    return {
+      name: ex.name,
+      muscle: ex.muscle,
+      isUnilateral: !!ex.isUnilateral,
+      targetSets: ex.sets,
+      targetReps: ex.reps,
+      notes: "",
+      showNotes: false,
+      kind: isChecklistItem ? "checklist" : "lift",
+      targetType: ex.targetType ?? null,
+      targetSeconds: ex.targetSeconds ?? null,
+      targetValue: ex.targetValue ?? null,
+      targetUnit: ex.targetUnit ?? null,
+      category: parseCategory(ex.category),
+      completedRounds: 0,
+      targetRounds,
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+      // Deliberately empty for a checklist item: a placeholder set would be picked
+      // up by the volume and PR maths as soon as anything wrote a number into it.
+      sets: isChecklistItem
+        ? []
+        : Array.from({ length: ex.sets }, (_, i) => ({
+            setNumber: i + 1,
+            weight: 0,
+            reps: 0,
+            repsLeft: 0,
+            repsRight: 0,
+            completed: false,
+            isNewPr: false,
+          })),
+    };
+  });
 }
 
 // Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
@@ -227,16 +320,32 @@ export default function Log() {
     const key = draftKey(user.id, program.id, day.dayNumber);
     activeSessionRef.current = { programId: program.id, dayNumber: day.dayNumber };
 
-    // Already initialized for this exact day (e.g. `program` just refetched
-    // after a reconnect) - don't touch in-progress `logs`.
-    if (initializedKeyRef.current === key) return;
+    // The seed key covers the day AND the shape of its exercise list. Keying on
+    // the day alone meant an edit to the program could never reach an open
+    // logger: saving invalidates the program query, but this page often mounts
+    // and seeds from the cached copy BEFORE that refetch lands, and every later
+    // run then early-returned because the day hadn't changed. The added item was
+    // invisible until the draft was discarded - and discarding only helped when
+    // it happened to come after the refetch, which is why it took a few tries.
+    const seedKey = `${key}::${dayStructureKey(day)}`;
+    if (initializedKeyRef.current === seedKey) return;
 
-    initializedKeyRef.current = key;
+    // Same day, different structure: the program was edited while this session
+    // was open. Re-seed from the new structure but keep what the user has
+    // already entered - reconcile folds it back in by exercise name.
+    const structureChangedMidSession = currentDraftKeyRef.current === key;
+
+    initializedKeyRef.current = seedKey;
     currentDraftKeyRef.current = key;
+
+    if (structureChangedMidSession) {
+      setLogs((prev) => reconcileDraftLogs(prev, day));
+      return;
+    }
 
     const draft = loadDraft(key);
     if (draft) {
-      setLogs(draft.logs);
+      setLogs(reconcileDraftLogs(draft.logs, day));
       return;
     }
 
@@ -254,6 +363,41 @@ export default function Log() {
       saveActiveSession(user.id, activeSessionRef.current);
     }
   }, [logs]);
+
+  // Drives the countdown display. Only runs while a timer is actually going, so an
+  // ordinary lifting session schedules nothing. The remaining time is always
+  // derived from `timerEndsAt` rather than counted down here, so a throttled or
+  // frozen tab (backgrounded phone, locked screen) resumes showing the correct
+  // value instead of however far the interval got.
+  const hasRunningTimer = logs.some((ex) => ex.timerEndsAt != null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasRunningTimer) return;
+    const id = window.setInterval(() => setNowTs(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [hasRunningTimer]);
+
+  // A finished countdown ticks its own round off, so a completed hold needs no
+  // extra tap. `nowTs` must stay in the dep list: `logs` does not change while a
+  // countdown runs, so depending on it alone would leave an expired timer frozen
+  // at 0:00 instead of completing its round. Comparing against the clock (rather
+  // than counting down) also catches a timer that expired while the tab was hidden.
+  useEffect(() => {
+    const now = Date.now();
+    const expired = logs.some((ex) => ex.timerEndsAt != null && ex.timerEndsAt <= now);
+    if (!expired) return;
+    setLogs((prev) =>
+      prev.map((ex) => {
+        if (ex.timerEndsAt == null || ex.timerEndsAt > now) return ex;
+        return {
+          ...ex,
+          completedRounds: Math.min(ex.targetRounds, ex.completedRounds + 1),
+          timerEndsAt: null,
+          timerPausedRemaining: null,
+        };
+      }),
+    );
+  }, [logs, nowTs]);
 
   // Sets are saved implicitly by typing - no separate "confirm" step. Weight
   // and reps together mark a set as logged, and PR detection runs inline.
@@ -300,6 +444,64 @@ export default function Log() {
     });
   }
 
+  // Checklist items get their own completion path. They must NOT go through
+  // updateSet, whose `completed = weight > 0 && hasReps` can never be true for
+  // something with no weight and no reps.
+  function patchItem(exIdx: number, patch: Partial<LoggedExercise>) {
+    setLogs((prev) => prev.map((ex, i) => (i === exIdx ? { ...ex, ...patch } : ex)));
+  }
+
+  /**
+   * Completes the current round of a timed item and rolls straight on to the
+   * next one - clearing the timer resets it to the full hold, ready to start
+   * again. Unlike toggleChecklistRound this only ever moves forward: a swipe is
+   * a one-way gesture, so it must not un-tick a finished item by accident.
+   *
+   * Undo comes for free at the end: once the last round lands the item is done,
+   * the filling card gives way to the ordinary checklist row, and that row's
+   * tick clears it.
+   */
+  function completeChecklistRound(exIdx: number) {
+    const ex = logs[exIdx];
+    patchItem(exIdx, {
+      completedRounds: Math.min(ex.targetRounds, ex.completedRounds + 1),
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+    });
+  }
+
+  /** Tick the next round, or untick everything once all rounds are done. */
+  function toggleChecklistRound(exIdx: number) {
+    const ex = logs[exIdx];
+    const done = ex.completedRounds >= ex.targetRounds;
+    patchItem(exIdx, {
+      completedRounds: done ? 0 : ex.completedRounds + 1,
+      // Ticking by hand cancels any running countdown for that round.
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+    });
+  }
+
+  function startTimer(exIdx: number) {
+    const ex = logs[exIdx];
+    const seconds = ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
+    if (seconds <= 0) return;
+    patchItem(exIdx, { timerEndsAt: Date.now() + seconds * 1000, timerPausedRemaining: null });
+  }
+
+  function pauseTimer(exIdx: number) {
+    const ex = logs[exIdx];
+    if (ex.timerEndsAt == null) return;
+    patchItem(exIdx, {
+      timerEndsAt: null,
+      timerPausedRemaining: Math.max(0, Math.ceil((ex.timerEndsAt - Date.now()) / 1000)),
+    });
+  }
+
+  function resetTimer(exIdx: number) {
+    patchItem(exIdx, { timerEndsAt: null, timerPausedRemaining: null });
+  }
+
   function updateNotes(exIdx: number, notes: string) {
     setLogs((prev) => {
       const next = [...prev];
@@ -324,18 +526,35 @@ export default function Log() {
           dayNumber: activeDay?.dayNumber ?? 1,
           weekNumber: program?.weekNumber ?? 1,
           dayLabel: activeDay?.label ?? null,
-          exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
-            name: ex.name,
-            muscle: ex.muscle,
-            sets: ex.sets.map((s) =>
-              ex.isUnilateral
-                ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
-                : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
-            ),
-            notes: ex.notes || undefined,
-          })),
+          exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => {
+            if (ex.kind === "checklist") {
+              return {
+                name: ex.name,
+                muscle: "",
+                // No sets, ever. An empty array is what keeps this row out of the
+                // volume, e1RM and PR maths on the way back in.
+                sets: [],
+                kind: "checklist" as const,
+                completedRounds: ex.completedRounds,
+                targetSeconds: ex.targetSeconds,
+                category: ex.category,
+                notes: ex.notes || undefined,
+              };
+            }
+            return {
+              name: ex.name,
+              muscle: ex.muscle,
+              kind: "lift" as const,
+              sets: ex.sets.map((s) =>
+                ex.isUnilateral
+                  ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
+                  : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
+              ),
+              notes: ex.notes || undefined,
+            };
+          }),
           notes: null,
-        } as any,
+        },
       });
     } catch {
       // Leave the draft and the user on the page - losing a finished session to a
@@ -361,7 +580,15 @@ export default function Log() {
   }
 
   function handleFinishClick() {
-    const allSetsComplete = logs.every((ex) => ex.sets.every((s) => s.completed));
+    // Checklist items count toward the gate exactly like sets do. Nothing is
+    // blocked either way - an unticked item only means Finish warns first, and
+    // the confirm sheet still lets the session through.
+    const allSetsComplete = logs.every((ex) => {
+      if (ex.kind === "checklist") {
+        return ex.completedRounds >= ex.targetRounds;
+      }
+      return ex.sets.every((s) => s.completed);
+    });
     if (allSetsComplete) {
       finishWorkout();
     } else {
@@ -496,6 +723,121 @@ export default function Log() {
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
+          // Checklist items render in program order, inline among the exercise
+          // cards - a warmup item appears above the first lift because that is
+          // where it sits in the day.
+          if (ex.kind === "checklist") {
+            const meta = categoryMeta(ex.category);
+            const accent = meta?.token ?? CHECKLIST_ACCENT;
+            const allDone = ex.completedRounds >= ex.targetRounds;
+            const isRunning = ex.timerEndsAt != null;
+            const timed = (ex.targetSeconds ?? 0) > 0 && ex.targetType === "duration";
+            const remaining = isRunning
+              ? Math.max(0, Math.ceil((ex.timerEndsAt! - Date.now()) / 1000))
+              : ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
+            const total = ex.targetSeconds ?? 0;
+            const target = describeTarget(ex);
+
+            // A timed item gets the filling card with swipe-to-complete. Every
+            // other checklist item keeps the tick, which is still the right
+            // control when there is no duration to visualise.
+            if (timed && !allDone) {
+              return (
+                <motion.div
+                  key={`${ex.name}-${exIdx}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: exIdx * 0.06 }}
+                  data-testid={`log-checklist-${exIdx}`}
+                >
+                  <ChecklistLogCard
+                    name={ex.name}
+                    accent={accent}
+                    label={meta ? meta.label : "Checklist"}
+                    completedRounds={ex.completedRounds}
+                    targetRounds={ex.targetRounds}
+                    remaining={remaining}
+                    total={total}
+                    isRunning={isRunning}
+                    isPaused={ex.timerPausedRemaining != null}
+                    onCompleteRound={() => completeChecklistRound(exIdx)}
+                    onStart={() => startTimer(exIdx)}
+                    onPause={() => pauseTimer(exIdx)}
+                    onReset={() => resetTimer(exIdx)}
+                    testId={`checklist-${exIdx}`}
+                  />
+                </motion.div>
+              );
+            }
+
+            return (
+              <motion.div
+                key={`${ex.name}-${exIdx}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: exIdx * 0.06 }}
+                // Same neutral card fill as an exercise card; the accent border,
+                // icon and timer carry the distinction without a colour wash.
+                className="rounded-xl overflow-hidden border bg-card"
+                style={{ borderColor: `color-mix(in srgb, ${accent} 32%, transparent)` }}
+                data-testid={`log-checklist-${exIdx}`}
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <button
+                    onClick={() => toggleChecklistRound(exIdx)}
+                    aria-pressed={allDone}
+                    // An untouched tick renders no text, so without an explicit
+                    // label this button reaches a screen reader unnamed.
+                    aria-label={
+                      allDone
+                        ? `${ex.name} — done, tap to clear`
+                        : `${ex.name} — mark round ${Math.min(ex.completedRounds + 1, ex.targetRounds)} of ${ex.targetRounds} done`
+                    }
+                    className={`shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                      allDone
+                        ? "bg-chart-2/15 border-chart-2/50 text-chart-2"
+                        : "bg-secondary/30 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    }`}
+                    title={allDone ? "Mark as not done" : "Mark a round done"}
+                    data-testid={`checklist-tick-${exIdx}`}
+                  >
+                    {allDone ? (
+                      <Check className="w-4 h-4" />
+                    ) : ex.completedRounds > 0 ? (
+                      <span className="text-[11px] font-display font-bold tabular-nums">
+                        {ex.completedRounds}/{ex.targetRounds}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      className={`font-semibold text-foreground truncate ${allDone ? "opacity-55 line-through" : ""}`}
+                    >
+                      {ex.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      <span className="font-medium" style={{ color: accent }}>
+                        {meta ? meta.label : "Checklist"}
+                      </span>
+                      {ex.targetRounds > 1 && (
+                        <> · round {Math.min(ex.completedRounds + 1, ex.targetRounds)} of {ex.targetRounds}</>
+                      )}
+                      {target && ex.targetRounds === 1 && <> · {target}</>}
+                    </p>
+                  </div>
+
+                  {!timed && target && (
+                    <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap shrink-0">
+                      {target}
+                    </span>
+                  )}
+                </div>
+
+              </motion.div>
+            );
+          }
+
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
           const prevNote = lastNoteByExercise[ex.name.toLowerCase()];
           const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
