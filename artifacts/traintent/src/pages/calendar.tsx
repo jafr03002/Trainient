@@ -1,6 +1,7 @@
 import { useRef, useState, type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2, Check, ListChecks } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2, Check, ListChecks, Clock } from "lucide-react";
+import { formatSessionLength, formatStartTime, countsTowardAverage } from "@/lib/sessionDuration";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListWorkouts,
@@ -41,6 +42,8 @@ type WorkoutLog = {
   weekNumber: number;
   mode: string;
   exercisesLogged: any[];
+  startedAt?: string | null;
+  durationSeconds?: number | null;
 };
 
 type SessionModalProps = {
@@ -161,6 +164,31 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef 
                 {new Date(session.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
               </p>
+              {/* Timing gets its own line rather than extending the date line
+                  sideways. This is also the only place in the calendar that has
+                  ever shown a time of day - `date` is a bare YYYY-MM-DD, so
+                  `startedAt` is what makes it possible. */}
+              {session.durationSeconds != null && (
+                <div className="mt-1" data-testid="text-session-duration">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    {session.startedAt && (
+                      <>
+                        {formatStartTime(session.startedAt)}
+                        <span className="text-muted-foreground/50">·</span>
+                      </>
+                    )}
+                    {formatSessionLength(session.durationSeconds)}
+                  </p>
+                  {/* An overnight session is stored honestly; this stops the
+                      resulting number reading as a bug. */}
+                  {!countsTowardAverage(session) && (
+                    <p className="text-[11px] text-muted-foreground/50 mt-0.5">
+                      Not counted toward your average
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <button ref={closeButtonRef} onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
               <X className="w-5 h-5" />

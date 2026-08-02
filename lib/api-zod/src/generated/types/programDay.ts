@@ -13,5 +13,12 @@ export interface ProgramDay {
   label: string;
   /** @maxLength 60 */
   focus: string;
+  /**
+     * The AI's predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.
+     * @minimum 1
+     * @maximum 300
+     * @nullable
+     */
+  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 }

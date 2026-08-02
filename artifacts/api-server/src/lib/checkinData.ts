@@ -13,6 +13,7 @@ import {
   muscleVolumeLatestWeek,
 } from "./workoutAnalysis";
 import { daysAgoStr, inWindow } from "./dateWindow";
+import { countsTowardAverage, AVERAGE_WINDOW } from "./sessionDuration";
 import { formatAdherence, type SessionAdherence } from "./sessionAdherence";
 
 type BodyweightLog = { date: string; weight: number; weightUnit: string };
@@ -47,8 +48,11 @@ export function buildCheckinEvidence(args: {
   // the model are shown the same numbers.
   adherence: SessionAdherence;
   missedSessionReason: string | null;
+  // The current program's days, so measured session length can be shown against
+  // the length the model predicted for that day.
+  programDays?: { label?: string | null; dayNumber?: number; estimatedDurationMinutes?: number | null }[];
 }): CheckinEvidence {
-  const { today, bodyweightLogs, dailyLogs, workoutLogs, adherence, missedSessionReason } = args;
+  const { today, bodyweightLogs, dailyLogs, workoutLogs, adherence, missedSessionReason, programDays } = args;
   const weightUnit = bodyweightLogs[0]?.weightUnit ?? "kg";
 
   const thisStart = daysAgoStr(today, 6); // inclusive 7-day window ending today
@@ -104,6 +108,37 @@ export function buildCheckinEvidence(args: {
         .join("\n")
     : "  - No performed working sets logged in the recent window.";
 
+  // Measured session length per session type, against what the program predicted.
+  // Only sessions that pass the plausibility gate are shown - a forgotten Finish
+  // would otherwise tell the model a session takes 23 hours.
+  const durationGroups = new Map<string, { label: string; seconds: number[] }>();
+  for (const log of workoutLogs) {
+    if (!countsTowardAverage({ durationSeconds: log.durationSeconds ?? null, exercisesLogged: log.exercisesLogged })) {
+      continue;
+    }
+    const label = log.dayLabel ?? `Day ${log.dayNumber ?? "?"}`;
+    let group = durationGroups.get(label);
+    if (!group) {
+      group = { label, seconds: [] };
+      durationGroups.set(label, group);
+    }
+    if (group.seconds.length < AVERAGE_WINDOW) group.seconds.push(log.durationSeconds!);
+  }
+
+  const durationLines = durationGroups.size
+    ? [...durationGroups.values()]
+        .map((g) => {
+          const actual = Math.round(g.seconds.reduce((a, b) => a + b, 0) / g.seconds.length / 60);
+          const planned = programDays?.find((d) => d.label === g.label)?.estimatedDurationMinutes ?? null;
+          const vs =
+            planned != null
+              ? `; planned ${planned} min (${actual - planned >= 0 ? "+" : ""}${actual - planned} min)`
+              : "";
+          return `  - ${g.label}: ${actual} min avg over ${g.seconds.length} session(s)${vs}`;
+        })
+        .join("\n")
+    : "  - No sessions with a trustworthy recorded duration yet.";
+
   const muscleVolumeLine = Object.keys(muscleVolume).length
     ? Object.entries(muscleVolume)
         .sort((a, b) => b[1] - a[1])
@@ -120,6 +155,8 @@ ${formatAdherence(adherence, missedSessionReason)}
 - progressionAcrossSets (per-exercise e1RM = weight × (1 + reps/30), oldest→newest sessions):
 ${progressionLines}
 - muscle volume this week (Σ weight × reps of working sets): ${muscleVolumeLine}
+- sessionDuration (measured wall-clock length per session type vs what the program planned):
+${durationLines}
 - sessionComments: ${comments.length ? "\n  · " + comments.join("\n  · ") : "none"}`;
 
   return { averageWeight, averageWeightLastWeek, weightUnit, text };

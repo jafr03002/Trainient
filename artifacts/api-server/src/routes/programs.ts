@@ -232,6 +232,12 @@ Apply these rules:
 - Name the program in plain language after its split (e.g. "Push Pull Legs", "Upper/Lower
   Split") - never append training-method jargon like "Hypertrophy" or "Strength" to the name,
   and never pad it with redundant generic nouns like "Block", "Program", or "Plan"
+- Give every day an estimated_duration_minutes: how long that session honestly takes from
+  walking in to walking out, counting a warm-up, every working set, and the rest you
+  prescribed between them. The client sees this before deciding to train and their real
+  session length is measured against it, so an optimistic number gets found out. If the
+  arithmetic lands somewhere the client is unlikely to sustain, fix the session rather than
+  the estimate
 
 Also produce exactly 2 "program highlights" - short explanations of why the program looks
 the way it does. Do not write one highlight per input factor (split, priority muscle,
@@ -247,6 +253,7 @@ Return ONLY valid JSON (no markdown, no explanation) structured as:
 { "program_name": "...", "split_type": "...",
   "program_highlights": [ { "title": "...", "detail": "..." } ],
   "days": [ { "day_number": 1, "label": "...", "focus": "...",
+    "estimated_duration_minutes": 55,
     "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
     "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
   "daily_step_target": 8000,
@@ -304,6 +311,7 @@ For each day, provide 5–7 exercises. For each exercise provide:
     dayNumber: d.day_number,
     label: d.label,
     focus: d.focus,
+    estimatedDurationMinutes: d.estimated_duration_minutes ?? null,
     exercises: d.exercises.map((e: any) => ({
       name: e.name,
       sets: e.sets,

@@ -318,6 +318,13 @@ export interface ProgramDay {
   label: string;
   /** @maxLength 60 */
   focus: string;
+  /**
+     * The AI's predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.
+     * @minimum 1
+     * @maximum 300
+     * @nullable
+     */
+  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 }
 
@@ -571,6 +578,16 @@ export interface WorkoutLog {
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
+  /**
+     * When the session clock started (the log page opening). Null for sessions logged before timing existed.
+     * @nullable
+     */
+  startedAt?: string | null;
+  /**
+     * Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.
+     * @nullable
+     */
+  durationSeconds?: number | null;
   createdAt: string;
 }
 
@@ -590,6 +607,27 @@ export interface WorkoutLogInput {
      * @nullable
      */
   notes?: string | null;
+  /** @nullable */
+  startedAt?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  durationSeconds?: number | null;
+}
+
+export interface SessionDurationStat {
+  /** @nullable */
+  dayLabel: string | null;
+  dayNumber: number;
+  averageSeconds: number;
+  /** How many eligible sessions the average is drawn from. */
+  sampleCount: number;
+}
+
+export interface SessionDurationStats {
+  stats: SessionDurationStat[];
 }
 
 export interface WorkoutStats {
