@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Dumbbell } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Info } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { MUSCLE_COLORS } from "@/lib/muscles";
 import {
@@ -43,6 +43,10 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
   // Which muscle group is expanded while browsing. One at a time keeps the
   // popover short instead of unrolling the entire library at once.
   const [openGroup, setOpenGroup] = useState<MuscleOption | null>(null);
+  // The exercise whose detail side is showing, if any. The popover has two
+  // sides: the list, and this. List state is left alone while it's set, so
+  // going back lands on the same search results or expanded group.
+  const [detail, setDetail] = useState<LibraryExercise | null>(null);
   const [highlight, setHighlight] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -65,12 +69,14 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
     onPick(exercise);
     setOpen(false);
     setBrowsing(false);
+    setDetail(null);
     inputRef.current?.focus();
   }
 
   function handleChange(next: string) {
     onChange(next);
     setHighlight(0);
+    setDetail(null);
     // Typing leaves browse mode - the list becomes the ranked matches for what's
     // now in the box. With nothing to suggest the popover gets out of the way
     // entirely rather than hanging around empty over a custom exercise name.
@@ -83,6 +89,7 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
     // Start with every group closed so the popover opens as a short list of
     // muscle groups rather than the whole library.
     setOpenGroup(null);
+    setDetail(null);
     setHighlight(0);
     setOpen(true);
     inputRef.current?.focus();
@@ -96,14 +103,21 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
       if (!open) return;
-      // Swallow it so the surrounding editor doesn't also treat this as a
-      // cancel - closing the suggestions leaves the typed text alone.
+      // Closing is Radix's to do, from the capture-phase document listener
+      // that has already run by the time this fires - see onEscapeKeyDown
+      // below, which is also where the detail side is stepped back from.
+      // Closing here as well would undo that step back, since the state it
+      // reads has been cleared a moment earlier in the same keystroke.
+      //
+      // All that's left is to swallow the key so the surrounding editor
+      // doesn't also treat it as a cancel - dismissing the suggestions leaves
+      // the typed text alone.
       e.preventDefault();
       e.stopPropagation();
-      setOpen(false);
-      setBrowsing(false);
       return;
     }
+    // The detail side has no rows, so there's nothing to move through or pick.
+    if (detail) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!open) {
         if (e.key === "ArrowDown") {
@@ -131,34 +145,56 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
 
   function renderRow(item: LibraryExercise, i: number, nested = false) {
     return (
-      <button
+      // A row carries two separate actions - pick the exercise, or look it up -
+      // so it's a wrapper around two buttons rather than one button. The
+      // wrapper holds the highlight state the arrow keys and the
+      // scroll-into-view effect read.
+      <div
         key={`${item.muscle}-${item.name}`}
-        type="button"
-        // Without this the input blurs on press and the popover closes before
-        // the click ever lands.
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => choose(item)}
         onMouseEnter={() => setHighlight(i)}
         data-highlighted={i === highlight}
-        className={`w-full flex items-center gap-2 py-2.5 pr-3 text-left text-sm transition-colors ${
-          // Indented under its group header so the nesting is legible.
-          nested ? "pl-9" : "pl-3"
-        } ${i === highlight ? "bg-secondary/70 text-foreground" : "text-foreground/90"}`}
+        className={`w-full flex items-center transition-colors ${
+          i === highlight ? "bg-secondary/70 text-foreground" : "text-foreground/90"
+        }`}
       >
-        {!nested && (
-          <span
-            className="shrink-0 w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: MUSCLE_COLORS[item.muscle] }}
-          />
-        )}
-        <span className="flex-1 min-w-0 truncate">{item.name}</span>
-        {/* Browse mode already says the muscle in the section header; in search
-            results it's what tells two same-named entries apart (dips are both
-            a chest and a triceps exercise). */}
-        {!browsing && (
-          <span className="shrink-0 text-[11px] text-muted-foreground">{item.muscle}</span>
-        )}
-      </button>
+        <button
+          type="button"
+          // Without this the input blurs on press and the popover closes before
+          // the click ever lands.
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => choose(item)}
+          className={`flex-1 min-w-0 flex items-center gap-2 py-2.5 pr-2 text-left text-sm ${
+            // Indented under its group header so the nesting is legible.
+            nested ? "pl-9" : "pl-3"
+          }`}
+        >
+          {!nested && (
+            <span
+              className="shrink-0 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: MUSCLE_COLORS[item.muscle] }}
+            />
+          )}
+          <span className="flex-1 min-w-0 truncate">{item.name}</span>
+          {/* Browse mode already says the muscle in the section header; in search
+              results it's what tells two same-named entries apart (dips are both
+              a chest and a triceps exercise). */}
+          {!browsing && (
+            <span className="shrink-0 text-[11px] text-muted-foreground">{item.muscle}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setDetail(item)}
+          // Solid rather than translucent: at 60% the circle all but vanishes
+          // against the popover and only the icon reads.
+          className="shrink-0 mr-2 w-6 h-6 grid place-items-center rounded-full bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          title={`About ${item.name}`}
+          aria-label={`About ${item.name}`}
+        >
+          <Info className="w-3.5 h-3.5" />
+        </button>
+      </div>
     );
   }
 
@@ -167,7 +203,10 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setBrowsing(false);
+        if (!next) {
+          setBrowsing(false);
+          setDetail(null);
+        }
       }}
     >
       <PopoverAnchor asChild>
@@ -209,6 +248,16 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
         // typing - the popover is a suggestion surface, not a modal.
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        // Radix runs this from a capture-phase document listener, ahead of the
+        // input's own key handler - so this is the one place that still sees
+        // the detail side as showing, and the only place the step back to the
+        // list can be taken. Leaving it unprevented is what closes the popover
+        // normally.
+        onEscapeKeyDown={(e) => {
+          if (!detail) return;
+          e.preventDefault();
+          setDetail(null);
+        }}
         collisionPadding={12}
         // Matches the field on desktop, but with a floor: on a phone the name
         // input is only ~120px between the index badge and the three row
@@ -219,42 +268,87 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
         // resolves to nothing here and the list collapses to its content width.
         className="w-[max(var(--radix-popover-trigger-width),18rem)] max-w-[calc(100vw-1.5rem)] p-0 overflow-hidden"
       >
-        <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
-          {browsing
-            ? LIBRARY_GROUPS.map(({ muscle, names }) => {
-                const expanded = openGroup === muscle;
-                return (
-                  <div key={muscle}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => toggleGroup(muscle)}
-                      aria-expanded={expanded}
-                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
-                        expanded ? "bg-secondary/40 text-foreground" : "text-foreground/90 hover:bg-secondary/25"
-                      }`}
-                    >
-                      <ChevronRight
-                        className={`w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform ${
-                          expanded ? "rotate-90" : ""
+        {detail ? (
+          // The library's other side. It's a placeholder for now - what earns
+          // the info button its place is somewhere to put per-exercise guidance later,
+          // so this side exists and navigates before it has anything to say.
+          <div className="p-3">
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setDetail(null)}
+                className="shrink-0 -ml-1 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                title="Back to the exercise list"
+                aria-label="Back to the exercise list"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="shrink-0 w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: MUSCLE_COLORS[detail.muscle] }}
+                  />
+                  <span className="flex-1 min-w-0 truncate text-sm font-medium text-foreground">
+                    {detail.name}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{detail.muscle}</p>
+              </div>
+            </div>
+
+            <p className="mt-3 text-sm text-muted-foreground">
+              Exercise details are coming soon.
+            </p>
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(detail)}
+              className="mt-3 w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Use this exercise
+            </button>
+          </div>
+        ) : (
+          <div ref={listRef} className="max-h-72 overflow-y-auto py-1">
+            {browsing
+              ? LIBRARY_GROUPS.map(({ muscle, names }) => {
+                  const expanded = openGroup === muscle;
+                  return (
+                    <div key={muscle}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => toggleGroup(muscle)}
+                        aria-expanded={expanded}
+                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors ${
+                          expanded ? "bg-secondary/40 text-foreground" : "text-foreground/90 hover:bg-secondary/25"
                         }`}
-                      />
-                      <span
-                        className="shrink-0 w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: MUSCLE_COLORS[muscle] }}
-                      />
-                      <span className="flex-1 min-w-0 truncate font-medium">{muscle}</span>
-                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                        {names.length}
-                      </span>
-                    </button>
-                    {expanded &&
-                      names.map((name, i) => renderRow({ name, muscle }, i, true))}
-                  </div>
-                );
-              })
-            : items.map((item, i) => renderRow(item, i))}
-        </div>
+                      >
+                        <ChevronRight
+                          className={`w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform ${
+                            expanded ? "rotate-90" : ""
+                          }`}
+                        />
+                        <span
+                          className="shrink-0 w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: MUSCLE_COLORS[muscle] }}
+                        />
+                        <span className="flex-1 min-w-0 truncate font-medium">{muscle}</span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                          {names.length}
+                        </span>
+                      </button>
+                      {expanded &&
+                        names.map((name, i) => renderRow({ name, muscle }, i, true))}
+                    </div>
+                  );
+                })
+              : items.map((item, i) => renderRow(item, i))}
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );
