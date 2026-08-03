@@ -82,18 +82,43 @@ export function formatStartTime(startedAt: string): string {
  * Last-resort estimate for a day nobody has trained yet and the AI never sized -
  * i.e. every Independent-mode day. Work time per set plus its prescribed rest,
  * plus a warm-up allowance.
+ *
+ * A checklist item is priced from what it actually declares, never from the set
+ * arithmetic: its `sets` is a round count for a stretch hold or a plank, so
+ * feeding it through sets × (work + rest) charged a plain tick-off over two
+ * minutes of lifting time it never takes. A timed item costs its own target,
+ * once per round. An untimed one - "just tick it", a rep count, a distance -
+ * costs nothing, because nothing on the row says how long it runs and a guess
+ * here is indistinguishable from the bug this replaces.
  */
 export const WARMUP_SECONDS = 8 * 60;
 export const WORK_SECONDS_PER_SET = 40;
 export const DEFAULT_REST_SECONDS = 90;
 
-export function estimateDurationSeconds(
-  exercises: { sets?: number | null; restSeconds?: number | null }[]
-): number | null {
+type EstimableExercise = {
+  sets?: number | null;
+  restSeconds?: number | null;
+  kind?: string | null;
+  targetType?: string | null;
+  targetSeconds?: number | null;
+};
+
+export function estimateDurationSeconds(exercises: EstimableExercise[]): number | null {
   if (!exercises.length) return null;
-  const work = exercises.reduce(
-    (total, ex) => total + (ex.sets || 0) * (WORK_SECONDS_PER_SET + (ex.restSeconds ?? DEFAULT_REST_SECONDS)),
-    0
-  );
-  return work > 0 ? work + WARMUP_SECONDS : null;
+
+  let liftWork = 0;
+  let checklistWork = 0;
+  for (const ex of exercises) {
+    const rounds = ex.sets || 0;
+    if (ex.kind === "checklist") {
+      if (ex.targetType === "duration") checklistWork += rounds * (ex.targetSeconds || 0);
+      continue;
+    }
+    liftWork += rounds * (WORK_SECONDS_PER_SET + (ex.restSeconds ?? DEFAULT_REST_SECONDS));
+  }
+
+  // The warm-up allowance is for lifting, so a day of nothing but mobility work
+  // doesn't get charged for one it never does.
+  const total = liftWork + checklistWork + (liftWork > 0 ? WARMUP_SECONDS : 0);
+  return total > 0 ? total : null;
 }
