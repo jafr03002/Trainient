@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Dumbbell, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dumbbell, Info } from "lucide-react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { MUSCLE_COLORS } from "@/lib/muscles";
 import {
@@ -103,17 +103,17 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
       if (!open) return;
-      // Swallow it so the surrounding editor doesn't also treat this as a
-      // cancel - closing the suggestions leaves the typed text alone.
+      // Closing is Radix's to do, from the capture-phase document listener
+      // that has already run by the time this fires - see onEscapeKeyDown
+      // below, which is also where the detail side is stepped back from.
+      // Closing here as well would undo that step back, since the state it
+      // reads has been cleared a moment earlier in the same keystroke.
+      //
+      // All that's left is to swallow the key so the surrounding editor
+      // doesn't also treat it as a cancel - dismissing the suggestions leaves
+      // the typed text alone.
       e.preventDefault();
       e.stopPropagation();
-      // From the detail side Escape is a step back to the list, not a close.
-      if (detail) {
-        setDetail(null);
-        return;
-      }
-      setOpen(false);
-      setBrowsing(false);
       return;
     }
     // The detail side has no rows, so there's nothing to move through or pick.
@@ -192,7 +192,7 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
           title={`About ${item.name}`}
           aria-label={`About ${item.name}`}
         >
-          <Eye className="w-3.5 h-3.5" />
+          <Info className="w-3.5 h-3.5" />
         </button>
       </div>
     );
@@ -248,9 +248,11 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
         // typing - the popover is a suggestion surface, not a modal.
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
-        // Radix dismisses on Escape from a document listener, which the input's
-        // own handler can't head off - so the "go back to the list instead of
-        // closing" case has to be taken here.
+        // Radix runs this from a capture-phase document listener, ahead of the
+        // input's own key handler - so this is the one place that still sees
+        // the detail side as showing, and the only place the step back to the
+        // list can be taken. Leaving it unprevented is what closes the popover
+        // normally.
         onEscapeKeyDown={(e) => {
           if (!detail) return;
           e.preventDefault();
@@ -268,7 +270,7 @@ export function ExerciseNamePicker({ value, onChange, onPick, invalid, maxLength
       >
         {detail ? (
           // The library's other side. It's a placeholder for now - what earns
-          // the eye its place is somewhere to put per-exercise guidance later,
+          // the info button its place is somewhere to put per-exercise guidance later,
           // so this side exists and navigates before it has anything to say.
           <div className="p-3">
             <div className="flex items-start gap-2">
