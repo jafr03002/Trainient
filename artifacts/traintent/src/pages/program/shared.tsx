@@ -13,7 +13,7 @@ import {
   getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
-import { formatSessionLength, estimateDurationSeconds } from "@/lib/sessionDuration";
+import { formatSessionLength, MIN_SESSIONS_FOR_AVERAGE } from "@/lib/sessionDuration";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
@@ -87,8 +87,6 @@ export type ProgramDay = {
   dayNumber: number;
   label: string;
   focus: string;
-  /** The AI's predicted session length. Absent for Independent-mode days. */
-  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 };
 
@@ -1272,12 +1270,13 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
-  // Checklist items are counted separately, not folded into either figure: their
-  // `sets` is a round count for something like a stretch hold, so adding it to
-  // "Sets" would overstate the day's training volume, and counting them under
-  // "Exercises" would misdescribe them.
+  // Checklist items are invisible to both figures, and get no figure of their own:
+  // their `sets` is a round count for something like a stretch hold, so adding it
+  // to "Sets" would overstate the day's training volume, and counting them under
+  // "Exercises" would misdescribe them. The item itself still shows in the roster
+  // below and in the logger - it just isn't summarised as a number up here, so the
+  // stats read purely as lifting volume (matching trainingWorkloadFor server-side).
   const liftExercises = day ? day.exercises.filter((ex) => !isChecklist(ex)) : [];
-  const checklistCount = day ? day.exercises.length - liftExercises.length : 0;
   const totalSets = liftExercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
 
   // Each day's colour, from the same order the calendar and the editor use, so
@@ -1286,24 +1285,17 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
   const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
 
-  // How long this session takes, in descending order of how much we actually
-  // know. A measured average beats the AI's guess, which beats arithmetic - and
-  // the label says which one the user is looking at rather than passing an
-  // estimate off as a measurement. Tier 3 is what every Independent-mode day
-  // shows, since no AI ever sized those.
+  // How long this session takes - measured, or not shown at all. There is no
+  // estimate tier any more: the tile appears once this day has been trained
+  // MIN_SESSIONS_FOR_AVERAGE times and stays absent until then, so the number
+  // never has to be labelled as a guess or defended as one.
   const sessionDuration = (() => {
     if (!day) return null;
     const measured = durationStats.data?.stats.find(
       (s) => (s.dayLabel != null ? s.dayLabel === day.label : s.dayNumber === day.dayNumber)
     );
-    if (measured && measured.sampleCount >= 1) {
-      return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration", measured: true };
-    }
-    if (day.estimatedDurationMinutes) {
-      return { text: formatSessionLength(day.estimatedDurationMinutes * 60), label: "Est. duration", measured: false };
-    }
-    const seconds = estimateDurationSeconds(day.exercises);
-    return seconds ? { text: formatSessionLength(seconds), label: "Est. duration", measured: false } : null;
+    if (!measured || measured.sampleCount < MIN_SESSIONS_FOR_AVERAGE) return null;
+    return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration" };
   })();
 
   // This page is the only way to pick which day to log - the log page itself
@@ -1402,14 +1394,6 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
               <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
             </div>
-            {checklistCount > 0 && (
-              <div className="flex-1 min-w-0 border-l border-border pl-4">
-                <p className="font-display text-xl font-bold text-foreground">{checklistCount}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
-                  Checklist
-                </p>
-              </div>
-            )}
             {sessionDuration && (
               <div className="flex-1 min-w-0 border-l border-border pl-4" data-testid="stat-session-duration">
                 <p className="font-display text-xl font-bold text-foreground flex items-center gap-1.5">

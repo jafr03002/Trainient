@@ -27,10 +27,6 @@ export const MAX_STORABLE_SECONDS = 24 * 60 * 60;
 // number tracks current fitness rather than averaging in last year's pace.
 export const AVERAGE_WINDOW = 10;
 
-// One eligible session is a noisy average, but it is a real measurement of this
-// user where the alternative (the AI's estimate) is a guess about them.
-export const MIN_SAMPLES_FOR_AVERAGE = 1;
-
 export function totalSetCount(exercisesLogged: unknown): number {
   const exercises = (exercisesLogged as LoggedExercise[] | null) ?? [];
   return exercises.reduce((n, ex) => n + (ex?.sets?.length ?? 0), 0);
@@ -61,11 +57,21 @@ export function isPlausibleDuration(seconds: number | null | undefined, setCount
  * deliberately more permissive than the log page's `completed` flag: that flag
  * requires weight > 0, so a bodyweight set logged as reps-only would otherwise
  * disqualify an entire honest session.
+ *
+ * Checklist rows are held to none of this, because a logged one carries `sets: []`
+ * by design - that empty array is the invariant keeping stretches out of the
+ * volume and PR maths. Judging them by the lift rule made every session
+ * containing one permanently ineligible: not "not yet averaged", but never, no
+ * matter how many times the day was trained. A day with a stretch programmed
+ * into it could never show a duration at all.
  */
 export function isFullyLogged(exercisesLogged: unknown): boolean {
   const exercises = (exercisesLogged as LoggedExercise[] | null) ?? [];
-  if (exercises.length === 0) return false;
-  return exercises.every(
+  const lifts = exercises.filter((ex) => ex?.kind !== "checklist");
+  // A session of nothing but ticked-off stretches has no set data to vouch for
+  // it, so it stays out rather than averaging in as a very short "workout".
+  if (lifts.length === 0) return false;
+  return lifts.every(
     (ex) => (ex?.sets?.length ?? 0) > 0 && ex.sets.every((s: LoggedSet) => isPerformed(s))
   );
 }

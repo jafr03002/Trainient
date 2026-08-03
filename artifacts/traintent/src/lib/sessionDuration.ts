@@ -18,7 +18,7 @@ type LoggedSetLike = {
   repsLeft?: number | null;
   repsRight?: number | null;
 };
-type LoggedExerciseLike = { sets?: LoggedSetLike[] };
+type LoggedExerciseLike = { sets?: LoggedSetLike[]; kind?: string | null };
 
 function isPerformed(s: LoggedSetLike): boolean {
   return (s.weight || 0) > 0 || (s.reps || 0) > 0 || (s.repsLeft || 0) > 0 || (s.repsRight || 0) > 0;
@@ -41,8 +41,13 @@ export function countsTowardAverage(log: {
   const band = plausibleBand(setCount);
   const d = log.durationSeconds;
   if (d == null || !band || d < band.min || d > band.max) return false;
-  if (exercises.length === 0) return false;
-  return exercises.every((ex) => (ex?.sets?.length ?? 0) > 0 && ex.sets!.every(isPerformed));
+  // Checklist rows are exempt from the "every exercise has sets" rule - a logged
+  // one carries `sets: []` by design, so holding it to the lift rule would make
+  // every session containing a stretch permanently ineligible. See the server's
+  // isFullyLogged, which is the source of truth for this.
+  const lifts = exercises.filter((ex) => ex?.kind !== "checklist");
+  if (lifts.length === 0) return false;
+  return lifts.every((ex) => (ex?.sets?.length ?? 0) > 0 && ex.sets!.every(isPerformed));
 }
 
 /** Ticking stopwatch: "18:42" under an hour, "1:07:15" at or past it. */
@@ -79,21 +84,17 @@ export function formatStartTime(startedAt: string): string {
 }
 
 /**
- * Last-resort estimate for a day nobody has trained yet and the AI never sized -
- * i.e. every Independent-mode day. Work time per set plus its prescribed rest,
- * plus a warm-up allowance.
+ * How many logged sessions of a day it takes before its average is worth showing.
+ *
+ * The program page used to fall back to an estimate when it had fewer - the AI's
+ * predicted length, or failing that arithmetic over sets and rest. Both were
+ * guesses dressed as data, and the arithmetic one needed its own rules for every
+ * kind of row (a checklist item's `sets` is a round count, not a set) to stay
+ * even roughly honest. A duration is now only ever a measurement: three sessions
+ * of evidence, or the tile doesn't appear.
+ *
+ * Three rather than one because a single session sets the bar wherever that day
+ * happened to land - a rushed session or one with a long phone call in it - and
+ * the user has no way to see that the "average" is a sample of one.
  */
-export const WARMUP_SECONDS = 8 * 60;
-export const WORK_SECONDS_PER_SET = 40;
-export const DEFAULT_REST_SECONDS = 90;
-
-export function estimateDurationSeconds(
-  exercises: { sets?: number | null; restSeconds?: number | null }[]
-): number | null {
-  if (!exercises.length) return null;
-  const work = exercises.reduce(
-    (total, ex) => total + (ex.sets || 0) * (WORK_SECONDS_PER_SET + (ex.restSeconds ?? DEFAULT_REST_SECONDS)),
-    0
-  );
-  return work > 0 ? work + WARMUP_SECONDS : null;
-}
+export const MIN_SESSIONS_FOR_AVERAGE = 3;
