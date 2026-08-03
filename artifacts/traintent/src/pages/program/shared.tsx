@@ -13,7 +13,7 @@ import {
   getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
-import { formatSessionLength, estimateDurationSeconds } from "@/lib/sessionDuration";
+import { formatSessionLength, MIN_SESSIONS_FOR_AVERAGE } from "@/lib/sessionDuration";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
@@ -87,8 +87,6 @@ export type ProgramDay = {
   dayNumber: number;
   label: string;
   focus: string;
-  /** The AI's predicted session length. Absent for Independent-mode days. */
-  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 };
 
@@ -1287,24 +1285,17 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
   const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
 
-  // How long this session takes, in descending order of how much we actually
-  // know. A measured average beats the AI's guess, which beats arithmetic - and
-  // the label says which one the user is looking at rather than passing an
-  // estimate off as a measurement. Tier 3 is what every Independent-mode day
-  // shows, since no AI ever sized those.
+  // How long this session takes - measured, or not shown at all. There is no
+  // estimate tier any more: the tile appears once this day has been trained
+  // MIN_SESSIONS_FOR_AVERAGE times and stays absent until then, so the number
+  // never has to be labelled as a guess or defended as one.
   const sessionDuration = (() => {
     if (!day) return null;
     const measured = durationStats.data?.stats.find(
       (s) => (s.dayLabel != null ? s.dayLabel === day.label : s.dayNumber === day.dayNumber)
     );
-    if (measured && measured.sampleCount >= 1) {
-      return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration", measured: true };
-    }
-    if (day.estimatedDurationMinutes) {
-      return { text: formatSessionLength(day.estimatedDurationMinutes * 60), label: "Est. duration", measured: false };
-    }
-    const seconds = estimateDurationSeconds(day.exercises);
-    return seconds ? { text: formatSessionLength(seconds), label: "Est. duration", measured: false } : null;
+    if (!measured || measured.sampleCount < MIN_SESSIONS_FOR_AVERAGE) return null;
+    return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration" };
   })();
 
   // This page is the only way to pick which day to log - the log page itself

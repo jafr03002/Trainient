@@ -79,46 +79,17 @@ export function formatStartTime(startedAt: string): string {
 }
 
 /**
- * Last-resort estimate for a day nobody has trained yet and the AI never sized -
- * i.e. every Independent-mode day. Work time per set plus its prescribed rest,
- * plus a warm-up allowance.
+ * How many logged sessions of a day it takes before its average is worth showing.
  *
- * A checklist item is priced from what it actually declares, never from the set
- * arithmetic: its `sets` is a round count for a stretch hold or a plank, so
- * feeding it through sets × (work + rest) charged a plain tick-off over two
- * minutes of lifting time it never takes. A timed item costs its own target,
- * once per round. An untimed one - "just tick it", a rep count, a distance -
- * costs nothing, because nothing on the row says how long it runs and a guess
- * here is indistinguishable from the bug this replaces.
+ * The program page used to fall back to an estimate when it had fewer - the AI's
+ * predicted length, or failing that arithmetic over sets and rest. Both were
+ * guesses dressed as data, and the arithmetic one needed its own rules for every
+ * kind of row (a checklist item's `sets` is a round count, not a set) to stay
+ * even roughly honest. A duration is now only ever a measurement: three sessions
+ * of evidence, or the tile doesn't appear.
+ *
+ * Three rather than one because a single session sets the bar wherever that day
+ * happened to land - a rushed session or one with a long phone call in it - and
+ * the user has no way to see that the "average" is a sample of one.
  */
-export const WARMUP_SECONDS = 8 * 60;
-export const WORK_SECONDS_PER_SET = 40;
-export const DEFAULT_REST_SECONDS = 90;
-
-type EstimableExercise = {
-  sets?: number | null;
-  restSeconds?: number | null;
-  kind?: string | null;
-  targetType?: string | null;
-  targetSeconds?: number | null;
-};
-
-export function estimateDurationSeconds(exercises: EstimableExercise[]): number | null {
-  if (!exercises.length) return null;
-
-  let liftWork = 0;
-  let checklistWork = 0;
-  for (const ex of exercises) {
-    const rounds = ex.sets || 0;
-    if (ex.kind === "checklist") {
-      if (ex.targetType === "duration") checklistWork += rounds * (ex.targetSeconds || 0);
-      continue;
-    }
-    liftWork += rounds * (WORK_SECONDS_PER_SET + (ex.restSeconds ?? DEFAULT_REST_SECONDS));
-  }
-
-  // The warm-up allowance is for lifting, so a day of nothing but mobility work
-  // doesn't get charged for one it never does.
-  const total = liftWork + checklistWork + (liftWork > 0 ? WARMUP_SECONDS : 0);
-  return total > 0 ? total : null;
-}
+export const MIN_SESSIONS_FOR_AVERAGE = 3;
