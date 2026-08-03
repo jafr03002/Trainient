@@ -1272,12 +1272,13 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
   ];
 
-  // Checklist items are counted separately, not folded into either figure: their
-  // `sets` is a round count for something like a stretch hold, so adding it to
-  // "Sets" would overstate the day's training volume, and counting them under
-  // "Exercises" would misdescribe them.
+  // Checklist items are invisible to both figures, and get no figure of their own:
+  // their `sets` is a round count for something like a stretch hold, so adding it
+  // to "Sets" would overstate the day's training volume, and counting them under
+  // "Exercises" would misdescribe them. The item itself still shows in the roster
+  // below and in the logger - it just isn't summarised as a number up here, so the
+  // stats read purely as lifting volume (matching trainingWorkloadFor server-side).
   const liftExercises = day ? day.exercises.filter((ex) => !isChecklist(ex)) : [];
-  const checklistCount = day ? day.exercises.length - liftExercises.length : 0;
   const totalSets = liftExercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
 
   // Each day's colour, from the same order the calendar and the editor use, so
@@ -1402,14 +1403,6 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
               <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
             </div>
-            {checklistCount > 0 && (
-              <div className="flex-1 min-w-0 border-l border-border pl-4">
-                <p className="font-display text-xl font-bold text-foreground">{checklistCount}</p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
-                  Checklist
-                </p>
-              </div>
-            )}
             {sessionDuration && (
               <div className="flex-1 min-w-0 border-l border-border pl-4" data-testid="stat-session-duration">
                 <p className="font-display text-xl font-bold text-foreground flex items-center gap-1.5">
