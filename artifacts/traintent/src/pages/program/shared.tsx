@@ -40,6 +40,7 @@ import {
   type ActiveSessionPointer,
   resolveActiveSession,
   discardActiveSession,
+  startSession,
 } from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { DiscardSessionDialog } from "@/components/workout/DiscardSessionDialog";
@@ -55,7 +56,6 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
-import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 
 export type Exercise = {
   name: string;
@@ -1244,14 +1244,12 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const [conflict, setConflict] = useState<ActiveSessionPointer | null>(null);
   const tourDayTabsRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
-  const logNavTarget = useNavTourTarget("/log");
   const finishProgramTour = useFinishProgramTour();
 
   const showProgramTour =
     tourEnabled &&
     !!profileQuery.data && !profileQuery.data.programPageTourSeenAt &&
     !isPreCalibrationLocked(program, new Date());
-  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
   const durationStats = useGetSessionDurationStats();
   const days = program.days as ProgramDay[];
@@ -1268,8 +1266,15 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       ? []
       : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
     { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
-    { target: tourStartWorkoutRef, text: "Hit this when you're ready to start logging your workout." },
-    { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
+    // The tour hands over to the real Start workout button rather than to the
+    // Log nav item, because this button is the only thing that opens a session:
+    // tapping Log without one lands on the log page's idle screen, with nothing
+    // there to walk the client through.
+    {
+      kind: "navClick",
+      target: tourStartWorkoutRef,
+      text: "Ready to train? Tap here to start logging your workout.",
+    },
   ];
 
   // Checklist items are counted separately, not folded into either figure: their
@@ -1312,6 +1317,9 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   // one rather than silently orphaning it.
   function handleStartWorkout() {
     if (!day) return; // also stops the old `?day=undefined` navigation
+    // This button is the tour's last step, so tapping it retires that leg
+    // whatever happens next - a lock dialog, a conflict dialog, or the session.
+    if (showProgramTour) finishProgramTour();
     if (locked) {
       setLockDialogOpen(true);
       return;
@@ -1325,6 +1333,11 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       setConflict(active.pointer);
       return;
     }
+    // Starting the session here is what makes it exist - the log page only ever
+    // resumes one, so navigating without this would land on its idle screen. An
+    // already-open session for this same day is resumed, never restarted, so its
+    // logged sets and its running clock both survive the round trip.
+    if (user?.id && !isSameSession) startSession(user.id, program.id, day.dayNumber);
     setLocation(`/log?day=${day.dayNumber}`);
   }
 
@@ -1497,7 +1510,10 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           setLocation("/log");
         }}
         onDiscard={() => {
-          if (user?.id) discardActiveSession(user.id);
+          if (user?.id && day) {
+            discardActiveSession(user.id);
+            startSession(user.id, program.id, day.dayNumber);
+          }
           setConflict(null);
           if (day) setLocation(`/log?day=${day.dayNumber}`);
         }}

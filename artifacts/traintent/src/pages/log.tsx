@@ -20,7 +20,6 @@ import {
   type LoggedExercise,
   type ActiveSessionPointer,
   draftKey,
-  loadDraft,
   saveDraft,
   clearDraft,
   saveActiveSession,
@@ -38,15 +37,6 @@ type PrFlash = { id: number; exercise: string; weight: number };
 function isEmptySet(s: any): boolean {
   if (!s) return true;
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
-}
-
-// A ticked checklist item counts as real data. Without this a mobility-only session
-// reads as empty: the day picker would stay unlocked mid-session and the draft could
-// be discarded out from under the user.
-function hasLoggedData(logs: LoggedExercise[]): boolean {
-  return logs.some(
-    (ex) => ex.notes.trim() !== "" || (ex.completedRounds ?? 0) > 0 || ex.sets.some((s) => !isEmptySet(s)),
-  );
 }
 
 /**
@@ -181,6 +171,10 @@ export default function Log() {
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
   const [activeDay, setActiveDay] = useState<any>(null);
+  // Whether a session is open, once we've been able to look: null while the
+  // program/user are still loading (nothing has been resolved yet), false when
+  // there is genuinely nothing in progress - the idle screen.
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [resumedElsewhere, setResumedElsewhere] = useState(false);
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
@@ -212,6 +206,9 @@ export default function Log() {
   const initializedKeyRef = useRef<string | null>(null);
   const currentDraftKeyRef = useRef<string | null>(null);
   const activeSessionRef = useRef<ActiveSessionPointer | null>(null);
+  // Set the moment the session is deliberately ended (finished or cancelled),
+  // so nothing re-seeds or re-saves it in the frames before we navigate away.
+  const endingRef = useRef(false);
 
   // Prior all-time best score per exercise, plus the set of exercises that have
   // ever been logged before - both drawn from saved history (previous sessions
@@ -285,38 +282,52 @@ export default function Log() {
     return days[0];
   }
 
-  // Only one workout session can be in progress at a time. If a different day
-  // already has an unfinished, unsaved draft, keep the user in that session
-  // instead of silently starting a new one (which would orphan the old one).
+  // This page only ever RESUMES a session - it never starts one. A session
+  // begins when the client taps Start workout on the program page, which writes
+  // the draft and the pointer (see startSession); everything below therefore
+  // hangs off that pointer rather than off the `?day=` in the URL. With no
+  // pointer there is nothing to log and the idle screen renders instead, so
+  // merely opening /log can't quietly begin a session the client didn't ask for.
   useEffect(() => {
     if (!program?.days || !user?.id) return;
-    const requestedDay = resolveDay(program.days as any[]);
-    if (!requestedDay) return;
-
-    let day = requestedDay;
+    // Finishing or cancelling clears the session and navigates away; a refetch
+    // landing in that gap must not flash the idle screen over the leaving page.
+    if (endingRef.current) return;
 
     // `resolveActiveSession` already dropped the pointer if its draft is gone,
     // so anything it returns is a live session on some day.
     const active = resolveActiveSession(user.id);
-    if (
-      active &&
-      (String(active.pointer.programId) !== String(program.id) ||
-        active.pointer.dayNumber !== requestedDay.dayNumber)
-    ) {
-      const activeDayObj =
-        String(active.pointer.programId) === String(program.id)
-          ? (program.days as any[]).find((d) => d.dayNumber === active.pointer.dayNumber)
-          : undefined;
-      if (activeDayObj) {
-        day = activeDayObj;
-      } else {
-        // Belongs to another program, or to a day this program no longer has.
-        clearActiveSession(user.id);
-      }
+    const sessionDay = active
+      ? String(active.pointer.programId) === String(program.id)
+        ? (program.days as any[]).find((d) => d.dayNumber === active.pointer.dayNumber)
+        : undefined
+      : undefined;
+
+    // Belongs to another program, or to a day this program no longer has -
+    // nothing on this page can render it.
+    if (active && !sessionDay) clearActiveSession(user.id);
+
+    if (!sessionDay) {
+      setHasSession(false);
+      setActiveDay(null);
+      setLogs([]);
+      setStartedAt(null);
+      setResumedElsewhere(false);
+      initializedKeyRef.current = null;
+      currentDraftKeyRef.current = null;
+      activeSessionRef.current = null;
+      return;
     }
 
+    const day = sessionDay;
+    setHasSession(true);
     setActiveDay(day);
-    const wasRedirected = day.dayNumber !== requestedDay.dayNumber;
+
+    // `?day=` only says which day the client asked for; the open session decides
+    // which one they get. Landing on a different one (or on a bare /log) means
+    // they were sent back to the session already running, which the banner says.
+    const requestedDay = resolveDay(program.days as any[]);
+    const wasRedirected = !!requestedDay && requestedDay.dayNumber !== day.dayNumber;
     setResumedElsewhere(wasRedirected);
     if (wasRedirected) {
       setLocation(`/log?day=${day.dayNumber}`, { replace: true });
@@ -348,21 +359,14 @@ export default function Log() {
       return;
     }
 
-    const draft = loadDraft(key);
-    if (draft) {
-      setLogs(reconcileDraftLogs(draft.logs, day));
-      // Resume the original clock rather than restarting it - a refresh or a
-      // reconnect mid-session must not reset the elapsed time to zero. Drafts
-      // written before session timing existed have no start, so adopt now.
-      setStartedAt(draft.startedAt ?? Date.now());
-      return;
-    }
-
-    setLogs(buildFreshLogs(day));
-    // The clock runs from the moment the session opens, not from the first
-    // logged set - the user is here to train, and a timer that stays blank
-    // until they type reads as broken.
-    setStartedAt(Date.now());
+    // The draft always exists here - `resolveActiveSession` checked, and a
+    // freshly started session's is simply empty, which reconciles to a blank
+    // sheet built from the day. Resume its clock rather than restarting it: a
+    // refresh or a reconnect mid-session must not reset the elapsed time to
+    // zero. Drafts written before session timing existed have no start, so
+    // adopt now.
+    setLogs(reconcileDraftLogs(active!.draft.logs, day));
+    setStartedAt(active!.draft.startedAt ?? Date.now());
   }, [program, user?.id]);
 
   // The session clock. Recomputed from the start timestamp on every tick rather
@@ -379,14 +383,15 @@ export default function Log() {
   }, [startedAt]);
 
   // Mirror every change to localStorage so a reconnect/reload can restore the
-  // in-progress session instead of losing it. Only once real data has been
-  // entered - an untouched sheet shouldn't block starting a different day.
+  // in-progress session instead of losing it. No "has anything been typed yet"
+  // test any more: the draft exists from the moment Start workout is tapped
+  // (startSession writes it), so a started session is a session whether or not
+  // a number has been entered - and nothing lands here without one.
   useEffect(() => {
     const key = currentDraftKeyRef.current;
-    if (!key || logs.length === 0 || !hasLoggedData(logs)) return;
+    if (!key || logs.length === 0 || endingRef.current) return;
     // Persist the running clock alongside the logs so a refresh resumes the
-    // same start. The draft is still only written once there's real data, so
-    // opening the page and backing out leaves nothing behind.
+    // same start.
     saveDraft(key, logs, startedAt ?? Date.now());
     if (user?.id && activeSessionRef.current) {
       saveActiveSession(user.id, activeSessionRef.current);
@@ -600,6 +605,7 @@ export default function Log() {
       });
       return;
     }
+    endingRef.current = true;
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
     const loggedCount = logs.filter((ex) => ex.name.trim()).length;
@@ -631,6 +637,7 @@ export default function Log() {
   }
 
   function cancelWorkout() {
+    endingRef.current = true;
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
     setShowCancelConfirm(false);
@@ -671,6 +678,32 @@ export default function Log() {
               data-testid="button-log-no-program-cta"
             >
               {isIndependent ? "Create your program" : "Generate my program"}
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Nothing in progress. This is what the page looks like both before a session
+  // and after one has been finished or discarded - logging starts on the program
+  // page and nowhere else, so the only thing offered here is the way there.
+  if (hasSession === false) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="text-center py-20" data-testid="log-no-session">
+          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">No logging ongoing</h2>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+            Head to your program page and hit Start workout on the day you're training - your
+            session opens here.
+          </p>
+          <Link href="/program">
+            <button
+              className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+              data-testid="button-log-no-session-cta"
+            >
+              Go to my program
             </button>
           </Link>
         </div>
