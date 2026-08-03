@@ -144,6 +144,24 @@ export function clearActiveSession(userId: string) {
   }
 }
 
+/**
+ * Begin a session for a day - the only way one ever starts. Writes an empty
+ * draft plus the pointer at it, so "a session is in progress" is true from the
+ * moment the client taps Start workout on the program page rather than from the
+ * moment they type their first number. Opening the log page deliberately does
+ * NOT call this: with no session it shows its idle screen instead of quietly
+ * starting one behind the client's back.
+ *
+ * Always writes a fresh draft. A live session never comes through here (the
+ * program page resumes it instead of restarting it), so anything still sitting
+ * on this key is an orphan of an abandoned one - adopting its hours-old
+ * `startedAt` would open the session with the clock already running in hours.
+ */
+export function startSession(userId: string, programId: string | number, dayNumber: number) {
+  saveDraft(draftKey(userId, programId, dayNumber), [], Date.now());
+  saveActiveSession(userId, { programId, dayNumber });
+}
+
 // The pointer is only meaningful while its draft still exists - the draft may
 // have expired (DRAFT_MAX_AGE_MS) or already been saved and cleared. Self-heal
 // a stale pointer so every caller can treat null as "nothing in progress".

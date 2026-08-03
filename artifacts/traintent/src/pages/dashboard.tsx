@@ -393,7 +393,10 @@ export default function Dashboard() {
               <ChevronRight className="w-4 h-4" />
             </Link>
           ) : nextDay ? (
-            <Link href="/log">
+            // To the program page, not straight to /log: a session only starts
+            // from the day's Start workout button there, so linking into the
+            // logger would land on its "nothing in progress" idle screen.
+            <Link href="/program">
               <button
                 ref={tourStartWorkoutRef}
                 className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
