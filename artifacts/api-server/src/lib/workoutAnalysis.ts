@@ -11,7 +11,14 @@ export type LoggedSet = {
   repsRight?: number | null;
   completed?: boolean;
 };
-export type LoggedExercise = { name: string; muscle: string; sets: LoggedSet[] };
+export type LoggedExercise = {
+  name: string;
+  muscle: string;
+  sets: LoggedSet[];
+  /** "checklist" for a stretch/plank row, absent on a lift and on any row logged
+   *  before checklist items existed. Such a row carries `sets: []` on purpose. */
+  kind?: string | null;
+};
 
 // A minimal view of a workout_logs row - enough for all the analysis here.
 export type WorkoutLogRow = {

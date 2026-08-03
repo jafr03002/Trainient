@@ -18,7 +18,7 @@ type LoggedSetLike = {
   repsLeft?: number | null;
   repsRight?: number | null;
 };
-type LoggedExerciseLike = { sets?: LoggedSetLike[] };
+type LoggedExerciseLike = { sets?: LoggedSetLike[]; kind?: string | null };
 
 function isPerformed(s: LoggedSetLike): boolean {
   return (s.weight || 0) > 0 || (s.reps || 0) > 0 || (s.repsLeft || 0) > 0 || (s.repsRight || 0) > 0;
@@ -41,8 +41,13 @@ export function countsTowardAverage(log: {
   const band = plausibleBand(setCount);
   const d = log.durationSeconds;
   if (d == null || !band || d < band.min || d > band.max) return false;
-  if (exercises.length === 0) return false;
-  return exercises.every((ex) => (ex?.sets?.length ?? 0) > 0 && ex.sets!.every(isPerformed));
+  // Checklist rows are exempt from the "every exercise has sets" rule - a logged
+  // one carries `sets: []` by design, so holding it to the lift rule would make
+  // every session containing a stretch permanently ineligible. See the server's
+  // isFullyLogged, which is the source of truth for this.
+  const lifts = exercises.filter((ex) => ex?.kind !== "checklist");
+  if (lifts.length === 0) return false;
+  return lifts.every((ex) => (ex?.sets?.length ?? 0) > 0 && ex.sets!.every(isPerformed));
 }
 
 /** Ticking stopwatch: "18:42" under an hour, "1:07:15" at or past it. */
