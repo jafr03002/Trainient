@@ -54,6 +54,9 @@ type SessionModalProps = {
   // Lets the first-run calendar tour anchor its last step on the close button,
   // which lives in here rather than on the page.
   closeButtonRef?: RefObject<HTMLButtonElement | null>;
+  // ...and cut the sheet itself out of the tour's dimming backdrop, so the
+  // session the user has just opened is the one bright thing on screen.
+  panelRef?: RefObject<HTMLDivElement | null>;
 };
 
 // A set with no real data (weight and all rep fields zero/empty).
@@ -91,7 +94,7 @@ function setRepsLabel(s: any): string {
   return `${s.reps ?? 0}`;
 }
 
-function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef }: SessionModalProps) {
+function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef, panelRef }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
   const queryClient = useQueryClient();
   const deleteWorkout = useDeleteWorkout();
@@ -142,6 +145,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef 
           onClick={onClose}
         />
         <motion.div
+          ref={panelRef}
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
@@ -428,6 +432,7 @@ export default function Calendar() {
   const queryClient = useQueryClient();
   const tourGridRef = useRef<HTMLDivElement>(null);
   const tourCloseSessionRef = useRef<HTMLButtonElement>(null);
+  const tourSessionPanelRef = useRef<HTMLDivElement>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -455,6 +460,9 @@ export default function Calendar() {
     {
       kind: "awaitAction",
       target: tourCloseSessionRef,
+      // Ring the close button, but light up the whole sheet: the point of the
+      // step is the session itself, so it shouldn't sit under the scrim.
+      spotlight: tourSessionPanelRef,
       text: "And here's that past session in full - tap here to close it.",
       done: !selectedSession,
     },
@@ -731,6 +739,7 @@ export default function Calendar() {
           colorHex={colorFor(selectedSession.dayLabel ?? "Workout")}
           onClose={() => setSelectedSession(null)}
           closeButtonRef={showCalendarTour ? tourCloseSessionRef : undefined}
+          panelRef={showCalendarTour ? tourSessionPanelRef : undefined}
         />
       )}
 

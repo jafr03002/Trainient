@@ -1240,7 +1240,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   // The in-progress session that "Start workout" would have to throw away.
   const [conflict, setConflict] = useState<ActiveSessionPointer | null>(null);
-  const tourDayTabsRef = useRef<HTMLDivElement>(null);
+  const tourProgramBodyRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const finishProgramTour = useFinishProgramTour();
 
@@ -1263,7 +1263,10 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     ...(isIndependent
       ? []
       : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
-    { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
+    // Ring the tabs *and* the roster: the step says "your training days and
+    // exercises", and the tabs alone are the days half. Anchoring on the whole
+    // block also drops the bubble below it, instead of over the exercises.
+    { target: tourProgramBodyRef, text: "Here's your program — your training days and exercises." },
     // The tour hands over to the real Start workout button rather than to the
     // Log nav item, because this button is the only thing that opens a session:
     // tapping Log without one lands on the log page's idle screen, with nothing
@@ -1423,9 +1426,14 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </motion.div>
       )}
 
+      {/* Day switcher + roster. Grouped so the first-run tour can spotlight both
+          at once: its step says "your training days and exercises", and the
+          roster is what the second half of that sentence refers to. The wrapper
+          repeats the parent's space-y-6, so the two still sit exactly as far
+          apart as they did as loose siblings. */}
+      <div ref={tourProgramBodyRef} className="space-y-6">
       {/* Day switcher */}
       <div
-        ref={tourDayTabsRef}
         className="flex gap-1.5 rounded-xl border border-border bg-secondary/60 p-1 overflow-x-auto"
         data-testid="program-day-tabs"
       >
@@ -1471,6 +1479,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           })()}
         </motion.div>
       )}
+      </div>
 
       {showProgramTour && <CoachmarkTour steps={programTourSteps} onDone={finishProgramTour} testIdPrefix="program-tour" />}
 
