@@ -168,6 +168,14 @@ export default function Log() {
   const weightUnit = profile?.weightUnit ?? "kg";
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });
+  // A target is a comparison, and someone who has never logged has nothing to
+  // compare against: a prescribed "3 x 8" on a card they've never filled in
+  // reads as a rule to hit rather than the starting point it is. So every
+  // target on this page stays hidden until there is at least one saved session.
+  // History is undefined while it loads, which is what we want here - the
+  // first-timer case never flashes a target before it resolves. Independent
+  // mode is exempt: those numbers are the user's own, typed into their program.
+  const showTargets = isIndependent || (history != null && history.length > 0);
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
   const [activeDay, setActiveDay] = useState<any>(null);
@@ -844,7 +852,10 @@ export default function Log() {
               ? Math.max(0, Math.ceil((ex.timerEndsAt! - Date.now()) / 1000))
               : ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
             const total = ex.targetSeconds ?? 0;
-            const target = describeTarget(ex);
+            // The countdown on a timed card is the control itself, not a target,
+            // so it stays; this is only the "2:30" / "x 20" written next to the
+            // item's name.
+            const target = showTargets ? describeTarget(ex) : null;
 
             // A timed item gets the filling card with swipe-to-complete. Every
             // other checklist item keeps the tick, which is still the right
@@ -972,9 +983,11 @@ export default function Log() {
                   )}
                 </div>
                 <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Target: {ex.targetSets} × {ex.targetReps}
-                </p>
+                {showTargets && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Target: {ex.targetSets} × {ex.targetReps}
+                  </p>
+                )}
               </div>
               {!isIndependent && (
                 <button
