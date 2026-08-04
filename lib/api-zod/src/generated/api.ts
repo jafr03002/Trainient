@@ -212,6 +212,9 @@ export const getCurrentProgramResponseDaysItemExercisesItemTargetSecondsMax = 86
 export const getCurrentProgramResponseDaysItemExercisesItemTargetValueMin = 0;
 export const getCurrentProgramResponseDaysItemExercisesItemTargetValueMax = 100000;
 
+export const getCurrentProgramResponseScheduleOneSlotsMin = 2;
+export const getCurrentProgramResponseScheduleOneSlotsMax = 14;
+
 
 
 export const GetCurrentProgramResponse = zod.object({
@@ -267,7 +270,11 @@ export const GetCurrentProgramResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(getCurrentProgramResponseScheduleOneSlotsMin).max(getCurrentProgramResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 
@@ -292,6 +299,9 @@ export const listProgramsResponseDaysItemExercisesItemTargetSecondsMax = 86400;
 
 export const listProgramsResponseDaysItemExercisesItemTargetValueMin = 0;
 export const listProgramsResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const listProgramsResponseScheduleOneSlotsMin = 2;
+export const listProgramsResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -348,7 +358,11 @@ export const ListProgramsResponseItem = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(listProgramsResponseScheduleOneSlotsMin).max(listProgramsResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
 
@@ -500,6 +514,9 @@ export const updateProgramResponseDaysItemExercisesItemTargetSecondsMax = 86400;
 export const updateProgramResponseDaysItemExercisesItemTargetValueMin = 0;
 export const updateProgramResponseDaysItemExercisesItemTargetValueMax = 100000;
 
+export const updateProgramResponseScheduleOneSlotsMin = 2;
+export const updateProgramResponseScheduleOneSlotsMax = 14;
+
 
 
 export const UpdateProgramResponse = zod.object({
@@ -555,7 +572,11 @@ export const UpdateProgramResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(updateProgramResponseScheduleOneSlotsMin).max(updateProgramResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 
@@ -588,6 +609,9 @@ export const setProgramStartDateResponseDaysItemExercisesItemTargetSecondsMax = 
 
 export const setProgramStartDateResponseDaysItemExercisesItemTargetValueMin = 0;
 export const setProgramStartDateResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const setProgramStartDateResponseScheduleOneSlotsMin = 2;
+export const setProgramStartDateResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -644,7 +668,11 @@ export const SetProgramStartDateResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(setProgramStartDateResponseScheduleOneSlotsMin).max(setProgramStartDateResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 

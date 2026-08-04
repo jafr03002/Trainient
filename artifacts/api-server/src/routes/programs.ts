@@ -14,6 +14,7 @@ import { programGenerationKnowledge } from "../lib/knowledge";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
 import { PHASE_TEMPLATES, INITIAL_PHASE_STATE, energyBalanceForPhase, type LongTermPhase } from "../lib/phaseTemplate";
 import { trainingWeekNumber } from "../lib/trainingWeek";
+import { defaultFixedSchedule } from "../lib/programSchedule";
 
 const router = Router();
 
@@ -104,6 +105,9 @@ router.post("/programs", requireAuth, async (req, res) => {
       splitType,
       programHighlights: [],
       days,
+      // No `schedule`: scheduling belongs to AI mode only. A manual program is a
+      // list of days the user trains whenever they like, so the column stays null
+      // and the program page's schedule strip simply doesn't render.
       aiGenerated: false,
     })
     .returning();
@@ -128,7 +132,16 @@ router.put("/programs/:id", requireAuth, async (req, res) => {
   // or bypasses the UI.
   const [program] = await db
     .update(programsTable)
-    .set({ programName, splitType, days })
+    .set({
+      programName,
+      splitType,
+      days,
+      // Cleared rather than left alone: scheduling is AI-mode only now, but rows
+      // saved while the manual builder briefly offered it still carry one. Blanking
+      // it here retires those the next time the user saves, so no manual program is
+      // left showing a week it has no way to edit.
+      schedule: null,
+    })
     .where(and(eq(programsTable.id, id), eq(programsTable.userId, userId), eq(programsTable.aiGenerated, false)))
     .returning();
 
@@ -356,6 +369,11 @@ For each day, provide 5–7 exercises. For each exercise provide:
       splitType: raw.split_type,
       programHighlights,
       days,
+      // Derived here rather than asked of the model: the client stated which
+      // weekdays it wants to keep free, and honouring that exactly is arithmetic,
+      // not judgement. Always `fixed` - a rotating cycle drifts straight through
+      // the rest days they just picked.
+      schedule: defaultFixedSchedule(days, (profile.preferredRestDays as string[]) ?? []),
       aiGenerated: true,
     })
     .returning();

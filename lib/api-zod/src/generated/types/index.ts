@@ -55,6 +55,8 @@ export * from './programFeedback';
 export * from './programFeedbackCategoriesItem';
 export * from './programHighlight';
 export * from './programLongTermPhase';
+export * from './programSchedule';
+export * from './programScheduleMode';
 export * from './programShortTermPhase';
 export * from './programStartDateUpdate';
 export * from './programTrainingWorkload';

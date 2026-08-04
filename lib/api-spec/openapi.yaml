@@ -862,6 +862,33 @@ components:
         title:  { type: string }
         detail: { type: string }
 
+    # When each training day is trained. Held beside `days`, not on each day: a
+    # per-day weekday cannot express where the REST slots fall in a rotation, nor
+    # the same day appearing twice in one cycle.
+    #
+    # Every non-null slot is a `dayNumber` from the same program's `days`; null is
+    # a rest slot.
+    #   fixed    - exactly 7 slots, index 0 = Monday .. 6 = Sunday, repeating weekly.
+    #   rotating - 2..14 slots, one cycle, repeating from the program's startDate.
+    #
+    # Only AI generation and the weekly check-in write a schedule, and both only
+    # ever produce `fixed`. `rotating` is currently a shape readers must handle
+    # (the program page's strip does) rather than one anything produces - it is
+    # kept so a stored cycle stays readable and so AI can adopt it later.
+    ProgramSchedule:
+      type: object
+      required: [mode, slots]
+      properties:
+        mode:
+          type: string
+          enum: [fixed, rotating]
+        slots:
+          type: array
+          minItems: 2
+          maxItems: 14
+          items:
+            type: ["integer", "null"]
+
     Program:
       type: object
       required: [id, userId, weekNumber, programName, splitType, programHighlights, days, aiGenerated, generatedAt]
@@ -902,6 +929,10 @@ components:
             bpmMax: { type: integer }
             level:  { type: string, enum: [low, moderate, high] }
         startDate:           { type: ["string", "null"] }
+        schedule:
+          oneOf:
+            - $ref: "#/components/schemas/ProgramSchedule"
+            - type: "null"
 
     ProgramStartDateUpdate:
       type: object
@@ -919,6 +950,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProgramDay"
+        # No `schedule`: a manually built program is never scheduled. Only AI
+        # generation and the weekly check-in write one, so these routes have
+        # nothing to accept and the column stays null on the manual lineage.
 
     ProgramFeedback:
       type: object
