@@ -186,7 +186,10 @@ export default function Log() {
   const flashIdRef = useRef(0);
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
-  const tourSetRowRef = useRef<HTMLDivElement>(null);
+  // The sets block (column headers + rows) is what the first tour step rings;
+  // the exercise header is what the "?" step spotlights around its button.
+  const tourSetsBlockRef = useRef<HTMLDivElement>(null);
+  const tourExerciseHeadRef = useRef<HTMLDivElement>(null);
   const tourHelpRef = useRef<HTMLButtonElement>(null);
   const tourFinishRef = useRef<HTMLButtonElement>(null);
 
@@ -721,10 +724,30 @@ export default function Log() {
 
   const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
+  // Which card carries the first two steps' targets - see the note in the logger
+  // map below. -1 when the day is checklist items only, which is why those steps
+  // are dropped rather than left pointing at nothing.
+  const firstLiftIdx = logs.findIndex((ex) => ex.kind !== "checklist");
   const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
   const logTourSteps: CoachmarkStep[] = [
-    { target: tourSetRowRef, text: "Here you can track your weight and reps." },
-    ...(!isIndependent ? [{ target: tourHelpRef, text: "Not sure how to perform this exercise? Tap the ? whenever you need it." }] : []),
+    // Ring the whole sets block, not one row: the "Weight" / "Reps" column
+    // headers sit above the rows, and without them the step points at unlabelled
+    // number boxes. Anchoring on the block also puts the bubble under it rather
+    // than over the remaining sets.
+    ...(firstLiftIdx >= 0
+      ? [{ target: tourSetsBlockRef, text: "Here you can track your weight and reps." } as CoachmarkStep]
+      : []),
+    // Same idea for the help button - "this exercise" only means something with
+    // the exercise's own header lit next to the "?".
+    ...(!isIndependent && firstLiftIdx >= 0
+      ? [
+          {
+            target: tourHelpRef,
+            spotlight: tourExerciseHeadRef,
+            text: "Not sure how to perform this exercise? Tap the ? whenever you need it.",
+          } as CoachmarkStep,
+        ]
+      : []),
     { target: tourFinishRef, text: "This is where you save your workout." },
   ];
 
@@ -802,6 +825,12 @@ export default function Log() {
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
+          // The tour's first two steps are about weights, reps and how to
+          // perform a lift, so they hang off the first *lift* card rather than
+          // the first card: a day that opens with a checklist item (a warmup
+          // sits above the first lift) would otherwise leave their targets
+          // unmounted and the steps with nothing to point at.
+          const isFirstLift = exIdx === firstLiftIdx;
           // Checklist items render in program order, inline among the exercise
           // cards - a warmup item appears above the first lift because that is
           // where it sits in the day.
@@ -929,7 +958,10 @@ export default function Log() {
             className="bg-card border border-border rounded-xl overflow-hidden"
             data-testid={`log-exercise-${exIdx}`}
           >
-            <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
+            <div
+              ref={isFirstLift ? tourExerciseHeadRef : undefined}
+              className="p-4 border-b border-border/50 flex items-start justify-between gap-2"
+            >
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
@@ -946,7 +978,7 @@ export default function Log() {
               </div>
               {!isIndependent && (
                 <button
-                  ref={exIdx === 0 ? tourHelpRef : undefined}
+                  ref={isFirstLift ? tourHelpRef : undefined}
                   onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
                   className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                   title="How to perform this exercise"
@@ -957,7 +989,7 @@ export default function Log() {
               )}
             </div>
 
-            <div className="p-4">
+            <div className="p-4" ref={isFirstLift ? tourSetsBlockRef : undefined}>
               {/* Column headers */}
               {ex.isUnilateral ? (
                 <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
@@ -980,7 +1012,6 @@ export default function Log() {
                   return (
                   <div key={set.setNumber}>
                   <motion.div
-                    ref={exIdx === 0 && setIdx === 0 ? tourSetRowRef : undefined}
                     layout
                     className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""

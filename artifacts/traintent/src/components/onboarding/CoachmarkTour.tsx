@@ -16,11 +16,24 @@ import { CoachRobot } from "@/components/CoachRobot";
 //   (a logged session, a dialog's close button). The page reports the outcome
 //   of the action through `done`, and the step advances when that flips true -
 //   so the user has to really perform it, not just read about it.
+//
+// Anchored steps can also carry a `spotlight`: the element to cut out of the
+// dimming backdrop, when that should be bigger than the ringed target. The
+// calendar's last step rings the session sheet's close button but spotlights
+// the whole sheet, so the session the user just opened reads at full contrast
+// instead of sitting under the same scrim as the page behind it. Defaults to
+// `target`.
 export type CoachmarkStep =
-  | { kind?: "info"; target: RefObject<HTMLElement | null>; text: string }
+  | { kind?: "info"; target: RefObject<HTMLElement | null>; text: string; spotlight?: RefObject<HTMLElement | null> }
   | { kind: "center"; text: string }
-  | { kind: "navClick"; target: RefObject<HTMLElement | null>; text: string }
-  | { kind: "awaitAction"; target: RefObject<HTMLElement | null>; text: string; done: boolean };
+  | { kind: "navClick"; target: RefObject<HTMLElement | null>; text: string; spotlight?: RefObject<HTMLElement | null> }
+  | {
+      kind: "awaitAction";
+      target: RefObject<HTMLElement | null>;
+      text: string;
+      done: boolean;
+      spotlight?: RefObject<HTMLElement | null>;
+    };
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -29,7 +42,53 @@ function measure(el: HTMLElement): Rect {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (!a || !b) return a === b;
+  return a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height;
+}
+
+// How far the undimmed hole extends past the spotlit element, and how round its
+// corners are - a touch wider than the highlight ring (4px at rect - 4) so the
+// ring itself lands on clean, undimmed background.
+const HOLE_PAD = 8;
+const HOLE_RADIUS = 14;
+
+// The scrim's `clip-path`: everything except a rounded hole over `hole`. The
+// outer ring is deliberately far larger than any viewport, so the path never has
+// to be rebuilt when the window resizes. Clipped-away pixels aren't painted and
+// aren't hit-tested, so the hole is both bright and clickable.
+function scrimClipPath(hole: Rect): string {
+  const x = hole.left - HOLE_PAD;
+  const y = hole.top - HOLE_PAD;
+  const w = hole.width + HOLE_PAD * 2;
+  const h = hole.height + HOLE_PAD * 2;
+  const r = Math.max(0, Math.min(HOLE_RADIUS, w / 2, h / 2));
+  const outer = "M-20000,-20000 H20000 V20000 H-20000 Z";
+  const inner =
+    `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} ` +
+    `V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} ` +
+    `H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} ` +
+    `V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`;
+  return `path(evenodd, "${outer} ${inner}")`;
+}
+
 const BUBBLE_WIDTH = 320;
+
+// Coach's rendered box, as laid out by `coachAt` below: 30px square, inset 12px
+// (left-3 / right-3) from a top corner of the bubble and lifted 36px (-top-9)
+// above its top edge.
+const COACH_SIZE = 30;
+const COACH_INSET = 12;
+const COACH_LIFT = 36;
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return (
+    a.left < b.left + b.width &&
+    a.left + a.width > b.left &&
+    a.top < b.top + b.height &&
+    a.top + a.height > b.top
+  );
+}
 
 // How long a freshly-opened step keeps re-measuring its target, in ms. Long
 // enough to outlast the entrance animation of anything a step points into (the
@@ -59,6 +118,7 @@ export function CoachmarkTour({
   const [step, setStep] = useState(0);
   const [finished, setFinished] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [holeRect, setHoleRect] = useState<Rect | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [bubbleH, setBubbleH] = useState(160);
   const total = steps.length;
@@ -117,17 +177,28 @@ export function CoachmarkTour({
     const el = current && current.kind !== "center" ? current.target.current : null;
     if (!el) {
       setRect(null);
+      setHoleRect(null);
       return;
     }
+    // The area cut out of the scrim - the step's own `spotlight` when it names
+    // one, otherwise the ringed target itself.
+    const holeEl = (current && current.kind !== "center" ? current.spotlight?.current : null) ?? el;
     // Commit only real movement: `rect` feeds the bubble's height measurement
     // below, and handing it a fresh object per frame spins that into a render
     // loop that starves the page.
     let last: Rect | null = null;
+    let lastHole: Rect | null = null;
     const measureNow = () => {
       const r = measure(el);
-      if (last && r.top === last.top && r.left === last.left && r.width === last.width && r.height === last.height) return;
-      last = r;
-      setRect(r);
+      if (!sameRect(r, last)) {
+        last = r;
+        setRect(r);
+      }
+      const hr = holeEl === el ? r : measure(holeEl);
+      if (!sameRect(hr, lastHole)) {
+        lastHole = hr;
+        setHoleRect(hr);
+      }
     };
     const bringIntoView = () => {
       // Instant (not smooth) so the measurement reflects the settled position
@@ -163,6 +234,7 @@ export function CoachmarkTour({
     const ro = new ResizeObserver(() => bringIntoView());
     ro.observe(document.body);
     ro.observe(el);
+    if (holeEl !== el) ro.observe(holeEl);
     window.addEventListener("resize", measureNow);
     window.addEventListener("scroll", measureNow, true);
     return () => {
@@ -184,24 +256,46 @@ export function CoachmarkTour({
   // out from the page. Clicking it dismisses the tour, except on a hand-off
   // step, where it stays pointer-events-none so it never blocks the real
   // element the user needs to tap.
+  //
+  // An anchored step punches a hole in it over the spotlit element. Dimming the
+  // very thing a step tells you to tap reads as "disabled, don't touch"; leaving
+  // it at full contrast is what makes it look pressable, and lets the step's
+  // ring stand out against the page rather than against a grey wash.
+  // The dimming and the click target are two layers on purpose: the dark one is
+  // clipped (and so never hit-tested over the hole), while a transparent
+  // full-screen catcher keeps "click the backdrop to dismiss" covering the whole
+  // viewport. Without it, the hole would quietly turn into a live click-through
+  // on steps that only mean to point at something.
+  const spotlit = phase === "steps" && !isCenter && holeRect;
   const scrim = (
-    <div
-      className={`fixed inset-0 z-[60] bg-black/60 ${dismissable ? "" : "pointer-events-none"}`}
-      aria-hidden
-      onClick={dismissable ? end : undefined}
-    />
+    <>
+      <div
+        className="fixed inset-0 z-[60] bg-black/60 pointer-events-none transition-[clip-path] duration-200"
+        style={spotlit ? { clipPath: scrimClipPath(holeRect!) } : undefined}
+        aria-hidden
+      />
+      {dismissable && <div className="fixed inset-0 z-[60]" aria-hidden onClick={end} />}
+    </>
   );
 
-  // Coach, the AI coach mascot, perches in the top-left corner of every tour
-  // box. He's a child of the box element (never the scrim), so he always paints
-  // on top of the dimming backdrop and keeps his bright blue - he never darkens
-  // with the page behind it.
-  const coach = (
+  // Coach, the AI coach mascot, perches on a top corner of every tour box. He's
+  // a child of the box element (never the scrim), so he always paints on top of
+  // the dimming backdrop and keeps his bright blue - he never darkens with the
+  // page behind it.
+  //
+  // He overhangs the box's top edge, which puts him over whatever sits above the
+  // bubble - and when the bubble is anchored just below a small target, that is
+  // the target itself. On the calendar's last step he sat squarely on the session
+  // sheet's close button, hiding both the X and its highlight ring. The anchored
+  // branch below picks the corner that keeps him off the target.
+  const coachAt = (side: "left" | "right") => (
     <CoachRobot
-      size={30}
-      className="pointer-events-none absolute -top-9 left-3 drop-shadow-[0_5px_9px_rgba(23,55,110,0.35)]"
+      size={COACH_SIZE}
+      className={`pointer-events-none absolute -top-9 ${side === "left" ? "left-3" : "right-3"} drop-shadow-[0_5px_9px_rgba(23,55,110,0.35)]`}
     />
   );
+  // Unanchored surfaces (intro card, centered bubble) have no target to dodge.
+  const coach = coachAt("left");
 
   if (finished) return null;
 
@@ -309,12 +403,27 @@ export function CoachmarkTour({
   const bubbleTop = Math.min(Math.max(desiredTop, TOP_MARGIN), Math.max(TOP_MARGIN, maxTop));
   const bubbleLeft = Math.min(Math.max(rect!.left, 16), window.innerWidth - 16 - BUBBLE_WIDTH);
 
+  // Keep Coach off the highlighted element. He hangs above the bubble's top
+  // edge, so a bubble anchored under a small target puts him right on top of it
+  // - the calendar's close-button step is the case that bit. Both corners are
+  // measured against the ring (the target plus its 4px halo); the near corner
+  // wins unless it collides, and if the target is wide enough to swallow both,
+  // the default corner is no worse than the alternative.
+  const coachBox = (side: "left" | "right"): Rect => ({
+    top: bubbleTop - COACH_LIFT,
+    left: side === "left" ? bubbleLeft + COACH_INSET : bubbleLeft + BUBBLE_WIDTH - COACH_INSET - COACH_SIZE,
+    width: COACH_SIZE,
+    height: COACH_SIZE,
+  });
+  const ringBox: Rect = { top: rect!.top - 4, left: rect!.left - 4, width: rect!.width + 8, height: rect!.height + 8 };
+  const coachSide = overlaps(coachBox("left"), ringBox) && !overlaps(coachBox("right"), ringBox) ? "right" : "left";
+
   return (
     <>
       {scrim}
       <div
         className="fixed z-[60] rounded-lg ring-4 ring-primary/40 pointer-events-none transition-all duration-200"
-        style={{ top: rect!.top - 4, left: rect!.left - 4, width: rect!.width + 8, height: rect!.height + 8 }}
+        style={ringBox}
       />
       <div
         ref={bubbleRef}
@@ -322,7 +431,7 @@ export function CoachmarkTour({
         style={{ top: bubbleTop, left: bubbleLeft, width: BUBBLE_WIDTH }}
         data-testid={`${testIdPrefix}-bubble`}
       >
-        {coach}
+        {coachAt(coachSide)}
         {bubbleBody}
       </div>
     </>
