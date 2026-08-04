@@ -23,7 +23,15 @@ export const programsTable = pgTable("programs", {
   cardioIntensity: jsonb("cardio_intensity"),
   // User-chosen day (YYYY-MM-DD) to begin training, set via the
   // post-presentation commitment screen. Null until they've confirmed one.
+  // Also the anchor a rotating schedule counts its cycle from.
   startDate: text("start_date"),
+  // When each day is trained: { mode: "fixed" | "rotating", slots: (dayNumber | null)[] }.
+  // Deliberately stored beside `days` rather than as a field on each day - a
+  // per-day weekday can't express where the REST slots fall in a rotation, nor
+  // the same day appearing twice in one cycle. Kept out of `days` it also
+  // survives the wholesale day rewrite a weekly check-in performs.
+  // Null on every pre-existing row, and on any program never scheduled.
+  schedule: jsonb("schedule"),
   // Server-internal phase-template bookkeeping (see lib/phaseTemplate.ts) -
   // which hard-template segment the client is in and how many weeks they've
   // been there. Never returned to clients (stripped in serializeProgram).

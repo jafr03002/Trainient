@@ -19,6 +19,8 @@ import { computeSessionAdherence, MISSED_REASON_TEXT } from "../lib/sessionAdher
 import { trainingWeekNumber } from "../lib/trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
 import { PHASE_TEMPLATES, resolvePhaseProgression, effectivePhase, type LongTermPhase } from "../lib/phaseTemplate";
+import { defaultFixedSchedule, remapSchedule } from "../lib/programSchedule";
+import type { ProgramSchedule } from "@workspace/api-zod";
 // Today's date as YYYY-MM-DD (server local) - the reference "end of this week" for
 // the past-week evidence windows in buildCheckinEvidence. Lives in dateWindow.ts
 // with the rest of the date-string helpers, shared with the log-date guards.
@@ -351,6 +353,15 @@ ${evidence.text}`;
     detail: h.detail,
   }));
 
+  // A check-in writes a BRAND NEW program row, so anything not carried across
+  // here is silently lost - and the model re-emits days with no stable identity,
+  // so a day it renumbered or dropped can leave a slot pointing at nothing.
+  // remapSchedule blanks those slots; if that leaves nothing to train, fall back
+  // to a fresh default rather than handing the user an empty week.
+  const carriedSchedule =
+    remapSchedule(currentProgram.schedule as ProgramSchedule | null, updatedDays) ??
+    defaultFixedSchedule(updatedDays, (profile?.preferredRestDays as string[]) ?? []);
+
   const resolved = resolvePhaseProgression(
     template,
     priorSegmentIndex,
@@ -381,6 +392,10 @@ ${evidence.text}`;
       splitType: raw.updated_program.split_type,
       programHighlights: updatedHighlights,
       days: updatedDays,
+      schedule: carriedSchedule,
+      // A rotating cycle is meaningless without the date it counts from, so the
+      // anchor has to travel with it onto the new row. Fixed weeks don't read it.
+      startDate: carriedSchedule.mode === "rotating" ? currentProgram.startDate : null,
       // Explicit rather than relying on the column default: check-in output
       // always belongs to the AI lineage, never the manual one.
       aiGenerated: true,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
@@ -34,6 +34,7 @@ import {
 } from "@/lib/checklistItems";
 import { DurationWheel } from "@/components/DurationWheel";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
+import { WEEKDAY_LABELS, mondayIndexOf, todayDateString, upcomingSlots, type StoredSchedule } from "@/lib/programSchedule";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
 import {
@@ -1189,6 +1190,92 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   );
 }
 
+// The read-only view of a program's schedule. Always shows the next seven days
+// rather than "the week", because that is the question a rotating cycle actually
+// answers - a 3-day rotation has no weeks, and pinning it to Mon-Sun would make
+// it look like it repeated every seven days when it doesn't.
+//
+// Renders nothing at all for an unscheduled program. That covers every row that
+// predates the feature and, by design, every Independent-mode program: only AI
+// generation and the weekly check-in ever write a schedule, so the strip is
+// simply absent on the manual lineage rather than showing an empty week.
+export function ScheduleStrip({
+  schedule,
+  startDate,
+  days,
+  colorFor,
+  onPickDay,
+}: {
+  schedule: StoredSchedule | null;
+  startDate: string | null;
+  days: ProgramDay[];
+  colorFor: (day: ProgramDay) => string;
+  onPickDay?: (dayNumber: number) => void;
+}) {
+  if (!schedule?.slots?.length) return null;
+
+  const today = todayDateString();
+  const upcoming = upcomingSlots(schedule, startDate, today, 7);
+  if (!upcoming.length) return null;
+
+  const dayByNumber = new Map(days.map((d) => [d.dayNumber, d]));
+
+  return (
+    <div className="space-y-2" data-testid="program-schedule-strip">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {schedule.mode === "rotating" ? (
+          <><RotateCw className="w-3.5 h-3.5" /> {schedule.slots.length}-day rotation</>
+        ) : (
+          <><CalendarDays className="w-3.5 h-3.5" /> Every week</>
+        )}
+      </div>
+      {/* Scrolls rather than squeezing into 7 equal columns: at phone width that
+          left every cell ~41px, where "Posterior 1" and "Posterior 2" both
+          truncate to "Pos…" - useless for the one question this strip answers.
+          Cells keep a floor width and scroll instead, the same idiom as the day
+          switcher directly below. */}
+      <div className="flex gap-1.5 overflow-x-auto">
+        {upcoming.map(({ date, dayId }, i) => {
+          const day = dayId != null ? dayByNumber.get(dayId) : null;
+          const tones = day ? dayTones(colorFor(day)) : null;
+          const isToday = i === 0;
+          return (
+            <button
+              key={date}
+              type="button"
+              disabled={!day}
+              onClick={() => day && onPickDay?.(day.dayNumber)}
+              style={
+                tones
+                  ? { backgroundColor: tones.soft, boxShadow: `inset 0 0 0 1px ${tones.solid}` }
+                  : undefined
+              }
+              className={`flex-1 shrink-0 basis-[4.75rem] rounded-lg px-1.5 py-2 text-center transition-colors ${
+                tones ? "" : "bg-secondary/40 border border-border"
+              } ${day ? "cursor-pointer" : "cursor-default"}`}
+              data-testid={`schedule-strip-day-${i}`}
+            >
+              <span
+                className={`block text-[10px] uppercase tracking-wide ${
+                  isToday ? "text-foreground font-semibold" : "text-muted-foreground"
+                }`}
+              >
+                {isToday ? "Today" : WEEKDAY_LABELS[mondayIndexOf(date) ?? 0]}
+              </span>
+              <span
+                className="block text-[11px] font-medium truncate mt-0.5"
+                style={tones ? { color: tones.text } : undefined}
+              >
+                {day ? day.label : <span className="text-muted-foreground">Rest</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Shown on a program page whose lineage is NOT the active training mode -
 // explains why workout logging isn't offered there.
 export function InactiveLineageNotice({ children }: { children: ReactNode }) {
@@ -1426,11 +1513,24 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </motion.div>
       )}
 
+      <ScheduleStrip
+        schedule={(program.schedule as StoredSchedule | null) ?? null}
+        startDate={program.startDate ?? null}
+        days={days}
+        colorFor={dayColor}
+        onPickDay={(dayNumber) => {
+          const index = days.findIndex((d) => d.dayNumber === dayNumber);
+          if (index >= 0) setActiveDay(index);
+        }}
+      />
+
       {/* Day switcher + roster. Grouped so the first-run tour can spotlight both
           at once: its step says "your training days and exercises", and the
           roster is what the second half of that sentence refers to. The wrapper
           repeats the parent's space-y-6, so the two still sit exactly as far
-          apart as they did as loose siblings. */}
+          apart as they did as loose siblings. The schedule strip stays outside
+          it: that step describes the days and their exercises, not the week
+          they land on, so spotlighting the strip too would overshoot the copy. */}
       <div ref={tourProgramBodyRef} className="space-y-6">
       {/* Day switcher */}
       <div

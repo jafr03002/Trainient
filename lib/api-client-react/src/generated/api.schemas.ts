@@ -333,6 +333,23 @@ export interface ProgramHighlight {
   detail: string;
 }
 
+export type ProgramScheduleMode = typeof ProgramScheduleMode[keyof typeof ProgramScheduleMode];
+
+
+export const ProgramScheduleMode = {
+  fixed: 'fixed',
+  rotating: 'rotating',
+} as const;
+
+export interface ProgramSchedule {
+  mode: ProgramScheduleMode;
+  /**
+     * @minItems 2
+     * @maxItems 14
+     */
+  slots: (number | null)[];
+}
+
 /**
  * @nullable
  */
@@ -426,6 +443,7 @@ export interface Program {
   cardioIntensity?: ProgramCardioIntensity;
   /** @nullable */
   startDate?: string | null;
+  schedule?: ProgramSchedule | null;
 }
 
 export interface ProgramStartDateUpdate {

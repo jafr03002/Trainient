@@ -6,36 +6,31 @@ import { MuscleVolumeChart } from "@/components/onboarding/MuscleVolumeChart";
 import { ProgramHighlights } from "@/components/onboarding/ProgramHighlights";
 import { SatisfactionGate, type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 import { formatSplitType } from "@/lib/utils";
+import { buildDayColorOrder, dayColorHex, dayTones } from "@/lib/dayColors";
+import { WEEKDAY_LABELS, type StoredSchedule } from "@/lib/programSchedule";
 
 type ProgramDay = Program["days"][number];
 
-// Rotating per-day accent, keyed by the day's position in the split so the same
-// day is the same color in the schedule strip and the session list.
-const DAY_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16"];
-function dayColor(index: number): string {
-  return DAY_COLORS[index % DAY_COLORS.length];
-}
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-// Which weekdays a program with N training days lands on - rest days spread out
-// rather than all bunched at the end. Falls back to the first N weekdays.
-const SCHEDULE_SLOTS: Record<number, number[]> = {
-  1: [0],
-  2: [0, 3],
-  3: [0, 2, 4],
-  4: [0, 1, 3, 4],
-  5: [0, 1, 2, 4, 5],
-  6: [0, 1, 2, 4, 5, 6],
-  7: [0, 1, 2, 3, 4, 5, 6],
-};
-
-function scheduleFor(days: ProgramDay[]): (ProgramDay | null)[] {
-  const slots = SCHEDULE_SLOTS[days.length] ?? days.map((_, i) => i);
+// This card used to invent its own week from a hardcoded SCHEDULE_SLOTS lookup
+// keyed on the day COUNT, which ignored the rest days the client had just been
+// asked for and was never persisted - so the schedule shown here was not the one
+// they would go on to train. It now renders the real programs.schedule the server
+// derived from their stated rest days.
+//
+// Day colours come from lib/dayColors like every other surface. The private
+// 7-colour palette that used to live here drifted from the app's 10-colour one,
+// so a day was one colour in onboarding and another on the program page.
+function weekFromSchedule(program: Program, days: ProgramDay[]): (ProgramDay | null)[] {
+  const schedule = (program.schedule as StoredSchedule | null) ?? null;
+  const byNumber = new Map(days.map((d) => [d.dayNumber, d]));
+  if (schedule?.mode === "fixed" && schedule.slots.length === 7) {
+    return schedule.slots.map((n) => (n != null ? byNumber.get(n) ?? null : null));
+  }
+  // A rotating cycle has no fixed week to draw. Generation only ever produces
+  // fixed schedules, so this is the unscheduled/legacy fallback: lay the days out
+  // in order and let the caption say only how many there are.
   const week: (ProgramDay | null)[] = Array(7).fill(null);
-  slots.forEach((weekdayIndex, i) => {
-    if (days[i]) week[weekdayIndex] = days[i];
-  });
+  days.slice(0, 7).forEach((d, i) => { week[i] = d; });
   return week;
 }
 
@@ -171,7 +166,12 @@ export function PresentationDeck({
   }, [program.id, program.generatedAt]);
 
   const days = program.days;
-  const week = scheduleFor(days);
+  const week = weekFromSchedule(program, days);
+  const isRealSchedule = (program.schedule as StoredSchedule | null)?.mode === "fixed";
+  // Same positional order the program page and calendar use, so a day is the
+  // same colour here as it will be everywhere else from now on.
+  const colorOrder = buildDayColorOrder(days.map((d) => d.label));
+  const dayColor = (day: ProgramDay) => dayColorHex(day.label, colorOrder);
   const phases = timelineFor(goal, program.longTermGoalWeight, weightUnit);
 
   const cards = ["program", "timeline", "balance", "sessions", "gate"] as const;
@@ -286,27 +286,35 @@ export function PresentationDeck({
                 <div>
                   <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Your week</h3>
                   <div className="grid grid-cols-7 gap-1">
-                    {WEEKDAYS.map((wd) => (
+                    {WEEKDAY_LABELS.map((wd) => (
                       <div key={wd} className="text-center text-[10px] font-medium text-muted-foreground pb-0.5">{wd}</div>
                     ))}
-                    {week.map((day, i) => (
-                      <div
-                        key={i}
-                        className="min-h-[52px] rounded-lg border border-border/50 bg-card/50 p-1"
-                      >
-                        {day && (
-                          <div
-                            className="text-[8.5px] font-semibold text-white rounded px-1 py-0.5 leading-tight [overflow-wrap:anywhere]"
-                            style={{ background: dayColor(day.dayNumber - 1) }}
-                          >
-                            {day.label}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {week.map((day, i) => {
+                      const tones = day ? dayTones(dayColor(day)) : null;
+                      return (
+                        <div
+                          key={i}
+                          className="min-h-[52px] rounded-lg border border-border/50 bg-card/50 p-1"
+                        >
+                          {day && tones && (
+                            <div
+                              className="text-[8.5px] font-semibold rounded px-1 py-0.5 leading-tight [overflow-wrap:anywhere]"
+                              // `on` is picked against the day's own colour rather
+                              // than assumed white, which was unreadable on amber
+                              // and lime.
+                              style={{ background: tones.solid, color: tones.on }}
+                            >
+                              {day.label}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2">
-                    {days.length} training days a week, with rest spread between them.
+                    {isRealSchedule
+                      ? `${days.length} training days a week, on the days you kept free.`
+                      : `${days.length} training days a week, with rest spread between them.`}
                   </p>
                 </div>
               </>
@@ -319,7 +327,7 @@ export function PresentationDeck({
                 <p className="text-sm text-muted-foreground">Tap any session to see the full exercise list.</p>
                 <div className="space-y-2">
                   {days.map((day) => (
-                    <SessionRow key={day.dayNumber} day={day} color={dayColor(day.dayNumber - 1)} />
+                    <SessionRow key={day.dayNumber} day={day} color={dayColor(day)} />
                   ))}
                 </div>
               </>
