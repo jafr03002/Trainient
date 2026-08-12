@@ -25,6 +25,7 @@ import {
   saveActiveSession,
   clearActiveSession,
   resolveActiveSession,
+  startSession,
 } from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
@@ -183,6 +184,12 @@ export default function Log() {
   // program/user are still loading (nothing has been resolved yet), false when
   // there is genuinely nothing in progress - the idle screen.
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  // A Start workout press reached this page and the session still couldn't be
+  // written - localStorage is where a session lives, so a browser refusing it
+  // (private mode, storage turned off, a full quota) means no workout can be
+  // logged at all. Kept apart from `hasSession` because the idle screen's
+  // "go and press Start workout" is exactly the wrong advice in that case.
+  const [startFailed, setStartFailed] = useState(false);
   const [resumedElsewhere, setResumedElsewhere] = useState(false);
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
@@ -278,11 +285,19 @@ export default function Log() {
 
   const sessionBestRef = useRef<Record<string, number>>({});
 
-  // Which program day to log - passed as ?day=<dayNumber> from the program page.
-  const targetDayNumber = (() => {
-    const raw = new URLSearchParams(window.location.search).get("day");
+  // Which program day to log - passed as ?day=<dayNumber> from the program page -
+  // and whether the client got here by pressing Start workout (`&start=1`) as
+  // opposed to opening the logger from the nav. The two say different things:
+  // `day` is which day is wanted, `start` is that a session was actually asked
+  // for, and only the second one licenses beginning one (see the effect below).
+  const { targetDayNumber, startRequested } = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("day");
     const n = raw ? parseInt(raw) : NaN;
-    return Number.isFinite(n) ? n : null;
+    return {
+      targetDayNumber: Number.isFinite(n) ? n : null,
+      startRequested: params.get("start") === "1",
+    };
   })();
 
   function resolveDay(days: any[]): any {
@@ -293,12 +308,19 @@ export default function Log() {
     return days[0];
   }
 
-  // This page only ever RESUMES a session - it never starts one. A session
-  // begins when the client taps Start workout on the program page, which writes
-  // the draft and the pointer (see startSession); everything below therefore
-  // hangs off that pointer rather than off the `?day=` in the URL. With no
-  // pointer there is nothing to log and the idle screen renders instead, so
-  // merely opening /log can't quietly begin a session the client didn't ask for.
+  // A session begins on a deliberate press of Start workout, and this page
+  // hangs off the pointer that press writes (see startSession) rather than off
+  // the `?day=` in the URL. Opening /log by itself - the nav item, a bookmark -
+  // asks for no session and gets none: the idle screen renders instead, so the
+  // logger can be looked at without quietly starting a workout.
+  //
+  // The one exception is a press that arrives here having failed to leave a
+  // pointer behind. `start=1` is that press, and honouring it is the difference
+  // between landing in a running session and landing on "No logging ongoing"
+  // one tap after Start workout - which reads as the button being broken, and
+  // gives the client nowhere to go but the button they just pressed. The URL
+  // carrying the request is dropped the moment it is served, so a later
+  // refresh or Back can't replay it into a second session.
   useEffect(() => {
     if (!program?.days || !user?.id) return;
     // Finishing or cancelling clears the session and navigates away; a refetch
@@ -307,16 +329,39 @@ export default function Log() {
 
     // `resolveActiveSession` already dropped the pointer if its draft is gone,
     // so anything it returns is a live session on some day.
-    const active = resolveActiveSession(user.id);
-    const sessionDay = active
-      ? String(active.pointer.programId) === String(program.id)
-        ? (program.days as any[]).find((d) => d.dayNumber === active.pointer.dayNumber)
-        : undefined
-      : undefined;
+    let active = resolveActiveSession(user.id);
+
+    const dayOf = (pointer: ActiveSessionPointer) =>
+      String(pointer.programId) === String(program.id)
+        ? (program.days as any[]).find((d) => d.dayNumber === pointer.dayNumber)
+        : undefined;
+
+    let sessionDay = active ? dayOf(active.pointer) : undefined;
 
     // Belongs to another program, or to a day this program no longer has -
     // nothing on this page can render it.
-    if (active && !sessionDay) clearActiveSession(user.id);
+    if (active && !sessionDay) {
+      clearActiveSession(user.id);
+      active = null;
+    }
+
+    // Nothing in progress, but the client pressed Start workout on this day to
+    // get here. Begin it, rather than showing them an idle screen that tells
+    // them to go and press the button they just pressed. Checked after the
+    // pointer above so a live session always wins: a press that collides with
+    // one never reaches this page (the program page raises its discard dialog
+    // first), and a resumed session must not be restarted from empty.
+    if (!active && startRequested && targetDayNumber != null) {
+      const wanted = (program.days as any[]).find((d) => d.dayNumber === targetDayNumber);
+      if (wanted) {
+        // startSession reports whether the session survived the write; false
+        // means storage itself refused it, which is the one case where there
+        // genuinely is nothing to log and the client deserves to know why.
+        setStartFailed(!startSession(user.id, program.id, wanted.dayNumber));
+        active = resolveActiveSession(user.id);
+        sessionDay = active ? dayOf(active.pointer) : undefined;
+      }
+    }
 
     if (!sessionDay) {
       setHasSession(false);
@@ -340,7 +385,11 @@ export default function Log() {
     const requestedDay = resolveDay(program.days as any[]);
     const wasRedirected = !!requestedDay && requestedDay.dayNumber !== day.dayNumber;
     setResumedElsewhere(wasRedirected);
-    if (wasRedirected) {
+    // Replaces rather than pushes, which also spends the `start=1` request: it
+    // has been served, and leaving it in the history entry would let a refresh -
+    // or a Back out of the session the client just finished - ask for the day to
+    // be started all over again.
+    if (wasRedirected || startRequested) {
       setLocation(`/log?day=${day.dayNumber}`, { replace: true });
     }
 
@@ -697,17 +746,23 @@ export default function Log() {
   }
 
   // Nothing in progress. This is what the page looks like both before a session
-  // and after one has been finished or discarded - logging starts on the program
-  // page and nowhere else, so the only thing offered here is the way there.
+  // and after one has been finished or discarded - logging starts on a Start
+  // workout press and nowhere else, so the only thing offered here is the way
+  // to that button. The one case that gets different words is a press that DID
+  // reach here and still couldn't open a session: sending that client back to
+  // the button would just repeat the failure.
   if (hasSession === false) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
         <div className="text-center py-20" data-testid="log-no-session">
           <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">No logging ongoing</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">
+            {startFailed ? "Couldn't start your workout" : "No logging ongoing"}
+          </h2>
           <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-            Head to your program page and hit Start workout on the day you're training - your
-            session opens here.
+            {startFailed
+              ? "This browser won't let the app store your session on this device, so there's nowhere to log to. Turn on site data (or leave private browsing) and try again."
+              : "Head to your program page and hit Start workout on the day you're training - your session opens here."}
           </p>
           <Link href="/program">
             <button

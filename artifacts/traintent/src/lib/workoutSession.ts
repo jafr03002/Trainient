@@ -147,19 +147,32 @@ export function clearActiveSession(userId: string) {
 /**
  * Begin a session for a day - the only way one ever starts. Writes an empty
  * draft plus the pointer at it, so "a session is in progress" is true from the
- * moment the client taps Start workout on the program page rather than from the
- * moment they type their first number. Opening the log page deliberately does
- * NOT call this: with no session it shows its idle screen instead of quietly
- * starting one behind the client's back.
+ * moment the client taps Start workout rather than from the moment they type
+ * their first number. Only a deliberate press calls this: opening the log page
+ * on its own shows the idle screen instead of quietly starting a session behind
+ * the client's back (the log page calls this only when the URL it was sent
+ * carries an explicit start request - see its `?start=1` handling).
  *
- * Always writes a fresh draft. A live session never comes through here (the
- * program page resumes it instead of restarting it), so anything still sitting
- * on this key is an orphan of an abandoned one - adopting its hours-old
+ * Always writes a fresh draft. A live session never comes through here (both
+ * callers resume one instead of restarting it), so anything still sitting on
+ * this key is an orphan of an abandoned one - adopting its hours-old
  * `startedAt` would open the session with the clock already running in hours.
+ *
+ * Returns whether the session is actually readable back afterwards. Every write
+ * below is best-effort (see saveDraft), so a browser that refuses localStorage -
+ * private mode, storage turned off, a full quota - fails silently. Assuming
+ * success and navigating into the logger anyway is what puts a client on its
+ * "No logging ongoing" screen seconds after tapping Start workout, with nothing
+ * on it explaining why; the caller needs to be able to say so instead.
  */
-export function startSession(userId: string, programId: string | number, dayNumber: number) {
+export function startSession(
+  userId: string,
+  programId: string | number,
+  dayNumber: number
+): boolean {
   saveDraft(draftKey(userId, programId, dayNumber), [], Date.now());
   saveActiveSession(userId, { programId, dayNumber });
+  return resolveActiveSession(userId) !== null;
 }
 
 // The pointer is only meaningful while its draft still exists - the draft may
