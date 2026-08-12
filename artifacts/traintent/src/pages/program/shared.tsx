@@ -1195,10 +1195,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
 // answers - a 3-day rotation has no weeks, and pinning it to Mon-Sun would make
 // it look like it repeated every seven days when it doesn't.
 //
-// Renders nothing at all for an unscheduled program. That covers every row that
-// predates the feature and, by design, every Independent-mode program: only AI
-// generation and the weekly check-in ever write a schedule, so the strip is
-// simply absent on the manual lineage rather than showing an empty week.
+// Renders nothing at all for an unscheduled program, which covers every row that
+// predates the feature. It is not what keeps the strip off the manual lineage,
+// though - that is the caller's job, since a manual row can still carry a stale
+// schedule. See the call site in ProgramWeekView.
 export function ScheduleStrip({
   schedule,
   startDate,
@@ -1513,8 +1513,15 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </motion.div>
       )}
 
+      {/* Manual lineage never shows a week. Scheduling is an AI-mode idea, and
+          the builder no longer offers one, so a manual program is just a list of
+          days trained whenever the user likes. Gated on the lineage rather than
+          on `schedule` being null, because rows saved while the builder briefly
+          offered a schedule still carry one and only get blanked the next time
+          PUT /programs/:id runs - until then a program built months ago went on
+          showing a week it has no way to edit. */}
       <ScheduleStrip
-        schedule={(program.schedule as StoredSchedule | null) ?? null}
+        schedule={program.aiGenerated ? ((program.schedule as StoredSchedule | null) ?? null) : null}
         startDate={program.startDate ?? null}
         days={days}
         colorFor={dayColor}
