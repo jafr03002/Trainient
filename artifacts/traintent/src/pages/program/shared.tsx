@@ -1415,12 +1415,18 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       setConflict(active.pointer);
       return;
     }
-    // Starting the session here is what makes it exist - the log page only ever
-    // resumes one, so navigating without this would land on its idle screen. An
-    // already-open session for this same day is resumed, never restarted, so its
-    // logged sets and its running clock both survive the round trip.
+    // Start it here, and say so in the URL. An already-open session for this
+    // same day is resumed, never restarted, so its logged sets and its running
+    // clock both survive the round trip.
+    //
+    // `start=1` is the tap itself, carried across the navigation: it tells the
+    // log page that this day was asked for, so it can begin the session if it
+    // finds none. Without it, anything that stopped the write below from
+    // landing - storage the browser refused, or a `user` Clerk hadn't resolved
+    // yet when the button was pressed - dead-ended on the logger's idle screen,
+    // which reads as "you didn't press Start workout" to someone who just did.
     if (user?.id && !isSameSession) startSession(user.id, program.id, day.dayNumber);
-    setLocation(`/log?day=${day.dayNumber}`);
+    setLocation(`/log?day=${day.dayNumber}&start=1`);
   }
 
   // The pointer can name a day of the *other* lineage's program, which this
@@ -1608,7 +1614,7 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
             startSession(user.id, program.id, day.dayNumber);
           }
           setConflict(null);
-          if (day) setLocation(`/log?day=${day.dayNumber}`);
+          if (day) setLocation(`/log?day=${day.dayNumber}&start=1`);
         }}
       />
     </div>
