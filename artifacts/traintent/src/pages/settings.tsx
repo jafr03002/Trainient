@@ -12,6 +12,7 @@ import {
   useCreatePortalSession,
   useGetCalendarColors,
   useGetCurrentProgram,
+  useListPrograms,
   useUpsertCalendarColor,
   getGetProfileQueryKey,
   getGetSubscriptionQueryKey,
@@ -39,6 +40,7 @@ export default function Settings() {
   const createPortal = useCreatePortalSession();
   const calendarColors = useGetCalendarColors();
   const currentProgram = useGetCurrentProgram();
+  const programs = useListPrograms();
   const upsertColor = useUpsertCalendarColor();
 
   const [name, setName] = useState("");
@@ -172,8 +174,23 @@ export default function Settings() {
   // days are listed even before they have a stored colour - the section used to
   // hang off the stored rows alone, so a user who had never customised anything
   // was shown nothing to customise.
+  //
+  // Stored colours are keyed by day label alone, with no lineage of their own,
+  // so they span both modes: without the filter below, a user who recoloured
+  // their Independent days and then switched to AI was offered those days here
+  // alongside the AI ones. A label counts as this mode's only if some program
+  // in this mode's lineage actually has a day by that name.
+  const lineageIsAi = currentMode !== "independent";
+  const lineageLabels = new Set(
+    (programs.data ?? [])
+      .filter((p) => !!p.aiGenerated === lineageIsAi)
+      .flatMap((p) => ((p.days ?? []) as { label?: string | null }[]).map((d) => d?.label))
+      .filter((label): label is string => !!label),
+  );
   const programLabels = ((currentProgram.data?.days ?? []) as { label?: string | null }[]).map((d) => d?.label);
-  const storedLabels = calendarColors.data?.map((c) => c.dayLabel) ?? [];
+  const storedLabels = (calendarColors.data ?? [])
+    .map((c) => c.dayLabel)
+    .filter((label) => lineageLabels.has(label));
   const colorOrder = buildDayColorOrder(programLabels, storedLabels);
   const knownLabels = Object.keys(colorOrder);
 
