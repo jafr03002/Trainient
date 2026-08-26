@@ -57,6 +57,7 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 
 export type Exercise = {
   name: string;
@@ -1345,7 +1346,10 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   // repeating that intro here reads as two overlapping tours. Drop it and open
   // on the real program. AI mode has no empty-state tour (the program is
   // generated), so it keeps the page intro as its first step.
-  const isIndependent = profileQuery.data?.mode === "independent";
+  // Flag-gated ahead of the mode read, like every other lineage test on this
+  // build - otherwise an "ai" profile row re-adds the page intro that my.tsx
+  // has already shown, and the client sees the same step twice.
+  const isIndependent = !AI_MODE_ENABLED || profileQuery.data?.mode === "independent";
   const programTourSteps: CoachmarkStep[] = [
     ...(isIndependent
       ? []

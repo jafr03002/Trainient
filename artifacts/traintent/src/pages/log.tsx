@@ -16,6 +16,7 @@ import {
 import { ChecklistLogCard } from "@/components/ChecklistLogCard";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import { formatClock } from "@/lib/sessionDuration";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import {
   type LoggedExercise,
   type ActiveSessionPointer,
@@ -165,7 +166,14 @@ export default function Log() {
   const { user } = useUser();
   const { data: program, isLoading: isProgramLoading } = useGetCurrentProgram();
   const { data: profile } = useGetProfile();
-  const isIndependent = profile?.mode === "independent";
+  // Flag-gated ahead of the mode read, the same way the dashboard gates its
+  // check-in banner and Settings its colour lineage: this build has no AI
+  // Coach mode, so everyone training here is in the Independent lineage. The
+  // stored mode alone would send a profile row still carrying "ai" - from an
+  // earlier build, or a database shared with a full deployment - down the AI
+  // branches below, and those point at /program/ai and /exercises/how-to:
+  // routes this build never mounts, so both dead-end on Not Found.
+  const isIndependent = !AI_MODE_ENABLED || profile?.mode === "independent";
   const weightUnit = profile?.weightUnit ?? "kg";
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });

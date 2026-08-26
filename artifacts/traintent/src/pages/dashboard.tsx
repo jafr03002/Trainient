@@ -121,7 +121,11 @@ export default function Dashboard() {
   }
 
   const profile = profileQuery.data;
-  const isIndependent = profile?.mode === "independent";
+  // Flag-gated ahead of the mode read (same pattern as log.tsx and Settings):
+  // with AI Coach mode off there is only one lineage, so a profile row still
+  // carrying mode "ai" must not be shown AI copy - "Generate a program" on a
+  // button whose only destination is the manual builder, say.
+  const isIndependent = !AI_MODE_ENABLED || profile?.mode === "independent";
 
   // The dashboard is the first leg of the first-run walkthrough (dashboard ->
   // program -> log workout), so it must fire the moment the user lands here

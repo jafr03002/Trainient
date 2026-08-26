@@ -13,6 +13,7 @@ import {
   useFinishProgramTour,
 } from "./shared";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 
 // The build-your-own program page. Reads and writes the manual lineage
 // (aiGenerated=false) exclusively - creating or editing a program here can
@@ -28,7 +29,12 @@ export default function MyProgram() {
   const tourCreateRef = useRef<HTMLButtonElement>(null);
   const finishProgramTour = useFinishProgramTour();
 
-  const isIndependent = profileQuery.data?.mode === "independent";
+  // Flag-gated ahead of the mode read (same pattern as log.tsx and Settings).
+  // This is the sharpest case of the four: reading the stored mode alone, a
+  // profile row still carrying "ai" lands on this page - the only program page
+  // this build mounts - is told its workouts log against the AI program, and
+  // is given no Start button to train with at all.
+  const isIndependent = !AI_MODE_ENABLED || profileQuery.data?.mode === "independent";
 
   // The first-run tour arrives here from the dashboard (see dashboard.tsx),
   // and in Independent mode there is usually no program yet - so the empty

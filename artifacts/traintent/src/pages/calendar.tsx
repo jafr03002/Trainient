@@ -24,6 +24,7 @@ import {
 import { CHECKLIST_ACCENT, categoryMeta, formatDuration } from "@/lib/checklistItems";
 import { phaseSolid, phaseSoft, phaseLabel } from "@/lib/phaseColors";
 import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import {
   buildPhaseRanges,
   buildCalibrationGroups,
@@ -166,7 +167,13 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {new Date(session.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
+                {/* Which lineage this session was logged in. Only worth saying
+                    where there are two: with AI Coach mode off, every session is
+                    an Independent one, so the label is a word repeated under every
+                    entry that distinguishes it from nothing. */}
+                {AI_MODE_ENABLED && (
+                  <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
+                )}
               </p>
               {/* Timing gets its own line rather than extending the date line
                   sideways. This is also the only place in the calendar that has
@@ -478,7 +485,10 @@ export default function Calendar() {
   // only ever apply to AI mode (mirrors dashboard.tsx's isIndependent gate).
   // Skipping this avoids surfacing a leftover calibration phase from a
   // program lineage the user switched away from.
-  const isIndependent = profileQuery.data?.mode === "independent";
+  // Flag-gated ahead of the mode read (same pattern as log.tsx and Settings):
+  // phase ranges are built from AI-generated programs, which this build never
+  // produces, so an "ai" profile row would only ever draw stale bands.
+  const isIndependent = !AI_MODE_ENABLED || profileQuery.data?.mode === "independent";
   const phaseRanges = isIndependent
     ? []
     : buildPhaseRanges(programsQuery.data ?? [], profileQuery.data?.onboardingCompletedAt);
