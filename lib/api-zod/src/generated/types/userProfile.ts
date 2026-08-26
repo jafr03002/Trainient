@@ -52,5 +52,7 @@ export interface UserProfile {
   weightLoggingTourSeenAt?: string | null;
   /** @nullable */
   dashboardTourSeenAt?: string | null;
+  /** @nullable */
+  calendarTourSeenAt?: string | null;
   createdAt: string;
 }

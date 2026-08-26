@@ -28,6 +28,7 @@ function serializeProfile(p: typeof userProfilesTable.$inferSelect) {
     programPageTourSeenAt: p.programPageTourSeenAt?.toISOString() ?? null,
     weightLoggingTourSeenAt: p.weightLoggingTourSeenAt?.toISOString() ?? null,
     dashboardTourSeenAt: p.dashboardTourSeenAt?.toISOString() ?? null,
+    calendarTourSeenAt: p.calendarTourSeenAt?.toISOString() ?? null,
   };
 }
 
@@ -123,7 +124,7 @@ router.patch("/profile", requireAuth, async (req, res) => {
   // Timestamp fields arrive as ISO strings over the wire (like every other date on
   // this API) but the columns are real timestamps - convert explicitly rather than
   // relying on the pg driver to infer the cast from the target column.
-  const { calibrationWalkthroughSeenAt, programPageTourSeenAt, weightLoggingTourSeenAt, dashboardTourSeenAt, ...rest } = parsed.data;
+  const { calibrationWalkthroughSeenAt, programPageTourSeenAt, weightLoggingTourSeenAt, dashboardTourSeenAt, calendarTourSeenAt, ...rest } = parsed.data;
   const [profile] = await db
     .update(userProfilesTable)
     .set({
@@ -139,6 +140,9 @@ router.patch("/profile", requireAuth, async (req, res) => {
         : {}),
       ...(dashboardTourSeenAt !== undefined
         ? { dashboardTourSeenAt: dashboardTourSeenAt ? new Date(dashboardTourSeenAt) : null }
+        : {}),
+      ...(calendarTourSeenAt !== undefined
+        ? { calendarTourSeenAt: calendarTourSeenAt ? new Date(calendarTourSeenAt) : null }
         : {}),
     })
     .where(eq(userProfilesTable.userId, userId))

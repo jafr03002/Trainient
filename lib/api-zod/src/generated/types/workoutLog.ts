@@ -21,5 +21,15 @@ export interface WorkoutLog {
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
+  /**
+     * When the session clock started (the log page opening). Null for sessions logged before timing existed.
+     * @nullable
+     */
+  startedAt?: string | null;
+  /**
+     * Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.
+     * @nullable
+     */
+  durationSeconds?: number | null;
   createdAt: string;
 }

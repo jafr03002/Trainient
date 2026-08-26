@@ -11,7 +11,14 @@ export type LoggedSet = {
   repsRight?: number | null;
   completed?: boolean;
 };
-export type LoggedExercise = { name: string; muscle: string; sets: LoggedSet[] };
+export type LoggedExercise = {
+  name: string;
+  muscle: string;
+  sets: LoggedSet[];
+  /** "checklist" for a stretch/plank row, absent on a lift and on any row logged
+   *  before checklist items existed. Such a row carries `sets: []` on purpose. */
+  kind?: string | null;
+};
 
 // A minimal view of a workout_logs row - enough for all the analysis here.
 export type WorkoutLogRow = {
@@ -19,6 +26,10 @@ export type WorkoutLogRow = {
   weekNumber: number;
   createdAt: Date;
   exercisesLogged: unknown;
+  dayLabel?: string | null;
+  dayNumber?: number;
+  /** Wall-clock session length. Null on sessions logged before timing existed. */
+  durationSeconds?: number | null;
 };
 
 // A set counts once it has any logged data - we do NOT require the user to have

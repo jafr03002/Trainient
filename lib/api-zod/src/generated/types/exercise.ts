@@ -5,6 +5,10 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { ExerciseCategory } from './exerciseCategory';
+import type { ExerciseKind } from './exerciseKind';
+import type { ExerciseTargetType } from './exerciseTargetType';
+import type { ExerciseTargetUnit } from './exerciseTargetUnit';
 
 export interface Exercise {
   /** @maxLength 80 */
@@ -26,4 +30,23 @@ export interface Exercise {
   /** @nullable */
   secondaryMuscle?: string | null;
   isUnilateral?: boolean;
+  kind?: ExerciseKind;
+  /** @nullable */
+  targetType?: ExerciseTargetType;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
+  targetValue?: number | null;
+  /** @nullable */
+  targetUnit?: ExerciseTargetUnit;
+  /** @nullable */
+  category?: ExerciseCategory;
 }

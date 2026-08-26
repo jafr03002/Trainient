@@ -9,6 +9,7 @@ import {
   ManualProgramBuilder,
   programDraftKey,
   loadProgramDraft,
+  programDraftHasChanges,
   useFinishProgramTour,
 } from "./shared";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
@@ -43,18 +44,23 @@ export default function MyProgram() {
   ];
 
   // Drop the user back into the builder, mid-edit, if a reload or crash
-  // interrupted them before they saved - a draft existing is exactly that
-  // signal. Only checked once: after this, Cancel (which intentionally
-  // leaves the draft in place) must not immediately snap back into it.
+  // interrupted them before they saved. The signal is a draft holding changes
+  // the program doesn't already have - not merely a draft existing, which was
+  // also true after cancelling out of the editor, so starting a workout and
+  // coming back landed on the edit view as if Cancel had never happened.
+  // Checked once per mount so a background refetch can't yank the page into
+  // edit mode while the user is reading it.
   const autoResumedRef = useRef(false);
   useEffect(() => {
     if (autoResumedRef.current || isLoading || profileQuery.isLoading || !user?.id) return;
     autoResumedRef.current = true;
 
     if (program) {
-      if (loadProgramDraft(programDraftKey(user.id, program.id))) setEditing(true);
+      const draft = loadProgramDraft(programDraftKey(user.id, program.id));
+      if (programDraftHasChanges(draft, program)) setEditing(true);
     } else {
-      if (loadProgramDraft(programDraftKey(user.id, "new"))) setBuilding(true);
+      const draft = loadProgramDraft(programDraftKey(user.id, "new"));
+      if (programDraftHasChanges(draft, null)) setBuilding(true);
     }
   }, [isLoading, profileQuery.isLoading, user?.id, program]);
 

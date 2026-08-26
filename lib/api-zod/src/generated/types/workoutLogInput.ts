@@ -23,4 +23,12 @@ export interface WorkoutLogInput {
      * @nullable
      */
   notes?: string | null;
+  /** @nullable */
+  startedAt?: Date | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  durationSeconds?: number | null;
 }

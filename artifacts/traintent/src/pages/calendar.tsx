@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, MessageSquare, Trash2, Check, ListChecks, Clock } from "lucide-react";
+import { formatSessionLength, formatStartTime, countsTowardAverage } from "@/lib/sessionDuration";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListWorkouts,
   useGetCalendarColors,
+  useGetCurrentProgram,
   useDeleteWorkout,
   useListPrograms,
   useGetProfile,
+  useUpdateProfile,
+  getGetProfileQueryKey,
   getListWorkoutsQueryKey,
   getGetRecentWorkoutsQueryKey,
   getGetWorkoutStatsQueryKey,
@@ -17,7 +21,9 @@ import {
   getGetMuscleVolumeBreakdownQueryKey,
   getGetWorkoutsByDayLabelQueryKey,
 } from "@workspace/api-client-react";
+import { CHECKLIST_ACCENT, categoryMeta, formatDuration } from "@/lib/checklistItems";
 import { phaseSolid, phaseSoft, phaseLabel } from "@/lib/phaseColors";
+import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
 import {
   buildPhaseRanges,
   buildCalibrationGroups,
@@ -26,17 +32,7 @@ import {
   isReviewPossible,
   CALIBRATION_FAMILY,
 } from "@/lib/calibration";
-
-const DEFAULT_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
-];
-
-function getColor(label: string, colorMap: Record<string, string>, allLabels: string[]): string {
-  if (colorMap[label]) return colorMap[label];
-  const idx = allLabels.indexOf(label);
-  return DEFAULT_COLORS[idx % DEFAULT_COLORS.length] ?? "#3b82f6";
-}
+import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 
 type WorkoutLog = {
   id: number;
@@ -46,6 +42,8 @@ type WorkoutLog = {
   weekNumber: number;
   mode: string;
   exercisesLogged: any[];
+  startedAt?: string | null;
+  durationSeconds?: number | null;
 };
 
 type SessionModalProps = {
@@ -53,6 +51,12 @@ type SessionModalProps = {
   allWorkouts: WorkoutLog[];
   colorHex: string;
   onClose: () => void;
+  // Lets the first-run calendar tour anchor its last step on the close button,
+  // which lives in here rather than on the page.
+  closeButtonRef?: RefObject<HTMLButtonElement | null>;
+  // ...and cut the sheet itself out of the tour's dimming backdrop, so the
+  // session the user has just opened is the one bright thing on screen.
+  panelRef?: RefObject<HTMLDivElement | null>;
 };
 
 // A set with no real data (weight and all rep fields zero/empty).
@@ -90,7 +94,7 @@ function setRepsLabel(s: any): string {
   return `${s.reps ?? 0}`;
 }
 
-function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalProps) {
+function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef, panelRef }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
   const queryClient = useQueryClient();
   const deleteWorkout = useDeleteWorkout();
@@ -141,6 +145,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
           onClick={onClose}
         />
         <motion.div
+          ref={panelRef}
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
@@ -163,8 +168,33 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
                 {new Date(session.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 <span className="text-muted-foreground/50"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
               </p>
+              {/* Timing gets its own line rather than extending the date line
+                  sideways. This is also the only place in the calendar that has
+                  ever shown a time of day - `date` is a bare YYYY-MM-DD, so
+                  `startedAt` is what makes it possible. */}
+              {session.durationSeconds != null && (
+                <div className="mt-1" data-testid="text-session-duration">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    {session.startedAt && (
+                      <>
+                        {formatStartTime(session.startedAt)}
+                        <span className="text-muted-foreground/50">·</span>
+                      </>
+                    )}
+                    {formatSessionLength(session.durationSeconds)}
+                  </p>
+                  {/* An overnight session is stored honestly; this stops the
+                      resulting number reading as a bug. */}
+                  {!countsTowardAverage(session) && (
+                    <p className="text-[11px] text-muted-foreground/50 mt-0.5">
+                      Not counted toward your average
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+            <button ref={closeButtonRef} onClick={onClose} className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -172,6 +202,36 @@ function SessionModal({ session, allWorkouts, colorHex, onClose }: SessionModalP
           {/* Exercise list */}
           <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-8 space-y-6">
             {exercises.map((ex: any, i: number) => {
+              // A logged checklist item has no sets and no muscle, so it gets a
+              // compact line of its own rather than an empty muscle pill above an
+              // empty set list.
+              if (ex.kind === "checklist") {
+                const meta = categoryMeta(ex.category);
+                const accent = meta?.token ?? CHECKLIST_ACCENT;
+                const done = (ex.completedRounds ?? 0) > 0;
+                return (
+                  <div key={i} className="flex items-center gap-3 min-w-0" data-testid={`session-checklist-${i}`}>
+                    <span
+                      className={`shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center ${
+                        done ? "bg-chart-2/15 border-chart-2/50 text-chart-2" : "bg-secondary/30 border-border text-muted-foreground/50"
+                      }`}
+                    >
+                      {done ? <Check className="w-3.5 h-3.5" /> : <ListChecks className="w-3 h-3" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className={`font-semibold text-foreground truncate ${done ? "" : "opacity-60"}`}>{ex.name}</h3>
+                      <p className="text-xs text-muted-foreground truncate">
+                        <span className="font-medium" style={{ color: accent }}>
+                          {meta ? meta.label : "Checklist"}
+                        </span>
+                        {(ex.targetSeconds ?? 0) > 0 && <> · {formatDuration(ex.targetSeconds)}</>}
+                        {(ex.completedRounds ?? 0) > 1 && <> · {ex.completedRounds} rounds</>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
               const prevSets = findPrevExerciseSets(ex.name);
 
               return (
@@ -333,14 +393,22 @@ function DayAgendaSheet({ date, sessions, colorFor, onSelect, onClose }: DayAgen
             {sessions.map((session) => {
               const label = session.dayLabel ?? "Workout";
               const color = colorFor(label);
+              const exerciseCount = (session.exercisesLogged as any[]).filter(exerciseHasData).length;
               return (
                 <button
                   key={session.id}
                   onClick={() => onSelect(session)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/60 bg-secondary/20 text-left hover:bg-secondary/40 transition-colors"
+                  data-testid={`day-agenda-session-${session.id}`}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-border/60 bg-secondary/20 text-left hover:bg-secondary/40 transition-colors"
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground truncate">{label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {exerciseCount} exercise{exerciseCount === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground shrink-0" />
                 </button>
               );
             })}
@@ -357,8 +425,14 @@ export default function Calendar() {
   const [dayAgenda, setDayAgenda] = useState<{ date: string; sessions: WorkoutLog[] } | null>(null);
   const workoutsQuery = useListWorkouts({ limit: 200 });
   const colorsQuery = useGetCalendarColors();
+  const currentProgramQuery = useGetCurrentProgram();
   const programsQuery = useListPrograms();
   const profileQuery = useGetProfile();
+  const updateProfile = useUpdateProfile();
+  const queryClient = useQueryClient();
+  const tourGridRef = useRef<HTMLDivElement>(null);
+  const tourCloseSessionRef = useRef<HTMLButtonElement>(null);
+  const tourSessionPanelRef = useRef<HTMLDivElement>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -369,6 +443,37 @@ export default function Calendar() {
   const totalCells = Math.ceil((startPadding + lastDay.getDate()) / 7) * 7;
 
   const workouts = (workoutsQuery.data ?? []) as WorkoutLog[];
+
+  // Final leg of the walkthrough, handed over from the dashboard's "open up your
+  // calendar" nudge once the user has logged a session. Both steps are ones the
+  // user has to carry out - open a session, then close it again - so the tour
+  // ends having actually shown them a past session rather than describing one.
+  const showCalendarTour =
+    !!profileQuery.data && !profileQuery.data.calendarTourSeenAt && workouts.length > 0;
+  const calendarTourSteps: CoachmarkStep[] = [
+    {
+      kind: "awaitAction",
+      target: tourGridRef,
+      text: "Here you can track and look back at your sessions - tap one to open it.",
+      done: !!selectedSession,
+    },
+    {
+      kind: "awaitAction",
+      target: tourCloseSessionRef,
+      // Ring the close button, but light up the whole sheet: the point of the
+      // step is the session itself, so it shouldn't sit under the scrim.
+      spotlight: tourSessionPanelRef,
+      text: "And here's that past session in full - tap here to close it.",
+      done: !selectedSession,
+    },
+  ];
+  function finishCalendarTour() {
+    updateProfile.mutate(
+      { data: { calendarTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+  }
+
   // Independent mode has no AI-generated phase lineage - phases/calibration
   // only ever apply to AI mode (mirrors dashboard.tsx's isIndependent gate).
   // Skipping this avoids surfacing a leftover calibration phase from a
@@ -387,6 +492,15 @@ export default function Calendar() {
 
   const allLabels = [...new Set(workouts.map((w) => w.dayLabel).filter(Boolean))] as string[];
 
+  // A session's colour is the one its day wears on the program page and in the
+  // editor - so the order comes from the current program's days, not from the
+  // order sessions happen to have been logged in. Labels from older programs
+  // (or renamed days) fall in behind them, keeping their own stable colour.
+  const programLabels = ((currentProgramQuery.data?.days ?? []) as { label?: string | null }[])
+    .map((d) => d?.label);
+  const colorOrder = buildDayColorOrder(programLabels, allLabels);
+  const colorFor = (label: string) => dayColorHex(label, colorOrder, colorMap);
+
   const workoutsByDate: Record<string, WorkoutLog[]> = {};
   workouts.forEach((w) => {
     if (!workoutsByDate[w.date]) workoutsByDate[w.date] = [];
@@ -395,6 +509,13 @@ export default function Calendar() {
 
   function prevMonth() { setCurrentDate(new Date(year, month - 1, 1)); }
   function nextMonth() { setCurrentDate(new Date(year, month + 1, 1)); }
+
+  // Mobile tap on a day cell. A lone session opens straight to its detail -
+  // the agenda sheet would just be an extra tap to pick the only option.
+  function openDay(date: string, sessions: WorkoutLog[]) {
+    if (sessions.length === 1) setSelectedSession(sessions[0]);
+    else setDayAgenda({ date, sessions });
+  }
 
   const monthName = currentDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
@@ -446,7 +567,7 @@ export default function Calendar() {
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div ref={tourGridRef} className="grid grid-cols-7 gap-1">
         {Array.from({ length: totalCells }).map((_, idx) => {
           const dayNum = idx - startPadding + 1;
           const isCurrentMonth = dayNum >= 1 && dayNum <= lastDay.getDate();
@@ -472,7 +593,7 @@ export default function Calendar() {
           return (
             <div
               key={idx}
-              className={`min-h-[72px] md:min-h-[88px] p-1.5 rounded-xl border transition-colors ${
+              className={`relative min-h-[72px] md:min-h-[88px] p-1.5 rounded-xl border transition-colors ${
                 !isCurrentMonth
                   ? "border-transparent"
                   : isToday
@@ -515,7 +636,7 @@ export default function Calendar() {
                   <div className="hidden md:block space-y-0.5">
                     {sessions.map((session) => {
                       const label = session.dayLabel ?? "Workout";
-                      const color = getColor(label, colorMap, allLabels);
+                      const color = colorFor(label);
                       return (
                         <button
                           key={session.id}
@@ -532,28 +653,38 @@ export default function Calendar() {
                       );
                     })}
                   </div>
-                  {/* Mobile: dots (capped, +N overflow) - tap opens the day's full agenda */}
+                  {/* Mobile: dots (capped at 3, +N overflow) - purely decorative, the
+                      whole cell is the tap target (see the overlay button below) */}
                   {sessions.length > 0 && (
-                    <button
-                      onClick={() => setDayAgenda({ date: dateStr, sessions })}
-                      className="md:hidden flex flex-wrap items-center gap-1"
-                    >
-                      {sessions.slice(0, 4).map((session) => (
+                    <div className="md:hidden flex flex-wrap items-center gap-1">
+                      {sessions.slice(0, 3).map((session) => (
                         <span
                           key={session.id}
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: getColor(session.dayLabel ?? "Workout", colorMap, allLabels) }}
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: colorFor(session.dayLabel ?? "Workout") }}
                         />
                       ))}
-                      {sessions.length > 4 && (
-                        <span className="text-[8px] font-bold text-muted-foreground">+{sessions.length - 4}</span>
+                      {sessions.length > 3 && (
+                        <span className="text-[9px] font-bold text-muted-foreground">+{sessions.length - 3}</span>
                       )}
-                    </button>
+                    </div>
                   )}
                   {showReviewNudge && (
                     <div className="mt-1 px-1 py-0.5 rounded text-[8px] font-semibold leading-tight text-amber-300 bg-amber-500/10 border border-amber-500/25">
                       Calibration review possible
                     </div>
+                  )}
+                  {/* Mobile tap target: the dots alone are a ~6px hit area, so the whole
+                      cell is the button. Safe to overlay - the desktop session pills are
+                      hidden at exactly the widths where this is shown. */}
+                  {sessions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openDay(dateStr, sessions)}
+                      aria-label={`${dayNum} ${monthName} - ${sessions.length} session${sessions.length === 1 ? "" : "s"}: ${sessions.map((s) => s.dayLabel ?? "Workout").join(", ")}`}
+                      data-testid={`day-cell-button-${dateStr}`}
+                      className="md:hidden absolute inset-0 rounded-xl transition-colors active:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
                   )}
                 </>
               )}
@@ -567,7 +698,7 @@ export default function Calendar() {
         <div className="flex flex-wrap gap-3 pt-2">
           {allLabels.map((label) => (
             <div key={label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <div className="w-3 h-3 rounded-sm" style={{ background: getColor(label, colorMap, allLabels) }} />
+              <div className="w-3 h-3 rounded-sm" style={{ background: colorFor(label) }} />
               {label}
             </div>
           ))}
@@ -591,7 +722,7 @@ export default function Calendar() {
         <DayAgendaSheet
           date={dayAgenda.date}
           sessions={dayAgenda.sessions}
-          colorFor={(label) => getColor(label, colorMap, allLabels)}
+          colorFor={colorFor}
           onSelect={(session) => {
             setSelectedSession(session);
             setDayAgenda(null);
@@ -605,9 +736,18 @@ export default function Calendar() {
         <SessionModal
           session={selectedSession}
           allWorkouts={workouts}
-          colorHex={getColor(selectedSession.dayLabel ?? "Workout", colorMap, allLabels)}
+          colorHex={colorFor(selectedSession.dayLabel ?? "Workout")}
           onClose={() => setSelectedSession(null)}
+          closeButtonRef={showCalendarTour ? tourCloseSessionRef : undefined}
+          panelRef={showCalendarTour ? tourSessionPanelRef : undefined}
         />
+      )}
+
+      {/* Rendered after the session modal deliberately: both sit at z-[60], so
+          painting the tour last is what keeps its bubble on top of the open
+          session rather than behind it. */}
+      {showCalendarTour && (
+        <CoachmarkTour steps={calendarTourSteps} onDone={finishCalendarTour} testIdPrefix="calendar-tour" />
       )}
     </div>
   );

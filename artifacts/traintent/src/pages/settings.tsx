@@ -7,18 +7,18 @@ import {
   useUpdateProfile,
   useDeleteAccount,
   useGetCalendarColors,
+  useGetCurrentProgram,
+  useListPrograms,
   useUpsertCalendarColor,
   getGetProfileQueryKey,
   getGetCalendarColorsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
+import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
+import { AI_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
 
-const DEFAULT_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1",
-];
 
 export default function Settings() {
   const { user } = useUser();
@@ -28,6 +28,8 @@ export default function Settings() {
   const updateProfile = useUpdateProfile();
   const deleteAccount = useDeleteAccount();
   const calendarColors = useGetCalendarColors();
+  const currentProgram = useGetCurrentProgram();
+  const programs = useListPrograms();
   const upsertColor = useUpsertCalendarColor();
 
   const [name, setName] = useState("");
@@ -111,14 +113,45 @@ export default function Settings() {
     queryClient.invalidateQueries({ queryKey: getGetCalendarColorsQueryKey() });
   }
 
-  // Unique day labels from calendar colors data
-  const knownLabels = calendarColors.data?.map((c) => c.dayLabel) ?? [];
+  // Flag-gated ahead of the mode test, the same way the dashboard gates its
+  // check-in banner: this build has no AI Coach mode, so the only lineage a
+  // user can be training in is the Independent one. Reading the stored mode
+  // here would offer AI-lineage day labels to a profile row that still
+  // carries mode "ai" from an earlier build or a shared database.
+  const currentMode = AI_MODE_ENABLED ? (profile.data?.mode ?? "ai") : "independent";
+
+  // The days you can recolour: your current program's, in program order, plus
+  // any label you've already recoloured (an older program's day, say). Program
+  // days are listed even before they have a stored colour - the section used to
+  // hang off the stored rows alone, so a user who had never customised anything
+  // was shown nothing to customise.
+  //
+  // Stored colours are keyed by day label alone, with no lineage of their own,
+  // so they span both modes: without the filter below, a user who recoloured
+  // their Independent days and then switched to AI was offered those days here
+  // alongside the AI ones. A label counts as this mode's only if some program
+  // in this mode's lineage actually has a day by that name.
+  const lineageIsAi = currentMode !== "independent";
+  const lineageLabels = new Set(
+    (programs.data ?? [])
+      .filter((p) => !!p.aiGenerated === lineageIsAi)
+      .flatMap((p) => ((p.days ?? []) as { label?: string | null }[]).map((d) => d?.label))
+      .filter((label): label is string => !!label),
+  );
+  const programLabels = ((currentProgram.data?.days ?? []) as { label?: string | null }[]).map((d) => d?.label);
+  const storedLabels = (calendarColors.data ?? [])
+    .map((c) => c.dayLabel)
+    .filter((label) => lineageLabels.has(label));
+  const colorOrder = buildDayColorOrder(programLabels, storedLabels);
+  const knownLabels = Object.keys(colorOrder);
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1">{user?.primaryEmailAddress?.emailAddress}</p>
+        {/* An email address has no spaces to wrap at, so a long one runs off the
+            side of a phone screen without break-words. */}
+        <p className="text-muted-foreground mt-1 break-words">{user?.primaryEmailAddress?.emailAddress}</p>
       </motion.div>
 
       {/* Profile */}
@@ -143,7 +176,10 @@ export default function Settings() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* Side by side only from sm up. Two columns on a phone left the weight
+            field ~40px wide and clipped the kg/lbs toggle against the card edge,
+            because the toggle's buttons take ~84px of the ~135px column. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-muted-foreground block mb-1.5">Age</label>
             <input
@@ -173,7 +209,10 @@ export default function Settings() {
                 }`}
                 data-testid="input-settings-weight"
               />
-              <div className="flex rounded-xl border border-border overflow-hidden">
+              {/* shrink-0: overflow-hidden zeroes this box's automatic minimum
+                  size, so without it the toggle shrinks and clips "lbs" in half
+                  rather than letting the input next to it give up the space. */}
+              <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
                 {["kg", "lbs"].map((u) => (
                   <button
                     key={u}
@@ -217,12 +256,14 @@ export default function Settings() {
         >
           <div>
             <h2 className="font-semibold text-foreground">Calendar colours</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Customise the colour for each training day label.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Each training day's colour, used on your calendar, your program page and in the editor.
+            </p>
           </div>
 
           <div className="space-y-3">
-            {knownLabels.map((label, i) => {
-              const currentColor = colorMap[label] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length] ?? "#3b82f6";
+            {knownLabels.map((label) => {
+              const currentColor = dayColorHex(label, colorOrder, colorMap);
               return (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">{label}</span>

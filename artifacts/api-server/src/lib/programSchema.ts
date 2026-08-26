@@ -23,9 +23,17 @@ const programDaySchema = {
     day_number: { type: "integer" },
     label: { type: "string" },
     focus: { type: "string" },
+    estimated_duration_minutes: {
+      type: "integer",
+      description:
+        "Realistic wall-clock length of this session in minutes, from walking in to walking out: " +
+        "warm-up, every working set, and the rest you prescribed between them. Be honest rather " +
+        "than optimistic - this is shown to the client before they decide to train, and it is " +
+        "compared against how long their sessions actually take.",
+    },
     exercises: { type: "array", items: exerciseSchema },
   },
-  required: ["day_number", "label", "focus", "exercises"],
+  required: ["day_number", "label", "focus", "estimated_duration_minutes", "exercises"],
   additionalProperties: false,
 };
 

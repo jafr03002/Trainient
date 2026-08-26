@@ -2,119 +2,36 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell } from "lucide-react";
+import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell, Check, Clock } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
+import {
+  CHECKLIST_ACCENT,
+  categoryMeta,
+  describeTarget,
+  parseCategory,
+  type ChecklistCategory,
+} from "@/lib/checklistItems";
+import { ChecklistLogCard } from "@/components/ChecklistLogCard";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
+import { formatClock } from "@/lib/sessionDuration";
+import {
+  type LoggedExercise,
+  type ActiveSessionPointer,
+  draftKey,
+  saveDraft,
+  clearDraft,
+  saveActiveSession,
+  clearActiveSession,
+  resolveActiveSession,
+  startSession,
+} from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
 
-type LoggedSet = {
-  setNumber: number;
-  weight: number;
-  reps: number;
-  repsLeft: number;
-  repsRight: number;
-  completed: boolean;
-  isNewPr: boolean;
-};
-
-type LoggedExercise = {
-  name: string;
-  muscle: string;
-  isUnilateral: boolean;
-  sets: LoggedSet[];
-  targetSets: number;
-  targetReps: string;
-  notes: string;
-  showNotes: boolean;
-};
-
 type PrFlash = { id: number; exercise: string; weight: number };
-
-type WorkoutDraft = {
-  logs: LoggedExercise[];
-  savedAt: number;
-};
-
-type ActiveSessionPointer = {
-  programId: string | number;
-  dayNumber: number;
-};
-
-const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // discard drafts older than a day
-
-// Keyed on programId + day only - `weekNumber` is now a live calendar
-// calculation (see api-server's trainingWeek helper) that can roll over
-// mid-session, so it can't be used to identify a draft.
-function draftKey(userId: string, programId: string | number, dayNumber: number): string {
-  return `traintent:workout-draft:${userId}:${programId}:${dayNumber}`;
-}
-
-function activeSessionKey(userId: string): string {
-  return `traintent:workout-draft:active:${userId}`;
-}
-
-// In-progress workout data lives only in memory otherwise, so a lost network
-// connection (which triggers a page/data reload) wipes out everything the
-// user has logged so far. Mirror it to localStorage as they go and restore
-// it on the next mount so a reconnect never erases a session mid-workout.
-function loadDraft(key: string): WorkoutDraft | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as WorkoutDraft;
-    if (!parsed || !Array.isArray(parsed.logs)) return null;
-    if (Date.now() - (parsed.savedAt ?? 0) > DRAFT_MAX_AGE_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function saveDraft(key: string, logs: LoggedExercise[]) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify({ logs, savedAt: Date.now() } as WorkoutDraft));
-  } catch {
-    // localStorage unavailable (e.g. private browsing) - degrade to in-memory only
-  }
-}
-
-function clearDraft(key: string) {
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-function loadActiveSession(userId: string): ActiveSessionPointer | null {
-  try {
-    const raw = window.localStorage.getItem(activeSessionKey(userId));
-    if (!raw) return null;
-    return JSON.parse(raw) as ActiveSessionPointer;
-  } catch {
-    return null;
-  }
-}
-
-function saveActiveSession(userId: string, pointer: ActiveSessionPointer) {
-  try {
-    window.localStorage.setItem(activeSessionKey(userId), JSON.stringify(pointer));
-  } catch {
-    // ignore
-  }
-}
-
-function clearActiveSession(userId: string) {
-  try {
-    window.localStorage.removeItem(activeSessionKey(userId));
-  } catch {
-    // ignore
-  }
-}
 
 // A set with no real data (weight and all rep fields zero/empty) - e.g. an
 // abandoned/empty session - should not count as "last time" or as "started".
@@ -123,29 +40,105 @@ function isEmptySet(s: any): boolean {
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
 }
 
-function hasLoggedData(logs: LoggedExercise[]): boolean {
-  return logs.some((ex) => ex.notes.trim() !== "" || ex.sets.some((s) => !isEmptySet(s)));
+/**
+ * Rebuilds the session from the CURRENT program day, then folds the user's entered
+ * work back in by exercise name.
+ *
+ * A draft is just a JSON blob in localStorage with a 24h life, so it can easily
+ * predate the shape the app now expects - a session left open across the release
+ * that added checklist items restores entries with no `kind`, which then render as
+ * lift cards with an empty muscle chip and a nonsense "Target: 1 x". Taking the
+ * structure from the program and only the DATA from the draft fixes that, and as a
+ * side effect also handles the program being edited mid-session (an added or
+ * removed exercise no longer leaves the logger showing a stale list).
+ */
+/**
+ * Identifies the shape of a day's exercise list - what is in it and how much of
+ * each - so an edit to the program can be told apart from a plain refetch of it.
+ * Deliberately ignores anything the logger doesn't build its rows from (muscle,
+ * cue, category), since a change there shouldn't disturb an open session.
+ */
+function dayStructureKey(day: any): string {
+  return ((day?.exercises as any[]) ?? [])
+    .map((ex) => `${ex?.kind ?? "lift"}:${ex?.name ?? ""}:${ex?.sets ?? ""}:${ex?.reps ?? ""}:${ex?.targetSeconds ?? ""}`)
+    .join("|");
+}
+
+function reconcileDraftLogs(draftLogs: LoggedExercise[], day: any): LoggedExercise[] {
+  const byName = new Map<string, LoggedExercise>();
+  for (const entry of draftLogs ?? []) {
+    if (entry?.name) byName.set(entry.name.toLowerCase(), entry);
+  }
+
+  return buildFreshLogs(day).map((fresh) => {
+    const saved = byName.get(fresh.name.toLowerCase());
+    if (!saved) return fresh;
+
+    if (fresh.kind === "checklist") {
+      return {
+        ...fresh,
+        notes: saved.notes ?? "",
+        showNotes: !!saved.showNotes,
+        // Clamp: the program's round count may have been lowered since.
+        completedRounds: Math.min(fresh.targetRounds, saved.completedRounds ?? 0),
+        // A countdown is only restored while it is still in the future; one that
+        // expired while the tab was closed is dropped rather than replayed.
+        timerEndsAt: saved.timerEndsAt != null && saved.timerEndsAt > Date.now() ? saved.timerEndsAt : null,
+        timerPausedRemaining: saved.timerPausedRemaining ?? null,
+      };
+    }
+
+    return {
+      ...fresh,
+      notes: saved.notes ?? "",
+      showNotes: !!saved.showNotes,
+      // Keep the fresh row count (the program is the authority on how many sets
+      // are prescribed) and copy across whatever the user actually logged.
+      sets: fresh.sets.map((s, i) => {
+        const savedSet = saved.sets?.[i];
+        return savedSet ? { ...s, ...savedSet, setNumber: s.setNumber } : s;
+      }),
+    };
+  });
 }
 
 function buildFreshLogs(day: any): LoggedExercise[] {
-  return day.exercises.map((ex: any) => ({
-    name: ex.name,
-    muscle: ex.muscle,
-    isUnilateral: !!ex.isUnilateral,
-    targetSets: ex.sets,
-    targetReps: ex.reps,
-    notes: "",
-    showNotes: false,
-    sets: Array.from({ length: ex.sets }, (_, i) => ({
-      setNumber: i + 1,
-      weight: 0,
-      reps: 0,
-      repsLeft: 0,
-      repsRight: 0,
-      completed: false,
-      isNewPr: false,
-    })),
-  }));
+  return day.exercises.map((ex: any) => {
+    const isChecklistItem = ex.kind === "checklist";
+    const targetRounds = Math.max(1, ex.sets ?? 1);
+    return {
+      name: ex.name,
+      muscle: ex.muscle,
+      isUnilateral: !!ex.isUnilateral,
+      targetSets: ex.sets,
+      targetReps: ex.reps,
+      notes: "",
+      showNotes: false,
+      kind: isChecklistItem ? "checklist" : "lift",
+      targetType: ex.targetType ?? null,
+      targetSeconds: ex.targetSeconds ?? null,
+      targetValue: ex.targetValue ?? null,
+      targetUnit: ex.targetUnit ?? null,
+      category: parseCategory(ex.category),
+      completedRounds: 0,
+      targetRounds,
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+      // Deliberately empty for a checklist item: a placeholder set would be picked
+      // up by the volume and PR maths as soon as anything wrote a number into it.
+      sets: isChecklistItem
+        ? []
+        : Array.from({ length: ex.sets }, (_, i) => ({
+            setNumber: i + 1,
+            weight: 0,
+            reps: 0,
+            repsLeft: 0,
+            repsRight: 0,
+            completed: false,
+            isNewPr: false,
+          })),
+    };
+  });
 }
 
 // Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
@@ -176,17 +169,42 @@ export default function Log() {
   const weightUnit = profile?.weightUnit ?? "kg";
   const { data: personalRecords } = useGetPersonalRecords();
   const { data: history } = useListWorkouts({ limit: 200 });
+  // A target is a comparison, and someone who has never logged has nothing to
+  // compare against: a prescribed "3 x 8" on a card they've never filled in
+  // reads as a rule to hit rather than the starting point it is. So every
+  // target on this page stays hidden until there is at least one saved session.
+  // History is undefined while it loads, which is what we want here - the
+  // first-timer case never flashes a target before it resolves. Independent
+  // mode is exempt: those numbers are the user's own, typed into their program.
+  const showTargets = isIndependent || (history != null && history.length > 0);
   const createWorkout = useCreateWorkout();
   const [logs, setLogs] = useState<LoggedExercise[]>([]);
   const [activeDay, setActiveDay] = useState<any>(null);
+  // Whether a session is open, once we've been able to look: null while the
+  // program/user are still loading (nothing has been resolved yet), false when
+  // there is genuinely nothing in progress - the idle screen.
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  // A Start workout press reached this page and the session still couldn't be
+  // written - localStorage is where a session lives, so a browser refusing it
+  // (private mode, storage turned off, a full quota) means no workout can be
+  // logged at all. Kept apart from `hasSession` because the idle screen's
+  // "go and press Start workout" is exactly the wrong advice in that case.
+  const [startFailed, setStartFailed] = useState(false);
   const [resumedElsewhere, setResumedElsewhere] = useState(false);
   const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Epoch ms the session clock started, and the seconds since, recomputed each
+  // tick. Null until the user logs their first real set.
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
   const flashIdRef = useRef(0);
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
-  const tourSetRowRef = useRef<HTMLDivElement>(null);
+  // The sets block (column headers + rows) is what the first tour step rings;
+  // the exercise header is what the "?" step spotlights around its button.
+  const tourSetsBlockRef = useRef<HTMLDivElement>(null);
+  const tourExerciseHeadRef = useRef<HTMLDivElement>(null);
   const tourHelpRef = useRef<HTMLButtonElement>(null);
   const tourFinishRef = useRef<HTMLButtonElement>(null);
 
@@ -206,6 +224,9 @@ export default function Log() {
   const initializedKeyRef = useRef<string | null>(null);
   const currentDraftKeyRef = useRef<string | null>(null);
   const activeSessionRef = useRef<ActiveSessionPointer | null>(null);
+  // Set the moment the session is deliberately ended (finished or cancelled),
+  // so nothing re-seeds or re-saves it in the frames before we navigate away.
+  const endingRef = useRef(false);
 
   // Prior all-time best score per exercise, plus the set of exercises that have
   // ever been logged before - both drawn from saved history (previous sessions
@@ -264,11 +285,19 @@ export default function Log() {
 
   const sessionBestRef = useRef<Record<string, number>>({});
 
-  // Which program day to log - passed as ?day=<dayNumber> from the program page.
-  const targetDayNumber = (() => {
-    const raw = new URLSearchParams(window.location.search).get("day");
+  // Which program day to log - passed as ?day=<dayNumber> from the program page -
+  // and whether the client got here by pressing Start workout (`&start=1`) as
+  // opposed to opening the logger from the nav. The two say different things:
+  // `day` is which day is wanted, `start` is that a session was actually asked
+  // for, and only the second one licenses beginning one (see the effect below).
+  const { targetDayNumber, startRequested } = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("day");
     const n = raw ? parseInt(raw) : NaN;
-    return Number.isFinite(n) ? n : null;
+    return {
+      targetDayNumber: Number.isFinite(n) ? n : null,
+      startRequested: params.get("start") === "1",
+    };
   })();
 
   function resolveDay(days: any[]): any {
@@ -279,68 +308,190 @@ export default function Log() {
     return days[0];
   }
 
-  // Only one workout session can be in progress at a time. If a different day
-  // already has an unfinished, unsaved draft, keep the user in that session
-  // instead of silently starting a new one (which would orphan the old one).
+  // A session begins on a deliberate press of Start workout, and this page
+  // hangs off the pointer that press writes (see startSession) rather than off
+  // the `?day=` in the URL. Opening /log by itself - the nav item, a bookmark -
+  // asks for no session and gets none: the idle screen renders instead, so the
+  // logger can be looked at without quietly starting a workout.
+  //
+  // The one exception is a press that arrives here having failed to leave a
+  // pointer behind. `start=1` is that press, and honouring it is the difference
+  // between landing in a running session and landing on "No logging ongoing"
+  // one tap after Start workout - which reads as the button being broken, and
+  // gives the client nowhere to go but the button they just pressed. The URL
+  // carrying the request is dropped the moment it is served, so a later
+  // refresh or Back can't replay it into a second session.
   useEffect(() => {
     if (!program?.days || !user?.id) return;
-    const requestedDay = resolveDay(program.days as any[]);
-    if (!requestedDay) return;
+    // Finishing or cancelling clears the session and navigates away; a refetch
+    // landing in that gap must not flash the idle screen over the leaving page.
+    if (endingRef.current) return;
 
-    let day = requestedDay;
+    // `resolveActiveSession` already dropped the pointer if its draft is gone,
+    // so anything it returns is a live session on some day.
+    let active = resolveActiveSession(user.id);
 
-    const active = loadActiveSession(user.id);
-    if (active && (active.programId !== program.id || active.dayNumber !== requestedDay.dayNumber)) {
-      if (active.programId === program.id) {
-        const activeDraft = loadDraft(draftKey(user.id, active.programId, active.dayNumber));
-        const activeDayObj = (program.days as any[]).find((d) => d.dayNumber === active.dayNumber);
-        if (activeDraft && activeDayObj) {
-          day = activeDayObj;
-        } else {
-          clearActiveSession(user.id);
-        }
-      } else {
-        clearActiveSession(user.id);
+    const dayOf = (pointer: ActiveSessionPointer) =>
+      String(pointer.programId) === String(program.id)
+        ? (program.days as any[]).find((d) => d.dayNumber === pointer.dayNumber)
+        : undefined;
+
+    let sessionDay = active ? dayOf(active.pointer) : undefined;
+
+    // Belongs to another program, or to a day this program no longer has -
+    // nothing on this page can render it.
+    if (active && !sessionDay) {
+      clearActiveSession(user.id);
+      active = null;
+    }
+
+    // Nothing in progress, but the client pressed Start workout on this day to
+    // get here. Begin it, rather than showing them an idle screen that tells
+    // them to go and press the button they just pressed. Checked after the
+    // pointer above so a live session always wins: a press that collides with
+    // one never reaches this page (the program page raises its discard dialog
+    // first), and a resumed session must not be restarted from empty.
+    if (!active && startRequested && targetDayNumber != null) {
+      const wanted = (program.days as any[]).find((d) => d.dayNumber === targetDayNumber);
+      if (wanted) {
+        // startSession reports whether the session survived the write; false
+        // means storage itself refused it, which is the one case where there
+        // genuinely is nothing to log and the client deserves to know why.
+        setStartFailed(!startSession(user.id, program.id, wanted.dayNumber));
+        active = resolveActiveSession(user.id);
+        sessionDay = active ? dayOf(active.pointer) : undefined;
       }
     }
 
+    if (!sessionDay) {
+      setHasSession(false);
+      setActiveDay(null);
+      setLogs([]);
+      setStartedAt(null);
+      setResumedElsewhere(false);
+      initializedKeyRef.current = null;
+      currentDraftKeyRef.current = null;
+      activeSessionRef.current = null;
+      return;
+    }
+
+    const day = sessionDay;
+    setHasSession(true);
     setActiveDay(day);
-    const wasRedirected = day.dayNumber !== requestedDay.dayNumber;
+
+    // `?day=` only says which day the client asked for; the open session decides
+    // which one they get. Landing on a different one (or on a bare /log) means
+    // they were sent back to the session already running, which the banner says.
+    const requestedDay = resolveDay(program.days as any[]);
+    const wasRedirected = !!requestedDay && requestedDay.dayNumber !== day.dayNumber;
     setResumedElsewhere(wasRedirected);
-    if (wasRedirected) {
+    // Replaces rather than pushes, which also spends the `start=1` request: it
+    // has been served, and leaving it in the history entry would let a refresh -
+    // or a Back out of the session the client just finished - ask for the day to
+    // be started all over again.
+    if (wasRedirected || startRequested) {
       setLocation(`/log?day=${day.dayNumber}`, { replace: true });
     }
 
     const key = draftKey(user.id, program.id, day.dayNumber);
     activeSessionRef.current = { programId: program.id, dayNumber: day.dayNumber };
 
-    // Already initialized for this exact day (e.g. `program` just refetched
-    // after a reconnect) - don't touch in-progress `logs`.
-    if (initializedKeyRef.current === key) return;
+    // The seed key covers the day AND the shape of its exercise list. Keying on
+    // the day alone meant an edit to the program could never reach an open
+    // logger: saving invalidates the program query, but this page often mounts
+    // and seeds from the cached copy BEFORE that refetch lands, and every later
+    // run then early-returned because the day hadn't changed. The added item was
+    // invisible until the draft was discarded - and discarding only helped when
+    // it happened to come after the refetch, which is why it took a few tries.
+    const seedKey = `${key}::${dayStructureKey(day)}`;
+    if (initializedKeyRef.current === seedKey) return;
 
-    initializedKeyRef.current = key;
+    // Same day, different structure: the program was edited while this session
+    // was open. Re-seed from the new structure but keep what the user has
+    // already entered - reconcile folds it back in by exercise name.
+    const structureChangedMidSession = currentDraftKeyRef.current === key;
+
+    initializedKeyRef.current = seedKey;
     currentDraftKeyRef.current = key;
 
-    const draft = loadDraft(key);
-    if (draft) {
-      setLogs(draft.logs);
+    if (structureChangedMidSession) {
+      setLogs((prev) => reconcileDraftLogs(prev, day));
       return;
     }
 
-    setLogs(buildFreshLogs(day));
+    // The draft always exists here - `resolveActiveSession` checked, and a
+    // freshly started session's is simply empty, which reconciles to a blank
+    // sheet built from the day. Resume its clock rather than restarting it: a
+    // refresh or a reconnect mid-session must not reset the elapsed time to
+    // zero. Drafts written before session timing existed have no start, so
+    // adopt now.
+    setLogs(reconcileDraftLogs(active!.draft.logs, day));
+    setStartedAt(active!.draft.startedAt ?? Date.now());
   }, [program, user?.id]);
 
+  // The session clock. Recomputed from the start timestamp on every tick rather
+  // than incremented, so a throttled background tab can't make it drift.
+  useEffect(() => {
+    if (startedAt == null) {
+      setElapsedSeconds(null);
+      return;
+    }
+    const update = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
   // Mirror every change to localStorage so a reconnect/reload can restore the
-  // in-progress session instead of losing it. Only once real data has been
-  // entered - an untouched sheet shouldn't block starting a different day.
+  // in-progress session instead of losing it. No "has anything been typed yet"
+  // test any more: the draft exists from the moment Start workout is tapped
+  // (startSession writes it), so a started session is a session whether or not
+  // a number has been entered - and nothing lands here without one.
   useEffect(() => {
     const key = currentDraftKeyRef.current;
-    if (!key || logs.length === 0 || !hasLoggedData(logs)) return;
-    saveDraft(key, logs);
+    if (!key || logs.length === 0 || endingRef.current) return;
+    // Persist the running clock alongside the logs so a refresh resumes the
+    // same start.
+    saveDraft(key, logs, startedAt ?? Date.now());
     if (user?.id && activeSessionRef.current) {
       saveActiveSession(user.id, activeSessionRef.current);
     }
   }, [logs]);
+
+  // Drives the countdown display. Only runs while a timer is actually going, so an
+  // ordinary lifting session schedules nothing. The remaining time is always
+  // derived from `timerEndsAt` rather than counted down here, so a throttled or
+  // frozen tab (backgrounded phone, locked screen) resumes showing the correct
+  // value instead of however far the interval got.
+  const hasRunningTimer = logs.some((ex) => ex.timerEndsAt != null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasRunningTimer) return;
+    const id = window.setInterval(() => setNowTs(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [hasRunningTimer]);
+
+  // A finished countdown ticks its own round off, so a completed hold needs no
+  // extra tap. `nowTs` must stay in the dep list: `logs` does not change while a
+  // countdown runs, so depending on it alone would leave an expired timer frozen
+  // at 0:00 instead of completing its round. Comparing against the clock (rather
+  // than counting down) also catches a timer that expired while the tab was hidden.
+  useEffect(() => {
+    const now = Date.now();
+    const expired = logs.some((ex) => ex.timerEndsAt != null && ex.timerEndsAt <= now);
+    if (!expired) return;
+    setLogs((prev) =>
+      prev.map((ex) => {
+        if (ex.timerEndsAt == null || ex.timerEndsAt > now) return ex;
+        return {
+          ...ex,
+          completedRounds: Math.min(ex.targetRounds, ex.completedRounds + 1),
+          timerEndsAt: null,
+          timerPausedRemaining: null,
+        };
+      }),
+    );
+  }, [logs, nowTs]);
 
   // Sets are saved implicitly by typing - no separate "confirm" step. Weight
   // and reps together mark a set as logged, and PR detection runs inline.
@@ -387,6 +538,64 @@ export default function Log() {
     });
   }
 
+  // Checklist items get their own completion path. They must NOT go through
+  // updateSet, whose `completed = weight > 0 && hasReps` can never be true for
+  // something with no weight and no reps.
+  function patchItem(exIdx: number, patch: Partial<LoggedExercise>) {
+    setLogs((prev) => prev.map((ex, i) => (i === exIdx ? { ...ex, ...patch } : ex)));
+  }
+
+  /**
+   * Completes the current round of a timed item and rolls straight on to the
+   * next one - clearing the timer resets it to the full hold, ready to start
+   * again. Unlike toggleChecklistRound this only ever moves forward: a swipe is
+   * a one-way gesture, so it must not un-tick a finished item by accident.
+   *
+   * Undo comes for free at the end: once the last round lands the item is done,
+   * the filling card gives way to the ordinary checklist row, and that row's
+   * tick clears it.
+   */
+  function completeChecklistRound(exIdx: number) {
+    const ex = logs[exIdx];
+    patchItem(exIdx, {
+      completedRounds: Math.min(ex.targetRounds, ex.completedRounds + 1),
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+    });
+  }
+
+  /** Tick the next round, or untick everything once all rounds are done. */
+  function toggleChecklistRound(exIdx: number) {
+    const ex = logs[exIdx];
+    const done = ex.completedRounds >= ex.targetRounds;
+    patchItem(exIdx, {
+      completedRounds: done ? 0 : ex.completedRounds + 1,
+      // Ticking by hand cancels any running countdown for that round.
+      timerEndsAt: null,
+      timerPausedRemaining: null,
+    });
+  }
+
+  function startTimer(exIdx: number) {
+    const ex = logs[exIdx];
+    const seconds = ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
+    if (seconds <= 0) return;
+    patchItem(exIdx, { timerEndsAt: Date.now() + seconds * 1000, timerPausedRemaining: null });
+  }
+
+  function pauseTimer(exIdx: number) {
+    const ex = logs[exIdx];
+    if (ex.timerEndsAt == null) return;
+    patchItem(exIdx, {
+      timerEndsAt: null,
+      timerPausedRemaining: Math.max(0, Math.ceil((ex.timerEndsAt - Date.now()) / 1000)),
+    });
+  }
+
+  function resetTimer(exIdx: number) {
+    patchItem(exIdx, { timerEndsAt: null, timerPausedRemaining: null });
+  }
+
   function updateNotes(exIdx: number, notes: string) {
     setLogs((prev) => {
       const next = [...prev];
@@ -411,18 +620,40 @@ export default function Log() {
           dayNumber: activeDay?.dayNumber ?? 1,
           weekNumber: program?.weekNumber ?? 1,
           dayLabel: activeDay?.label ?? null,
-          exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => ({
-            name: ex.name,
-            muscle: ex.muscle,
-            sets: ex.sets.map((s) =>
-              ex.isUnilateral
-                ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
-                : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
-            ),
-            notes: ex.notes || undefined,
-          })),
+          // Sent exactly as recorded, however implausible - an overnight session
+          // is stored honestly and simply fails the plausibility band when
+          // averages are computed. The user is never asked about the clock.
+          startedAt: startedAt ? new Date(startedAt).toISOString() : null,
+          durationSeconds: startedAt ? Math.round((Date.now() - startedAt) / 1000) : null,
+          exercisesLogged: logs.filter((ex) => ex.name.trim()).map((ex) => {
+            if (ex.kind === "checklist") {
+              return {
+                name: ex.name,
+                muscle: "",
+                // No sets, ever. An empty array is what keeps this row out of the
+                // volume, e1RM and PR maths on the way back in.
+                sets: [],
+                kind: "checklist" as const,
+                completedRounds: ex.completedRounds,
+                targetSeconds: ex.targetSeconds,
+                category: ex.category,
+                notes: ex.notes || undefined,
+              };
+            }
+            return {
+              name: ex.name,
+              muscle: ex.muscle,
+              kind: "lift" as const,
+              sets: ex.sets.map((s) =>
+                ex.isUnilateral
+                  ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
+                  : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
+              ),
+              notes: ex.notes || undefined,
+            };
+          }),
           notes: null,
-        } as any,
+        },
       });
     } catch {
       // Leave the draft and the user on the page - losing a finished session to a
@@ -434,6 +665,7 @@ export default function Log() {
       });
       return;
     }
+    endingRef.current = true;
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
     const loggedCount = logs.filter((ex) => ex.name.trim()).length;
@@ -448,7 +680,15 @@ export default function Log() {
   }
 
   function handleFinishClick() {
-    const allSetsComplete = logs.every((ex) => ex.sets.every((s) => s.completed));
+    // Checklist items count toward the gate exactly like sets do. Nothing is
+    // blocked either way - an unticked item only means Finish warns first, and
+    // the confirm sheet still lets the session through.
+    const allSetsComplete = logs.every((ex) => {
+      if (ex.kind === "checklist") {
+        return ex.completedRounds >= ex.targetRounds;
+      }
+      return ex.sets.every((s) => s.completed);
+    });
     if (allSetsComplete) {
       finishWorkout();
     } else {
@@ -457,33 +697,11 @@ export default function Log() {
   }
 
   function cancelWorkout() {
+    endingRef.current = true;
     if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
     if (user?.id) clearActiveSession(user.id);
     setShowCancelConfirm(false);
     setLocation("/program");
-  }
-
-  // Switch which program day the logger is showing. Only offered before the
-  // current sheet has any logged data (the day picker locks once a session is
-  // started - see `sessionStarted` below), so there is never an in-progress
-  // draft to orphan here. Re-seeds `logs` for the target day exactly like the
-  // mount effect, and syncs `?day=` so a reload lands on the same day.
-  function switchDay(targetNum: number) {
-    if (!program?.days || !user?.id) return;
-    if (targetNum === activeDay?.dayNumber) return;
-    const target = (program.days as any[]).find((d) => d.dayNumber === targetNum);
-    if (!target) return;
-
-    const key = draftKey(user.id, program.id, target.dayNumber);
-    initializedKeyRef.current = key;
-    currentDraftKeyRef.current = key;
-    activeSessionRef.current = { programId: program.id, dayNumber: target.dayNumber };
-
-    setActiveDay(target);
-    setResumedElsewhere(false);
-    const draft = loadDraft(key);
-    setLogs(draft ? draft.logs : buildFreshLogs(target));
-    setLocation(`/log?day=${target.dayNumber}`, { replace: true });
   }
 
   if (program && isPreCalibrationLocked(program, new Date())) {
@@ -527,6 +745,38 @@ export default function Log() {
     );
   }
 
+  // Nothing in progress. This is what the page looks like both before a session
+  // and after one has been finished or discarded - logging starts on a Start
+  // workout press and nowhere else, so the only thing offered here is the way
+  // to that button. The one case that gets different words is a press that DID
+  // reach here and still couldn't open a session: sending that client back to
+  // the button would just repeat the failure.
+  if (hasSession === false) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="text-center py-20" data-testid="log-no-session">
+          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-foreground mb-2">
+            {startFailed ? "Couldn't start your workout" : "No logging ongoing"}
+          </h2>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+            {startFailed
+              ? "This browser won't let the app store your session on this device, so there's nowhere to log to. Turn on site data (or leave private browsing) and try again."
+              : "Head to your program page and hit Start workout on the day you're training - your session opens here."}
+          </p>
+          <Link href="/program">
+            <button
+              className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+              data-testid="button-log-no-session-cta"
+            >
+              Go to my program
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!program || !activeDay) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
@@ -537,19 +787,35 @@ export default function Log() {
 
   const day = activeDay;
   const sessionPrCount = logs.reduce((acc, ex) => acc + ex.sets.filter((s) => s.isNewPr).length, 0);
-  // Once any set is filled in, the day picker locks - switching would abandon
-  // the in-progress session, which the one-session-at-a-time model forbids.
-  const sessionStarted = hasLoggedData(logs);
-  const programDays = (program.days as any[]) ?? [];
+  // Which card carries the first two steps' targets - see the note in the logger
+  // map below. -1 when the day is checklist items only, which is why those steps
+  // are dropped rather than left pointing at nothing.
+  const firstLiftIdx = logs.findIndex((ex) => ex.kind !== "checklist");
   const showLogTour = !!profile && !profile.weightLoggingTourSeenAt && logs.length > 0;
   const logTourSteps: CoachmarkStep[] = [
-    { target: tourSetRowRef, text: "Here you can track your weight and reps." },
-    ...(!isIndependent ? [{ target: tourHelpRef, text: "Not sure how to perform this exercise? Tap the ? whenever you need it." }] : []),
-    { target: tourFinishRef, text: "This is where you save your workout - and that's the end of the walkthrough." },
+    // Ring the whole sets block, not one row: the "Weight" / "Reps" column
+    // headers sit above the rows, and without them the step points at unlabelled
+    // number boxes. Anchoring on the block also puts the bubble under it rather
+    // than over the remaining sets.
+    ...(firstLiftIdx >= 0
+      ? [{ target: tourSetsBlockRef, text: "Here you can track your weight and reps." } as CoachmarkStep]
+      : []),
+    // Same idea for the help button - "this exercise" only means something with
+    // the exercise's own header lit next to the "?".
+    ...(!isIndependent && firstLiftIdx >= 0
+      ? [
+          {
+            target: tourHelpRef,
+            spotlight: tourExerciseHeadRef,
+            text: "Not sure how to perform this exercise? Tap the ? whenever you need it.",
+          } as CoachmarkStep,
+        ]
+      : []),
+    { target: tourFinishRef, text: "This is where you save your workout." },
   ];
 
   return (
-    <div className="p-6 max-w-3xl mx-auto pb-48 md:pb-32">
+    <div className="p-6 max-w-3xl mx-auto pb-12">
       {/* PR Toast Stack */}
       <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
         <AnimatePresence>
@@ -576,6 +842,18 @@ export default function Log() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
+            {/* Ambient information, not an achievement - deliberately not given
+                the PR pill's treatment, and kept out of the corner the PR badge
+                and "Cancel workout" already share. */}
+            {elapsedSeconds != null && (
+              <div
+                className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5"
+                data-testid="text-session-duration"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span className="font-medium tabular-nums">{formatClock(elapsedSeconds)}</span>
+              </div>
+            )}
             {resumedElsewhere && (
               <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
                 Resuming your in-progress session - finish it before starting a new one.
@@ -604,44 +882,136 @@ export default function Log() {
         </div>
       </motion.div>
 
-      {/* Day picker - lets a user starting from the "Log Workout" nav choose
-          which split day to log instead of being forced onto day 1. Hidden for
-          single-day programs; locked once the current session has data. */}
-      {programDays.length > 1 && (
-        <div className="mt-4">
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" data-testid="log-day-picker">
-            {programDays.map((d) => {
-              const isActive = d.dayNumber === day.dayNumber;
-              const locked = sessionStarted && !isActive;
-              return (
-                <button
-                  key={d.dayNumber}
-                  onClick={() => switchDay(d.dayNumber)}
-                  disabled={locked}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : locked
-                      ? "bg-secondary/20 text-muted-foreground/40 border-border/50 cursor-not-allowed"
-                      : "bg-secondary/20 text-muted-foreground border-border hover:text-foreground hover:border-border/80"
-                  }`}
-                  data-testid={`log-day-tab-${d.dayNumber}`}
-                >
-                  {d.label}
-                </button>
-              );
-            })}
-          </div>
-          {sessionStarted && (
-            <p className="text-[11px] text-muted-foreground/60 mt-1.5">
-              Finish or cancel this session to log a different day.
-            </p>
-          )}
-        </div>
-      )}
+      {/* No day picker here on purpose: the page logs exactly the one day named
+          above. Switching days happens on the program page, which prompts to
+          discard this session first (see DiscardSessionDialog). */}
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
+          // The tour's first two steps are about weights, reps and how to
+          // perform a lift, so they hang off the first *lift* card rather than
+          // the first card: a day that opens with a checklist item (a warmup
+          // sits above the first lift) would otherwise leave their targets
+          // unmounted and the steps with nothing to point at.
+          const isFirstLift = exIdx === firstLiftIdx;
+          // Checklist items render in program order, inline among the exercise
+          // cards - a warmup item appears above the first lift because that is
+          // where it sits in the day.
+          if (ex.kind === "checklist") {
+            const meta = categoryMeta(ex.category);
+            const accent = meta?.token ?? CHECKLIST_ACCENT;
+            const allDone = ex.completedRounds >= ex.targetRounds;
+            const isRunning = ex.timerEndsAt != null;
+            const timed = (ex.targetSeconds ?? 0) > 0 && ex.targetType === "duration";
+            const remaining = isRunning
+              ? Math.max(0, Math.ceil((ex.timerEndsAt! - Date.now()) / 1000))
+              : ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
+            const total = ex.targetSeconds ?? 0;
+            // The countdown on a timed card is the control itself, not a target,
+            // so it stays; this is only the "2:30" / "x 20" written next to the
+            // item's name.
+            const target = showTargets ? describeTarget(ex) : null;
+
+            // A timed item gets the filling card with swipe-to-complete. Every
+            // other checklist item keeps the tick, which is still the right
+            // control when there is no duration to visualise.
+            if (timed && !allDone) {
+              return (
+                <motion.div
+                  key={`${ex.name}-${exIdx}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: exIdx * 0.06 }}
+                  data-testid={`log-checklist-${exIdx}`}
+                >
+                  <ChecklistLogCard
+                    name={ex.name}
+                    accent={accent}
+                    label={meta ? meta.label : "Checklist"}
+                    completedRounds={ex.completedRounds}
+                    targetRounds={ex.targetRounds}
+                    remaining={remaining}
+                    total={total}
+                    isRunning={isRunning}
+                    isPaused={ex.timerPausedRemaining != null}
+                    onCompleteRound={() => completeChecklistRound(exIdx)}
+                    onStart={() => startTimer(exIdx)}
+                    onPause={() => pauseTimer(exIdx)}
+                    onReset={() => resetTimer(exIdx)}
+                    testId={`checklist-${exIdx}`}
+                  />
+                </motion.div>
+              );
+            }
+
+            return (
+              <motion.div
+                key={`${ex.name}-${exIdx}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: exIdx * 0.06 }}
+                // Same neutral card fill as an exercise card; the accent border,
+                // icon and timer carry the distinction without a colour wash.
+                className="rounded-xl overflow-hidden border bg-card"
+                style={{ borderColor: `color-mix(in srgb, ${accent} 32%, transparent)` }}
+                data-testid={`log-checklist-${exIdx}`}
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <button
+                    onClick={() => toggleChecklistRound(exIdx)}
+                    aria-pressed={allDone}
+                    // An untouched tick renders no text, so without an explicit
+                    // label this button reaches a screen reader unnamed.
+                    aria-label={
+                      allDone
+                        ? `${ex.name} — done, tap to clear`
+                        : `${ex.name} — mark round ${Math.min(ex.completedRounds + 1, ex.targetRounds)} of ${ex.targetRounds} done`
+                    }
+                    className={`shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
+                      allDone
+                        ? "bg-chart-2/15 border-chart-2/50 text-chart-2"
+                        : "bg-secondary/30 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    }`}
+                    title={allDone ? "Mark as not done" : "Mark a round done"}
+                    data-testid={`checklist-tick-${exIdx}`}
+                  >
+                    {allDone ? (
+                      <Check className="w-4 h-4" />
+                    ) : ex.completedRounds > 0 ? (
+                      <span className="text-[11px] font-display font-bold tabular-nums">
+                        {ex.completedRounds}/{ex.targetRounds}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      className={`font-semibold text-foreground truncate ${allDone ? "opacity-55 line-through" : ""}`}
+                    >
+                      {ex.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      <span className="font-medium" style={{ color: accent }}>
+                        {meta ? meta.label : "Checklist"}
+                      </span>
+                      {ex.targetRounds > 1 && (
+                        <> · round {Math.min(ex.completedRounds + 1, ex.targetRounds)} of {ex.targetRounds}</>
+                      )}
+                      {target && ex.targetRounds === 1 && <> · {target}</>}
+                    </p>
+                  </div>
+
+                  {!timed && target && (
+                    <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap shrink-0">
+                      {target}
+                    </span>
+                  )}
+                </div>
+
+              </motion.div>
+            );
+          }
+
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
           const prevNote = lastNoteByExercise[ex.name.toLowerCase()];
           const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
@@ -654,7 +1024,10 @@ export default function Log() {
             className="bg-card border border-border rounded-xl overflow-hidden"
             data-testid={`log-exercise-${exIdx}`}
           >
-            <div className="p-4 border-b border-border/50 flex items-start justify-between gap-2">
+            <div
+              ref={isFirstLift ? tourExerciseHeadRef : undefined}
+              className="p-4 border-b border-border/50 flex items-start justify-between gap-2"
+            >
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
@@ -665,13 +1038,15 @@ export default function Log() {
                   )}
                 </div>
                 <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Target: {ex.targetSets} × {ex.targetReps}
-                </p>
+                {showTargets && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Target: {ex.targetSets} × {ex.targetReps}
+                  </p>
+                )}
               </div>
               {!isIndependent && (
                 <button
-                  ref={exIdx === 0 ? tourHelpRef : undefined}
+                  ref={isFirstLift ? tourHelpRef : undefined}
                   onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
                   className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                   title="How to perform this exercise"
@@ -682,7 +1057,7 @@ export default function Log() {
               )}
             </div>
 
-            <div className="p-4">
+            <div className="p-4" ref={isFirstLift ? tourSetsBlockRef : undefined}>
               {/* Column headers */}
               {ex.isUnilateral ? (
                 <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
@@ -705,7 +1080,6 @@ export default function Log() {
                   return (
                   <div key={set.setNumber}>
                   <motion.div
-                    ref={exIdx === 0 && setIdx === 0 ? tourSetRowRef : undefined}
                     layout
                     className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
                       set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
@@ -828,25 +1202,29 @@ export default function Log() {
         );})}
       </div>
 
-      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 md:left-64 p-4 bg-background/90 backdrop-blur-sm border-t border-border z-40">
-        <div className="max-w-3xl mx-auto">
-          <button
-            ref={tourFinishRef}
-            onClick={handleFinishClick}
-            disabled={createWorkout.isPending}
-            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-            data-testid="button-finish-workout"
-          >
-            {createWorkout.isPending ? (
-              <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
-            ) : sessionPrCount > 0 ? (
-              <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
-            ) : (
-              "Finish workout"
-            )}
-          </button>
-        </div>
-      </div>
+      {/* Finishing lives at the end of the list, in normal flow - not in a bar
+          pinned to the bottom. On a phone that bar sat above the tab nav, and
+          the keyboard pushed both up over the set rows the user was typing
+          into; a full-width primary button in the scrolling thumb's path also
+          made ending the session an easy mis-tap. Scrolling past the last
+          exercise is the natural end of a session, so the button waits there.
+          The tour scrolls this into view for its final step (CoachmarkTour
+          calls scrollIntoView on each anchored target). */}
+      <button
+        ref={tourFinishRef}
+        onClick={handleFinishClick}
+        disabled={createWorkout.isPending}
+        className="w-full h-12 mt-8 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        data-testid="button-finish-workout"
+      >
+        {createWorkout.isPending ? (
+          <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+        ) : sessionPrCount > 0 ? (
+          <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+        ) : (
+          "Finish workout"
+        )}
+      </button>
 
       {showLogTour && <CoachmarkTour steps={logTourSteps} onDone={finishLogTour} testIdPrefix="log-tour" />}
 

@@ -10,6 +10,7 @@ import type { ProgramDay } from './programDay';
 import type { ProgramEnergyBalance } from './programEnergyBalance';
 import type { ProgramHighlight } from './programHighlight';
 import type { ProgramLongTermPhase } from './programLongTermPhase';
+import type { ProgramSchedule } from './programSchedule';
 import type { ProgramShortTermPhase } from './programShortTermPhase';
 import type { ProgramTrainingWorkload } from './programTrainingWorkload';
 
@@ -47,4 +48,5 @@ export interface Program {
   cardioIntensity?: ProgramCardioIntensity;
   /** @nullable */
   startDate?: string | null;
+  schedule?: ProgramSchedule | null;
 }

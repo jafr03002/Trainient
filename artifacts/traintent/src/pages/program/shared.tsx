@@ -1,25 +1,62 @@
 import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
+  useGetCalendarColors,
   useCreateManualProgram,
   useUpdateProfile,
+  useGetSessionDurationStats,
   customFetch,
   getGetCurrentProgramQueryKey,
   getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { formatSessionLength, MIN_SESSIONS_FOR_AVERAGE } from "@/lib/sessionDuration";
+import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
+import { buildDayColorOrder, dayColorAt, dayColorHex, dayTones } from "@/lib/dayColors";
+import {
+  CHECKLIST_ACCENT,
+  CHECKLIST_CATEGORIES,
+  DISTANCE_UNITS,
+  MAX_WHEEL_SECONDS,
+  TARGET_TYPE_OPTIONS,
+  categoryMeta,
+  clampTargetValue,
+  describeTarget,
+  describeTargetWithRounds,
+  formatDuration,
+  type ItemKind,
+  type TargetType,
+} from "@/lib/checklistItems";
+import { DurationWheel } from "@/components/DurationWheel";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
+import { WEEKDAY_LABELS, mondayIndexOf, todayDateString, upcomingSlots, type StoredSchedule } from "@/lib/programSchedule";
 import { formatSplitType } from "@/lib/utils";
 import { isPreCalibrationLocked } from "@/lib/calibration";
+import {
+  type ActiveSessionPointer,
+  resolveActiveSession,
+  discardActiveSession,
+  startSession,
+} from "@/lib/workoutSession";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
+import { DiscardSessionDialog } from "@/components/workout/DiscardSessionDialog";
+import { ExerciseNamePicker } from "@/components/program/ExerciseNamePicker";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
-import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 
 export type Exercise = {
   name: string;
@@ -31,7 +68,21 @@ export type Exercise = {
   muscle: string;
   secondaryMuscle?: string | null;
   isUnilateral?: boolean;
+  // Checklist items (see lib/checklistItems.ts). All optional: a row written before
+  // this feature existed has none of them and is a lift by default. On a checklist
+  // row `sets` carries the round count and `reps` the display target.
+  kind?: ItemKind;
+  targetType?: TargetType | null;
+  targetSeconds?: number | null;
+  targetValue?: number | null;
+  targetUnit?: string | null;
+  category?: string | null;
 };
+
+/** Legacy rows have no `kind`, so absent means lift. */
+export function isChecklist(ex: { kind?: string | null }): boolean {
+  return ex.kind === "checklist";
+}
 
 export type ProgramDay = {
   dayNumber: number;
@@ -52,47 +103,48 @@ function muscleAccent(muscle: string): { solid: string; glow: string } | null {
   };
 }
 
-// Hero-card tint per training day: each muscle maps onto one of the Voltage
-// chart tokens so a Pull day washes violet, Legs green, Push stays electric
-// blue. Token *references* (not raw colors) so the wash always tracks the
-// theme palette.
-const MUSCLE_HERO_TOKEN: Record<string, string> = {
-  Chest: "var(--primary)",
-  Shoulders: "var(--chart-3)",
-  Biceps: "var(--chart-5)",
-  Triceps: "var(--chart-5)",
-  "Upper Back": "var(--chart-4)",
-  Lats: "var(--chart-4)",
-  Quads: "var(--chart-2)",
-  Hamstrings: "var(--chart-2)",
-  Glutes: "var(--chart-2)",
-  Calves: "var(--chart-2)",
-  Core: "var(--chart-2)",
-};
-
-// The day's dominant color = the token most of its primary muscles map to;
-// ties break toward the earliest exercise so the tint feels stable.
-function dayHeroToken(day: ProgramDay): string {
-  const counts = new Map<string, number>();
-  for (const ex of day.exercises) {
-    const token = MUSCLE_HERO_TOKEN[ex.muscle];
-    if (token) counts.set(token, (counts.get(token) ?? 0) + 1);
-  }
-  let best = "var(--primary)";
-  let bestCount = 0;
-  for (const ex of day.exercises) {
-    const token = MUSCLE_HERO_TOKEN[ex.muscle];
-    if (!token) continue;
-    const count = counts.get(token) ?? 0;
-    if (count > bestCount) {
-      best = token;
-      bestCount = count;
-    }
-  }
-  return best;
+// The user's own per-day colour picks from Settings, keyed by day label. The
+// calendar honours these, so every day-coloured surface here has to as well -
+// otherwise a day recoloured in Settings would only change on the calendar.
+function useDayColorOverrides(): Record<string, string> {
+  const colorsQuery = useGetCalendarColors();
+  const map: Record<string, string> = {};
+  (colorsQuery.data ?? []).forEach((c) => { map[c.dayLabel] = c.hexColor; });
+  return map;
 }
 
 function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
+  // A checklist row has no muscle and no sets×reps, so it gets its own line-up:
+  // the category colour on the edge bar, the category name where the muscle would
+  // be, and the target ("2:30", "× 20") where the set count would be.
+  if (isChecklist(ex)) {
+    const meta = categoryMeta(ex.category);
+    const barColor = meta?.token ?? CHECKLIST_ACCENT;
+    const target = describeTargetWithRounds({ ...ex, rounds: ex.sets });
+    return (
+      <div className="flex items-center gap-3 py-3 pl-2.5 pr-4 min-w-0">
+        <div
+          className="w-1 self-stretch rounded-full shrink-0"
+          style={{ backgroundColor: barColor, boxShadow: `0 0 8px ${barColor}` }}
+        />
+        <ListChecks className="w-3.5 h-3.5 shrink-0" style={{ color: barColor }} />
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm text-foreground truncate">{ex.name}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+            <span className="font-medium" style={{ color: barColor }}>
+              {meta ? meta.label : "Checklist"}
+            </span>
+          </p>
+        </div>
+        {target && (
+          <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
+            {target}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   const accent = muscleAccent(ex.muscle);
   const barColor = accent?.solid ?? "hsl(var(--primary))";
   const barGlow = accent?.glow ?? "hsl(var(--primary) / 0.55)";
@@ -129,12 +181,43 @@ type EditExercise = {
   muscle: string;
   secondaryMuscle: string;
   isUnilateral: boolean;
+  // Checklist fields. `kind` decides which row shape renders and which validation
+  // applies; the rest are only read when kind === "checklist".
+  kind: ItemKind;
+  targetType: TargetType;
+  /** Seconds, straight from the min/sec wheel - the same unit the API stores. */
+  durationSeconds: number;
+  targetValue: string;
+  targetUnit: string;
+  category: string;
 };
 type EditDay = { label: string; exercises: EditExercise[] };
 
+const CHECKLIST_DEFAULTS = {
+  kind: "checklist" as ItemKind,
+  targetType: "none" as TargetType,
+  durationSeconds: 0,
+  targetValue: "",
+  targetUnit: "m",
+  category: "",
+};
+
 function newExercise(): EditExercise {
   // Section 1: default sets to 2 in the build-your-own flow.
-  return { name: "", sets: "2", reps: "8-12", muscle: "", secondaryMuscle: "", isUnilateral: false };
+  return {
+    name: "", sets: "2", reps: "8-12", muscle: "", secondaryMuscle: "", isUnilateral: false,
+    ...CHECKLIST_DEFAULTS,
+    kind: "lift",
+  };
+}
+
+// Starts as a plain tick-off: targetType "none", one round, no category. Every
+// target field is optional by design, so typing a name is the whole minimum.
+function newChecklistItem(): EditExercise {
+  return {
+    name: "", sets: "1", reps: "", muscle: "", secondaryMuscle: "", isUnilateral: false,
+    ...CHECKLIST_DEFAULTS,
+  };
 }
 
 function programToEditDays(program: { days: unknown }): EditDay[] {
@@ -143,11 +226,20 @@ function programToEditDays(program: { days: unknown }): EditDay[] {
     label: d.label ?? "",
     exercises: (d.exercises ?? []).map((e) => ({
       name: e.name ?? "",
-      sets: String(e.sets ?? 2),
+      // A checklist item defaults to a single round; a lift keeps the old default.
+      sets: String(e.sets ?? (isChecklist(e) ? 1 : 2)),
       reps: e.reps ?? "",
       muscle: e.muscle ?? "",
       secondaryMuscle: e.secondaryMuscle ?? "",
       isUnilateral: !!e.isUnilateral,
+      kind: isChecklist(e) ? "checklist" : "lift",
+      targetType: (e.targetType ?? "none") as TargetType,
+      // Clamped to what the wheel can express, so a legacy row storing more than
+      // an hour doesn't land on a position the picker can't scroll back to.
+      durationSeconds: Math.min(Math.max(0, e.targetSeconds ?? 0), MAX_WHEEL_SECONDS),
+      targetValue: e.targetValue != null ? String(e.targetValue) : "",
+      targetUnit: e.targetUnit ?? "m",
+      category: e.category ?? "",
     })),
   }));
 }
@@ -175,6 +267,15 @@ function findInvalidField(days: EditDay[]): FieldError | null {
     for (let ei = 0; ei < days[di].exercises.length; ei++) {
       const ex = days[di].exercises[ei];
       if (!ex.name.trim()) return { day: di, exercise: ei, field: "name", message: MISSING_FIELD_MESSAGE };
+      // A checklist item requires nothing beyond its name. Its target fields are
+      // optional on purpose - a blank duration just means "plain tick-off", not an
+      // error - and its round count is picked from a bounded select, so neither can
+      // be out of range. Rounds is still range-checked below via the shared path.
+      if (ex.kind === "checklist") {
+        const roundsMessage = ex.sets.trim() ? rangeError(ex.sets, FIELD_LIMITS.sets) : null;
+        if (roundsMessage) return { day: di, exercise: ei, field: "sets", message: roundsMessage };
+        continue;
+      }
       // Blank is an error here, unlike the optional profile fields rangeError is
       // usually pointing at - an exercise has to have a set count.
       const setsMessage = ex.sets.trim()
@@ -186,27 +287,14 @@ function findInvalidField(days: EditDay[]): FieldError | null {
   return null;
 }
 
-// Rotating per-day accent so days are easy to tell apart at a glance - cycles
-// if there are more days than colors. Exercises stay neutral/zebra-striped;
-// only days get real color, per the "bland gray blends together" complaint.
-const DAY_ACCENT_HUES: { h: number; s: number; l: number }[] = [
-  { h: 217, s: 91, l: 60 }, // blue
-  { h: 280, s: 68, l: 60 }, // purple
-  { h: 38, s: 92, l: 50 },  // gold
-  { h: 160, s: 84, l: 39 }, // teal
-  { h: 350, s: 75, l: 55 }, // pink-red
-  { h: 24, s: 90, l: 55 },  // orange
-  { h: 199, s: 89, l: 48 }, // cyan
-  { h: 142, s: 71, l: 45 }, // green
-];
-
-function dayAccent(index: number) {
-  const { h, s, l } = DAY_ACCENT_HUES[index % DAY_ACCENT_HUES.length];
-  return {
-    solid: `hsl(${h}, ${s}%, ${l}%)`,
-    soft: `hsla(${h}, ${s}%, ${l}%, 0.14)`,
-    text: `hsl(${h}, ${Math.min(s, 80)}%, ${Math.max(l, 70)}%)`,
-  };
+// A day card's colour is its position in the program (day 1 = first palette
+// colour), which is exactly what /program and the calendar derive their colours
+// from once the program is saved - so what you see while editing is what you
+// get everywhere else. Reordering days therefore reshuffles the colours, by
+// design: the colour belongs to the slot, not to the card being dragged. A
+// label the user has recoloured in Settings keeps that colour instead.
+function editDayTones(day: EditDay, index: number, overrides: Record<string, string>) {
+  return dayTones(overrides[day.label.trim()] ?? dayColorAt(index));
 }
 
 type ProgramDraft = { programName: string; days: EditDay[]; savedAt: number };
@@ -226,6 +314,8 @@ export function loadProgramDraft(key: string): ProgramDraft | null {
     const parsed = JSON.parse(raw) as ProgramDraft;
     if (!parsed || !Array.isArray(parsed.days)) return null;
     if (Date.now() - (parsed.savedAt ?? 0) > PROGRAM_DRAFT_MAX_AGE_MS) return null;
+    // Drafts written while days carried their own accent index still restore
+    // fine - colour is positional now, so the stored field is simply ignored.
     return parsed;
   } catch {
     return null;
@@ -248,6 +338,47 @@ function clearProgramDraft(key: string) {
   }
 }
 
+// Canonical, order- and whitespace-independent form of a builder state, so
+// "does this draft actually differ from the saved program?" can't be answered
+// wrongly by key order or a stray space. Defensive about missing fields: drafts
+// are read back from localStorage and may predate any of them.
+function serializeBuilderState(programName: string, days: EditDay[]): string {
+  return JSON.stringify([
+    (programName ?? "").trim(),
+    (days ?? []).map((d) => [
+      (d.label ?? "").trim(),
+      (d.exercises ?? []).map((e) => [
+        (e.name ?? "").trim(),
+        (e.sets ?? "").trim(),
+        (e.reps ?? "").trim(),
+        e.muscle ?? "",
+        e.secondaryMuscle ?? "",
+        !!e.isUnilateral,
+      ]),
+    ]),
+  ]);
+}
+
+// What the builder opens on before the user touches anything: the saved program
+// when editing, or one blank day when creating.
+function baselineBuilderState(program?: { programName: string; days: unknown } | null): string {
+  return program
+    ? serializeBuilderState(program.programName, programToEditDays(program))
+    : serializeBuilderState("", [{ label: "", exercises: [newExercise()] }]);
+}
+
+// True only for a draft holding work that isn't already saved. The program page
+// uses this - not the mere existence of a draft - to decide whether to reopen
+// the builder, so a draft left behind by an earlier version (which saved one
+// unconditionally, even for an untouched editor) can't pin the page to edit mode.
+export function programDraftHasChanges(
+  draft: ProgramDraft | null,
+  program?: { programName: string; days: unknown } | null,
+): boolean {
+  if (!draft) return false;
+  return serializeBuilderState(draft.programName, draft.days) !== baselineBuilderState(program);
+}
+
 type BuilderProps = {
   onSaved: () => void;
   onCancel?: () => void;
@@ -259,6 +390,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   const createManualProgram = useCreateManualProgram();
   const queryClient = useQueryClient();
   const { user } = useUser();
+  const colorOverrides = useDayColorOverrides();
   const draftKey = user?.id ? programDraftKey(user.id, editProgram?.id ?? "new") : null;
   // Captured once at mount - if the user's id weren't loaded yet on the very
   // first render, draftKey may still be null then even though it resolves a
@@ -286,17 +418,34 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
   // no program saved and nothing on screen to say why. Hold the reason here so
   // the user sees it instead of an apparent no-op.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Cancel with unsaved work behind it asks first, rather than silently
+  // throwing the edits away.
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Mirror every change to localStorage so a reload never loses in-progress
-  // program edits - only cleared once the program actually saves.
+  // Anything on screen that differs from what's already saved is unsaved work -
+  // the baseline is the saved program (or a blank day), never the restored draft.
+  const baseline = useRef(baselineBuilderState(editProgram)).current;
+  const isDirty = serializeBuilderState(programName, days) !== baseline;
+
+  // Mirror unsaved changes to localStorage so a reload never loses in-progress
+  // program edits. A draft is *only* written while the builder differs from
+  // what's already saved: a draft that matches the program is indistinguishable
+  // from "nothing in progress", and my.tsx reads a draft's existence as the
+  // signal to reopen the builder - so merely opening the editor and leaving
+  // would otherwise pin the page to edit mode forever.
   useEffect(() => {
     if (!draftKey) return;
+    if (!isDirty) {
+      clearProgramDraft(draftKey);
+      return;
+    }
     saveProgramDraft(draftKey, programName, days);
-  }, [draftKey, programName, days]);
+  }, [draftKey, programName, days, isDirty]);
 
   function moveDay(from: number, to: number) {
     if (from === to) return;
     setDays((d) => {
+      if (to < 0 || to >= d.length) return d;
       const next = [...d];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
@@ -325,6 +474,15 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     ));
   }
 
+  // Appends to the same `exercises` array as addExercise, so a checklist item is
+  // reorderable against the lifts with the existing arrows rather than living in a
+  // separate list that could only sit before or after them.
+  function addChecklistItem(di: number) {
+    setDays((d) => d.map((day, i) =>
+      i === di ? { ...day, exercises: [...day.exercises, newChecklistItem()] } : day
+    ));
+  }
+
   function removeExercise(di: number, ei: number) {
     setDays((d) => d.map((day, i) =>
       i === di ? { ...day, exercises: day.exercises.filter((_, j) => j !== ei) } : day
@@ -342,18 +500,36 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }));
   }
 
-  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean) {
+  // Several fields at once, for the library picker - choosing an exercise sets
+  // its name and primary muscle together, which as two updateExercise calls
+  // would have the second overwrite the first's stale copy of the day.
+  function patchExercise(di: number, ei: number, patch: Partial<EditExercise>) {
     setDays((d) => d.map((day, i) =>
       i === di
-        ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, [field]: value } : ex) }
+        ? { ...day, exercises: day.exercises.map((ex, j) => j === ei ? { ...ex, ...patch } : ex) }
         : day
     ));
     // Clear the flag as soon as the offending field is made valid, so the red
     // border tracks the fix instead of waiting for another Save click.
-    if (fieldError?.day !== di || fieldError.exercise !== ei || field !== fieldError.field) return;
-    if (typeof value !== "string") return;
-    if (field === "name" && value.trim()) setFieldError(null);
-    if (field === "sets" && value.trim() && !rangeError(value, FIELD_LIMITS.sets)) setFieldError(null);
+    if (fieldError?.day !== di || fieldError.exercise !== ei) return;
+    if (fieldError.field === "label") return;
+    const fixed = patch[fieldError.field];
+    if (typeof fixed !== "string") return;
+    if (fieldError.field === "name" && fixed.trim()) setFieldError(null);
+    if (fieldError.field === "sets" && fixed.trim() && !rangeError(fixed, FIELD_LIMITS.sets)) setFieldError(null);
+  }
+
+  function updateExercise(di: number, ei: number, field: keyof EditExercise, value: string | boolean | number) {
+    const patch = { [field]: value } as Partial<EditExercise>;
+    // Switching how an item is measured clears the previous measure's value, so
+    // a duration left over from an earlier choice can't be saved against a
+    // "distance" item and quietly arm a timer. Done here rather than in
+    // patchExercise, which is a plain multi-field write with no rules of its own.
+    if (field === "targetType") {
+      if (value !== "duration") patch.durationSeconds = 0;
+      if (value !== "count" && value !== "distance") patch.targetValue = "";
+    }
+    patchExercise(di, ei, patch);
   }
 
   async function performSave() {
@@ -361,20 +537,58 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       dayNumber: i + 1,
       label: d.label.trim(),
       focus: d.label.trim(),
-      exercises: d.exercises.map((e) => ({
-        name: e.name.trim(),
-        // Safe to parse bare: handleSave/findInvalidField already rejected anything
-        // that isn't a whole number in range, so there's no fallback to hide a 0
-        // behind any more.
-        sets: parseInt(e.sets, 10),
-        reps: e.reps,
-        rpe: null,
-        restSeconds: null,
-        cue: null,
-        muscle: e.muscle,
-        secondaryMuscle: e.secondaryMuscle || null,
-        isUnilateral: e.isUnilateral,
-      })),
+      exercises: d.exercises.map((e) => {
+        if (e.kind === "checklist") {
+          const targetSeconds = e.targetType === "duration" ? e.durationSeconds : null;
+          const rounds = parseInt(e.sets, 10) || 1;
+          const targetValue =
+            (e.targetType === "count" || e.targetType === "distance") && e.targetValue.trim()
+              ? clampTargetValue(Number(e.targetValue), e.targetType)
+              : null;
+          return {
+            name: e.name.trim(),
+            // `sets` is the round count and `reps` the display target on a
+            // checklist row - reusing the required lift fields is what lets this
+            // ship without changing Exercise's required set.
+            sets: rounds,
+            reps: describeTarget({
+              targetType: e.targetType,
+              targetSeconds,
+              targetValue,
+              targetUnit: e.targetUnit,
+            }) ?? "",
+            rpe: null,
+            restSeconds: null,
+            cue: null,
+            // Deliberately blank: muscleKeyOf("") returns null, so the
+            // muscle-volume breakdown and the day's hero tint both skip this row.
+            muscle: "",
+            secondaryMuscle: null,
+            isUnilateral: false,
+            kind: "checklist" as const,
+            targetType: e.targetType,
+            targetSeconds,
+            targetValue,
+            targetUnit: e.targetType === "distance" ? e.targetUnit : e.targetType === "count" ? "reps" : null,
+            category: e.category || null,
+          };
+        }
+        return {
+          name: e.name.trim(),
+          // Safe to parse bare: handleSave/findInvalidField already rejected anything
+          // that isn't a whole number in range, so there's no fallback to hide a 0
+          // behind any more.
+          sets: parseInt(e.sets, 10),
+          reps: e.reps,
+          rpe: null,
+          restSeconds: null,
+          cue: null,
+          muscle: e.muscle,
+          secondaryMuscle: e.secondaryMuscle || null,
+          isUnilateral: e.isUnilateral,
+          kind: "lift" as const,
+        };
+      }),
     }));
 
     const body = {
@@ -439,13 +653,35 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
     }
     setFieldError(null);
 
-    const hasUnsetMuscle = days.some((d) => d.exercises.some((e) => e.name.trim() && !e.muscle));
+    // Checklist items are excluded: they have no muscle by design, so counting them
+    // here would raise the reminder on every save of a program that has one.
+    const hasUnsetMuscle = days.some((d) =>
+      d.exercises.some((e) => e.kind !== "checklist" && e.name.trim() && !e.muscle),
+    );
     if (hasUnsetMuscle) {
       setShowMuscleConfirm(true);
       return;
     }
 
     performSave();
+  }
+
+  // Cancel means "forget these edits", so the draft has to go with them -
+  // leaving it behind used to bounce the user straight back into the builder
+  // the next time the program page mounted (start a workout, log or discard it,
+  // come back, and the edit view was waiting there as if Cancel never happened).
+  function discardEdits() {
+    if (draftKey) clearProgramDraft(draftKey);
+    setShowCancelConfirm(false);
+    onCancel?.();
+  }
+
+  function handleCancel() {
+    if (isDirty) {
+      setShowCancelConfirm(true);
+      return;
+    }
+    discardEdits();
   }
 
   return (
@@ -462,7 +698,7 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
       </div>
 
       {days.map((day, di) => {
-        const accent = dayAccent(di);
+        const accent = editDayTones(day, di, colorOverrides);
         return (
         <div
           key={di}
@@ -491,29 +727,224 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                 Day {di + 1}
               </span>
             </div>
+            {/* min-w-0 is load-bearing: a text input's intrinsic width (~212px)
+                is its automatic minimum size, so without it the input refuses to
+                shrink on a phone and shoves the reorder and delete buttons out
+                past the card's right edge. */}
             <input
               type="text"
               value={day.label}
               onChange={(e) => updateDay(di, "label", e.target.value)}
               maxLength={MAX_DAY_LABEL}
               placeholder={`Day ${di + 1} name (e.g. Push, Upper A)`}
-              className={`flex-1 px-3 py-2 rounded-lg border bg-secondary/20 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary ${
+              className={`flex-1 min-w-0 px-3 py-2 rounded-lg border bg-secondary/20 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary ${
                 fieldError?.field === "label" && fieldError.day === di ? "border-destructive" : "border-border"
               }`}
               data-testid={`day-name-input-${di}`}
             />
             {days.length > 1 && (
-              <button
-                onClick={() => removeDay(di)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {/* Arrow reorder mirrors the exercise rows and keeps days
+                    reorderable where drag-and-drop is not available (touch). */}
+                <button
+                  onClick={() => moveDay(di, di - 1)}
+                  disabled={di === 0}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                  title="Move day up"
+                  data-testid={`day-move-up-${di}`}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => moveDay(di, di + 1)}
+                  disabled={di === days.length - 1}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                  title="Move day down"
+                  data-testid={`day-move-down-${di}`}
+                >
+                  <ArrowDown className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => removeDay(di)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Delete day"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </div>
 
           <div className="space-y-3">
-            {day.exercises.map((ex, ei) => (
+            {day.exercises.map((ex, ei) => ex.kind === "checklist" ? (
+              // A checklist row is deliberately a different shape from a lift row - no
+              // muscle/sets/reps grid - so the two never blur together in a mixed
+              // day. The reorder and delete controls are the same ones the lift
+              // rows use. Background stays the same neutral fill as a lift row;
+              // the accent border and pill carry the distinction on their own.
+              <div
+                key={ei}
+                className="rounded-lg border border-chart-4/30 p-3 space-y-2 bg-secondary/10"
+                data-testid={`checklist-item-${di}-${ei}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-chart-4/15 text-chart-4 text-[11px] font-medium flex items-center justify-center">
+                    {ei + 1}
+                  </span>
+                  <span className="shrink-0 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-chart-4 border border-chart-4/30 bg-chart-4/10 rounded-full px-2 py-0.5">
+                    <ListChecks className="w-3 h-3" />
+                    <span className="hidden sm:inline">Checklist</span>
+                  </span>
+                  <input
+                    type="text"
+                    value={ex.name}
+                    onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
+                    maxLength={MAX_EXERCISE_NAME}
+                    placeholder="e.g. Couch stretch"
+                    className={`flex-1 min-w-0 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
+                      fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
+                        ? "border-destructive"
+                        : "border-border"
+                    }`}
+                    data-testid={`checklist-name-input-${di}-${ei}`}
+                  />
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveExercise(di, ei, -1)}
+                      disabled={ei === 0}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move up"
+                      data-testid={`checklist-move-up-${di}-${ei}`}
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => moveExercise(di, ei, 1)}
+                      disabled={ei === day.exercises.length - 1}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors disabled:opacity-30"
+                      title="Move down"
+                      data-testid={`checklist-move-down-${di}-${ei}`}
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeExercise(di, ei)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      data-testid={`checklist-remove-${di}-${ei}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* items-start because the duration wheel is taller than a text
+                    input, and without it every other field on the line would be
+                    stretched to match. */}
+                <div className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-6 sm:col-span-5">
+                    <label className="text-[11px] text-muted-foreground block mb-1">Track by</label>
+                    <select
+                      value={ex.targetType}
+                      onChange={(e) => updateExercise(di, ei, "targetType", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary"
+                      data-testid={`checklist-tracktype-${di}-${ei}`}
+                    >
+                      {TARGET_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+
+                    {/* The wheel lives inside the Track by cell, directly under
+                        the select that summons it, rather than in a band of its
+                        own further down the card. Same column means it reads as
+                        this selector's value, and it lays out identically on
+                        mobile and desktop - the column is the only thing that
+                        needs to be wide enough for it. */}
+                    {ex.targetType === "duration" && (
+                      <div className="mt-1.5">
+                        <DurationWheel
+                          seconds={ex.durationSeconds}
+                          onChange={(s) => updateExercise(di, ei, "durationSeconds", s)}
+                          accent="hsl(var(--chart-4))"
+                          testId={`checklist-duration-${di}-${ei}`}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {(ex.targetType === "count" || ex.targetType === "distance") && (
+                    <div className={ex.targetType === "distance" ? "col-span-3 sm:col-span-2" : "col-span-3 sm:col-span-4"}>
+                      <label className="text-[11px] text-muted-foreground block mb-1 text-center">Amount</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={ex.targetValue}
+                        onChange={(e) => updateExercise(di, ei, "targetValue", e.target.value.replace(/[^\d.]/g, ""))}
+                        placeholder={ex.targetType === "count" ? "20" : "400"}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
+                        data-testid={`checklist-amount-input-${di}-${ei}`}
+                      />
+                    </div>
+                  )}
+
+                  {ex.targetType === "distance" && (
+                    <div className="col-span-3 sm:col-span-2">
+                      <label className="text-[11px] text-muted-foreground block mb-1 text-center">Unit</label>
+                      <select
+                        value={ex.targetUnit}
+                        onChange={(e) => updateExercise(di, ei, "targetUnit", e.target.value)}
+                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary"
+                        data-testid={`checklist-unit-${di}-${ei}`}
+                      >
+                        {DISTANCE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className={ex.targetType === "count" || ex.targetType === "distance" ? "col-span-3" : "col-span-6 sm:col-span-3"}>
+                    <label className="text-[11px] text-muted-foreground block mb-1 text-center">Rounds</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={ex.sets}
+                      onChange={(e) => updateExercise(di, ei, "sets", e.target.value)}
+                      placeholder="1"
+                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary ${
+                        fieldError?.field === "sets" && fieldError.day === di && fieldError.exercise === ei
+                          ? "border-destructive"
+                          : "border-border"
+                      }`}
+                      data-testid={`checklist-rounds-input-${di}-${ei}`}
+                    />
+                  </div>
+
+                  <div className="col-span-12 sm:col-span-6">
+                    <label className="text-[11px] text-muted-foreground block mb-1">Category (optional)</label>
+                    <select
+                      value={ex.category}
+                      onChange={(e) => updateExercise(di, ei, "category", e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-border/70 bg-secondary/10 text-foreground text-sm focus:outline-none focus:border-primary"
+                      data-testid={`checklist-category-${di}-${ei}`}
+                    >
+                      <option value="">None</option>
+                      {CHECKLIST_CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Confirms what the wheel actually arms, in words. Kept out of the
+                    grid so it reads as a statement about the row rather than a
+                    fourth field, and so it can appear and disappear without
+                    reflowing the fields above it. */}
+                {ex.targetType === "duration" && ex.durationSeconds > 0 && (
+                  <span
+                    className="flex items-center gap-1 text-[11px] font-semibold text-chart-4"
+                    data-testid={`checklist-timer-hint-${di}-${ei}`}
+                  >
+                    <Timer className="w-3 h-3" />
+                    Shows a {formatDuration(ex.durationSeconds)} timer when logging
+                  </span>
+                )}
+              </div>
+            ) : (
               <div
                 key={ei}
                 className={`rounded-lg border border-border/60 p-3 space-y-2 ${
@@ -524,18 +955,18 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
                   <span className="shrink-0 w-5 h-5 rounded-full bg-secondary/60 text-muted-foreground text-[11px] font-medium flex items-center justify-center">
                     {ei + 1}
                   </span>
-                  <input
-                    type="text"
+                  <ExerciseNamePicker
                     value={ex.name}
-                    onChange={(e) => updateExercise(di, ei, "name", e.target.value)}
-                    maxLength={MAX_EXERCISE_NAME}
-                    placeholder="Exercise name"
-                    className={`flex-1 px-3 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm focus:outline-none focus:border-primary placeholder:text-muted-foreground ${
+                    onChange={(name) => updateExercise(di, ei, "name", name)}
+                    // Picking from the library is a deliberate statement about
+                    // the exercise, so it overwrites the primary muscle. The
+                    // secondary muscle is left exactly as the user set it.
+                    onPick={({ name, muscle }) => patchExercise(di, ei, { name, muscle })}
+                    invalid={
                       fieldError?.field === "name" && fieldError.day === di && fieldError.exercise === ei
-                        ? "border-destructive"
-                        : "border-border"
-                    }`}
-                    data-testid={`exercise-name-input-${di}-${ei}`}
+                    }
+                    maxLength={MAX_EXERCISE_NAME}
+                    testId={`exercise-name-input-${di}-${ei}`}
                   />
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
@@ -627,13 +1058,27 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
             ))}
           </div>
 
-          <button
-            onClick={() => addExercise(di)}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add exercise
-          </button>
+          {/* Two explicit buttons rather than one "Add item" that opens a type
+              menu: the menu would cost a tap on every add and hide the checklist
+              feature behind a control you'd have to already know about. */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <button
+              onClick={() => addExercise(di)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`add-exercise-${di}`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add exercise
+            </button>
+            <button
+              onClick={() => addChecklistItem(di)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid={`add-checklist-item-${di}`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add checklist item
+            </button>
+          </div>
         </div>
         );
       })}
@@ -693,7 +1138,8 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
         <div className="flex gap-2">
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
+              data-testid="button-cancel-builder"
               className="px-5 h-12 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
@@ -712,6 +1158,120 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
           </button>
         </div>
       )}
+
+      <AlertDialog
+        open={showCancelConfirm}
+        onOpenChange={(next) => { if (!next) setShowCancelConfirm(false); }}
+      >
+        <AlertDialogContent data-testid="dialog-discard-program-edits">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard your changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {editProgram
+                ? "Your program stays exactly as it was saved - everything you changed here will be lost."
+                : "The program you've started building won't be saved."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {/* Same footer ordering as DiscardSessionDialog: keep the safe action
+              first on mobile instead of the destructive one. */}
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0">
+            <AlertDialogCancel data-testid="button-keep-editing">Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={discardEdits}
+              className="bg-red-500/90 text-white hover:bg-red-500"
+              data-testid="button-discard-program-edits"
+            >
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// The read-only view of a program's schedule. Always shows the next seven days
+// rather than "the week", because that is the question a rotating cycle actually
+// answers - a 3-day rotation has no weeks, and pinning it to Mon-Sun would make
+// it look like it repeated every seven days when it doesn't.
+//
+// Renders nothing at all for an unscheduled program, which covers every row that
+// predates the feature. It is not what keeps the strip off the manual lineage,
+// though - that is the caller's job, since a manual row can still carry a stale
+// schedule. See the call site in ProgramWeekView.
+export function ScheduleStrip({
+  schedule,
+  startDate,
+  days,
+  colorFor,
+  onPickDay,
+}: {
+  schedule: StoredSchedule | null;
+  startDate: string | null;
+  days: ProgramDay[];
+  colorFor: (day: ProgramDay) => string;
+  onPickDay?: (dayNumber: number) => void;
+}) {
+  if (!schedule?.slots?.length) return null;
+
+  const today = todayDateString();
+  const upcoming = upcomingSlots(schedule, startDate, today, 7);
+  if (!upcoming.length) return null;
+
+  const dayByNumber = new Map(days.map((d) => [d.dayNumber, d]));
+
+  return (
+    <div className="space-y-2" data-testid="program-schedule-strip">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {schedule.mode === "rotating" ? (
+          <><RotateCw className="w-3.5 h-3.5" /> {schedule.slots.length}-day rotation</>
+        ) : (
+          <><CalendarDays className="w-3.5 h-3.5" /> Every week</>
+        )}
+      </div>
+      {/* Scrolls rather than squeezing into 7 equal columns: at phone width that
+          left every cell ~41px, where "Posterior 1" and "Posterior 2" both
+          truncate to "Pos…" - useless for the one question this strip answers.
+          Cells keep a floor width and scroll instead, the same idiom as the day
+          switcher directly below. */}
+      <div className="flex gap-1.5 overflow-x-auto">
+        {upcoming.map(({ date, dayId }, i) => {
+          const day = dayId != null ? dayByNumber.get(dayId) : null;
+          const tones = day ? dayTones(colorFor(day)) : null;
+          const isToday = i === 0;
+          return (
+            <button
+              key={date}
+              type="button"
+              disabled={!day}
+              onClick={() => day && onPickDay?.(day.dayNumber)}
+              style={
+                tones
+                  ? { backgroundColor: tones.soft, boxShadow: `inset 0 0 0 1px ${tones.solid}` }
+                  : undefined
+              }
+              className={`flex-1 shrink-0 basis-[4.75rem] rounded-lg px-1.5 py-2 text-center transition-colors ${
+                tones ? "" : "bg-secondary/40 border border-border"
+              } ${day ? "cursor-pointer" : "cursor-default"}`}
+              data-testid={`schedule-strip-day-${i}`}
+            >
+              <span
+                className={`block text-[10px] uppercase tracking-wide ${
+                  isToday ? "text-foreground font-semibold" : "text-muted-foreground"
+                }`}
+              >
+                {isToday ? "Today" : WEEKDAY_LABELS[mondayIndexOf(date) ?? 0]}
+              </span>
+              <span
+                className="block text-[11px] font-medium truncate mt-0.5"
+                style={tones ? { color: tones.text } : undefined}
+              >
+                {day ? day.label : <span className="text-muted-foreground">Rest</span>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -760,19 +1320,23 @@ type ProgramWeekViewProps = {
 
 export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
+  const colorOverrides = useDayColorOverrides();
+  const { user } = useUser();
+  const [, setLocation] = useLocation();
   const [activeDay, setActiveDay] = useState(0);
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
-  const tourDayTabsRef = useRef<HTMLDivElement>(null);
+  // The in-progress session that "Start workout" would have to throw away.
+  const [conflict, setConflict] = useState<ActiveSessionPointer | null>(null);
+  const tourProgramBodyRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
-  const logNavTarget = useNavTourTarget("/log");
   const finishProgramTour = useFinishProgramTour();
 
   const showProgramTour =
     tourEnabled &&
     !!profileQuery.data && !profileQuery.data.programPageTourSeenAt &&
     !isPreCalibrationLocked(program, new Date());
-  useNavTourClick("/log", showProgramTour ? finishProgramTour : null);
 
+  const durationStats = useGetSessionDurationStats();
   const days = program.days as ProgramDay[];
   const day = days[activeDay];
   const locked = isPreCalibrationLocked(program, new Date());
@@ -786,36 +1350,110 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     ...(isIndependent
       ? []
       : [{ kind: "center", text: "Here is your program page — where all your programs live." } as CoachmarkStep]),
-    { target: tourDayTabsRef, text: "Here's your program — your training days and exercises." },
-    { target: tourStartWorkoutRef, text: "You can click here and you can start logging." },
-    { kind: "navClick", target: logNavTarget, text: "Now let's log a workout — tap here." },
+    // Ring the tabs *and* the roster: the step says "your training days and
+    // exercises", and the tabs alone are the days half. Anchoring on the whole
+    // block also drops the bubble below it, instead of over the exercises.
+    { target: tourProgramBodyRef, text: "Here's your program — your training days and exercises." },
+    // The tour hands over to the real Start workout button rather than to the
+    // Log nav item, because this button is the only thing that opens a session:
+    // tapping Log without one lands on the log page's idle screen, with nothing
+    // there to walk the client through.
+    {
+      kind: "navClick",
+      target: tourStartWorkoutRef,
+      text: "Ready to train? Tap here to start logging your workout.",
+    },
   ];
 
-  const totalSets = day ? day.exercises.reduce((sum, ex) => sum + (ex.sets || 0), 0) : 0;
-  const heroToken = day ? dayHeroToken(day) : "var(--primary)";
+  // Checklist items are invisible to both figures, and get no figure of their own:
+  // their `sets` is a round count for something like a stretch hold, so adding it
+  // to "Sets" would overstate the day's training volume, and counting them under
+  // "Exercises" would misdescribe them. The item itself still shows in the roster
+  // below and in the logger - it just isn't summarised as a number up here, so the
+  // stats read purely as lifting volume (matching trainingWorkloadFor server-side).
+  const liftExercises = day ? day.exercises.filter((ex) => !isChecklist(ex)) : [];
+  const totalSets = liftExercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
+
+  // Each day's colour, from the same order the calendar and the editor use, so
+  // the day that's blue here is blue in its calendar pills and in its edit card.
+  const colorOrder = buildDayColorOrder(days.map((d) => d.label));
+  const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
+  const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
+
+  // How long this session takes - measured, or not shown at all. There is no
+  // estimate tier any more: the tile appears once this day has been trained
+  // MIN_SESSIONS_FOR_AVERAGE times and stays absent until then, so the number
+  // never has to be labelled as a guess or defended as one.
+  const sessionDuration = (() => {
+    if (!day) return null;
+    const measured = durationStats.data?.stats.find(
+      (s) => (s.dayLabel != null ? s.dayLabel === day.label : s.dayNumber === day.dayNumber)
+    );
+    if (!measured || measured.sampleCount < MIN_SESSIONS_FOR_AVERAGE) return null;
+    return { text: formatSessionLength(measured.averageSeconds), label: "Avg duration" };
+  })();
+
+  // This page is the only way to pick which day to log - the log page itself
+  // shows just the one day it is logging. Only one session can be in progress
+  // at a time, so starting a different day has to offer to discard the current
+  // one rather than silently orphaning it.
+  function handleStartWorkout() {
+    if (!day) return; // also stops the old `?day=undefined` navigation
+    // This button is the tour's last step, so tapping it retires that leg
+    // whatever happens next - a lock dialog, a conflict dialog, or the session.
+    if (showProgramTour) finishProgramTour();
+    if (locked) {
+      setLockDialogOpen(true);
+      return;
+    }
+    const active = user?.id ? resolveActiveSession(user.id) : null;
+    const isSameSession =
+      !!active &&
+      String(active.pointer.programId) === String(program.id) &&
+      active.pointer.dayNumber === day.dayNumber;
+    if (active && !isSameSession) {
+      setConflict(active.pointer);
+      return;
+    }
+    // Start it here, and say so in the URL. An already-open session for this
+    // same day is resumed, never restarted, so its logged sets and its running
+    // clock both survive the round trip.
+    //
+    // `start=1` is the tap itself, carried across the navigation: it tells the
+    // log page that this day was asked for, so it can begin the session if it
+    // finds none. Without it, anything that stopped the write below from
+    // landing - storage the browser refused, or a `user` Clerk hadn't resolved
+    // yet when the button was pressed - dead-ended on the logger's idle screen,
+    // which reads as "you didn't press Start workout" to someone who just did.
+    if (user?.id && !isSameSession) startSession(user.id, program.id, day.dayNumber);
+    setLocation(`/log?day=${day.dayNumber}&start=1`);
+  }
+
+  // The pointer can name a day of the *other* lineage's program, which this
+  // page can't label - fall back to something generic rather than guessing.
+  const conflictLabel =
+    conflict && String(conflict.programId) === String(program.id)
+      ? days.find((d) => d.dayNumber === conflict.dayNumber)?.label ?? "your other workout"
+      : "your other workout";
 
   // Only the lineage matching the active training mode gets a Start button.
   // /log always resolves the *active mode's* program, so offering this on the
   // other lineage's page sent the user into a session logged against a
   // different program's day list entirely.
-  const startWorkoutButton = !canStartWorkout ? null : locked ? (
+  const startWorkoutButton = !canStartWorkout ? null : (
     <button
-      onClick={() => setLockDialogOpen(true)}
-      className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
+      ref={tourStartWorkoutRef}
+      onClick={handleStartWorkout}
+      // The button is the biggest block of colour inside the hero, so leaving it
+      // primary blue made every day's card read blue no matter what the wash
+      // behind it was doing. It wears the day's colour too, with a foreground
+      // picked for that colour rather than assumed white.
+      style={{ backgroundColor: hero.solid, color: hero.on, boxShadow: `0 0 24px ${hero.glow}` }}
+      className="w-full mt-4 h-11 rounded-xl text-sm font-semibold transition-[filter] hover:brightness-110"
       data-testid="button-start-workout-program"
     >
       Start workout
     </button>
-  ) : (
-    <Link href={`/log?day=${day?.dayNumber}`} className="block">
-      <button
-        ref={tourStartWorkoutRef}
-        className="w-full mt-4 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors glow-primary"
-        data-testid="button-start-workout-program"
-      >
-        Start workout
-      </button>
-    </Link>
   );
 
   return (
@@ -842,56 +1480,100 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         </div>
       </motion.div>
 
-      {/* Day hero - gradient wash + border tinted by the day's dominant muscle color */}
+      {/* Day hero - gradient wash + border tinted by the day's own color */}
       {day && (
         <motion.div
           key={`hero-${activeDay}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          style={{ "--hero": heroToken } as CSSProperties}
+          style={{ "--hero": hero.parts } as CSSProperties}
           className="relative overflow-hidden rounded-2xl border border-[hsl(var(--hero)/0.3)] bg-[radial-gradient(120%_140%_at_0%_0%,hsl(var(--hero)/0.20),transparent_55%),linear-gradient(135deg,hsl(var(--hero)/0.07),transparent_45%)] bg-card p-5"
           data-testid="program-day-hero"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--hero))]">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: hero.text }}
+          >
             Day {day.dayNumber}
           </p>
           <h2 className="font-display text-2xl font-bold text-foreground mt-1">{day.focus}</h2>
           <div className="flex mt-4 pt-3 border-t border-border">
             <div className="flex-1 min-w-0">
-              <p className="font-display text-xl font-bold text-foreground">{day.exercises.length}</p>
+              <p className="font-display text-xl font-bold text-foreground">{liftExercises.length}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Exercises</p>
             </div>
             <div className="flex-1 min-w-0 border-l border-border pl-4">
               <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
             </div>
+            {sessionDuration && (
+              <div className="flex-1 min-w-0 border-l border-border pl-4" data-testid="stat-session-duration">
+                <p className="font-display text-xl font-bold text-foreground flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{sessionDuration.text}</span>
+                </p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
+                  {sessionDuration.label}
+                </p>
+              </div>
+            )}
           </div>
           {startWorkoutButton}
         </motion.div>
       )}
 
+      {/* Manual lineage never shows a week. Scheduling is an AI-mode idea, and
+          the builder no longer offers one, so a manual program is just a list of
+          days trained whenever the user likes. Gated on the lineage rather than
+          on `schedule` being null, because rows saved while the builder briefly
+          offered a schedule still carry one and only get blanked the next time
+          PUT /programs/:id runs - until then a program built months ago went on
+          showing a week it has no way to edit. */}
+      <ScheduleStrip
+        schedule={program.aiGenerated ? ((program.schedule as StoredSchedule | null) ?? null) : null}
+        startDate={program.startDate ?? null}
+        days={days}
+        colorFor={dayColor}
+        onPickDay={(dayNumber) => {
+          const index = days.findIndex((d) => d.dayNumber === dayNumber);
+          if (index >= 0) setActiveDay(index);
+        }}
+      />
+
+      {/* Day switcher + roster. Grouped so the first-run tour can spotlight both
+          at once: its step says "your training days and exercises", and the
+          roster is what the second half of that sentence refers to. The wrapper
+          repeats the parent's space-y-6, so the two still sit exactly as far
+          apart as they did as loose siblings. The schedule strip stays outside
+          it: that step describes the days and their exercises, not the week
+          they land on, so spotlighting the strip too would overshoot the copy. */}
+      <div ref={tourProgramBodyRef} className="space-y-6">
       {/* Day switcher */}
       <div
-        ref={tourDayTabsRef}
         className="flex gap-1.5 rounded-xl border border-border bg-secondary/60 p-1 overflow-x-auto"
         data-testid="program-day-tabs"
       >
-        {days.map((d, i) => (
-          <button
-            key={d.dayNumber}
-            onClick={() => setActiveDay(i)}
-            data-testid={`tab-day-${d.dayNumber}`}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
-              activeDay === i
-                ? "bg-primary text-primary-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground font-medium"
-            }`}
-          >
-            <span className={`text-xs mr-1 ${activeDay === i ? "opacity-80" : "opacity-60"}`}>{i + 1} ·</span>
-            {d.label}
-          </button>
-        ))}
+        {days.map((d, i) => {
+          const tone = dayTones(dayColor(d));
+          const isActive = activeDay === i;
+          return (
+            <button
+              key={d.dayNumber}
+              onClick={() => setActiveDay(i)}
+              data-testid={`tab-day-${d.dayNumber}`}
+              // The active tab wears the day's own colour rather than a blanket
+              // primary blue - a solid fill is out, since the palette runs light
+              // enough (amber, lime) that white-on-fill stops being readable.
+              style={isActive ? { backgroundColor: tone.soft, color: tone.text, boxShadow: `inset 0 0 0 1px ${tone.solid}` } : undefined}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
+                isActive ? "font-semibold" : "text-muted-foreground hover:text-foreground font-medium"
+              }`}
+            >
+              {d.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Exercise roster */}
@@ -903,11 +1585,18 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           transition={{ duration: 0.2 }}
           className="rounded-2xl border border-border bg-card divide-y divide-border/60 overflow-hidden"
         >
-          {day.exercises.map((ex, i) => (
-            <RosterRow key={ex.name} ex={ex} index={i} />
-          ))}
+          {/* Numbering counts lifts only, so a checklist item sitting between two
+              exercises doesn't consume a number and leave a gap ("...5, 7"). */}
+          {(() => {
+            let liftIndex = -1;
+            return day.exercises.map((ex, i) => {
+              if (!isChecklist(ex)) liftIndex++;
+              return <RosterRow key={`${ex.name}-${i}`} ex={ex} index={liftIndex} />;
+            });
+          })()}
         </motion.div>
       )}
+      </div>
 
       {showProgramTour && <CoachmarkTour steps={programTourSteps} onDone={finishProgramTour} testIdPrefix="program-tour" />}
 
@@ -915,6 +1604,29 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         open={lockDialogOpen}
         programId={program.id}
         onCancel={() => setLockDialogOpen(false)}
+      />
+
+      <DiscardSessionDialog
+        open={!!conflict}
+        inProgressLabel={conflictLabel}
+        targetLabel={day?.label ?? "this day"}
+        onDismiss={() => setConflict(null)}
+        // Bare `/log`, not `?day=`: the log page re-resolves the active session
+        // against the mode's current program and lands on the right day with
+        // its resume banner - which stays correct even when the session belongs
+        // to the other lineage's program.
+        onKeep={() => {
+          setConflict(null);
+          setLocation("/log");
+        }}
+        onDiscard={() => {
+          if (user?.id && day) {
+            discardActiveSession(user.id);
+            startSession(user.id, program.id, day.dayNumber);
+          }
+          setConflict(null);
+          if (day) setLocation(`/log?day=${day.dayNumber}&start=1`);
+        }}
       />
     </div>
   );

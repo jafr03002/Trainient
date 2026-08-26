@@ -47,6 +47,7 @@ export const GetProfileResponse = zod.object({
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
   "dashboardTourSeenAt": zod.string().nullish(),
+  "calendarTourSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -148,7 +149,8 @@ export const UpdateProfileBody = zod.object({
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
-  "dashboardTourSeenAt": zod.string().nullish()
+  "dashboardTourSeenAt": zod.string().nullish(),
+  "calendarTourSeenAt": zod.string().nullish()
 })
 
 export const UpdateProfileResponse = zod.object({
@@ -179,6 +181,7 @@ export const UpdateProfileResponse = zod.object({
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
   "dashboardTourSeenAt": zod.string().nullish(),
+  "calendarTourSeenAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -194,11 +197,23 @@ export const getCurrentProgramResponseDaysItemLabelMax = 60;
 
 export const getCurrentProgramResponseDaysItemFocusMax = 60;
 
+export const getCurrentProgramResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const getCurrentProgramResponseDaysItemExercisesItemNameMax = 80;
 
 export const getCurrentProgramResponseDaysItemExercisesItemSetsMax = 50;
 
 export const getCurrentProgramResponseDaysItemExercisesItemRepsMax = 50;
+
+export const getCurrentProgramResponseDaysItemExercisesItemKindDefault = `lift`;
+export const getCurrentProgramResponseDaysItemExercisesItemTargetSecondsMin = 0;
+export const getCurrentProgramResponseDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const getCurrentProgramResponseDaysItemExercisesItemTargetValueMin = 0;
+export const getCurrentProgramResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const getCurrentProgramResponseScheduleOneSlotsMin = 2;
+export const getCurrentProgramResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -217,6 +232,7 @@ export const GetCurrentProgramResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(getCurrentProgramResponseDaysItemLabelMax),
   "focus": zod.string().max(getCurrentProgramResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(getCurrentProgramResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(getCurrentProgramResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(getCurrentProgramResponseDaysItemExercisesItemSetsMax),
@@ -226,7 +242,13 @@ export const GetCurrentProgramResponse = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getCurrentProgramResponseDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getCurrentProgramResponseDaysItemExercisesItemTargetSecondsMin).max(getCurrentProgramResponseDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getCurrentProgramResponseDaysItemExercisesItemTargetValueMin).max(getCurrentProgramResponseDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 })),
   "generatedAt": zod.string(),
@@ -248,7 +270,11 @@ export const GetCurrentProgramResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(getCurrentProgramResponseScheduleOneSlotsMin).max(getCurrentProgramResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 
@@ -259,11 +285,23 @@ export const listProgramsResponseDaysItemLabelMax = 60;
 
 export const listProgramsResponseDaysItemFocusMax = 60;
 
+export const listProgramsResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const listProgramsResponseDaysItemExercisesItemNameMax = 80;
 
 export const listProgramsResponseDaysItemExercisesItemSetsMax = 50;
 
 export const listProgramsResponseDaysItemExercisesItemRepsMax = 50;
+
+export const listProgramsResponseDaysItemExercisesItemKindDefault = `lift`;
+export const listProgramsResponseDaysItemExercisesItemTargetSecondsMin = 0;
+export const listProgramsResponseDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const listProgramsResponseDaysItemExercisesItemTargetValueMin = 0;
+export const listProgramsResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const listProgramsResponseScheduleOneSlotsMin = 2;
+export const listProgramsResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -282,6 +320,7 @@ export const ListProgramsResponseItem = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(listProgramsResponseDaysItemLabelMax),
   "focus": zod.string().max(listProgramsResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(listProgramsResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(listProgramsResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(listProgramsResponseDaysItemExercisesItemSetsMax),
@@ -291,7 +330,13 @@ export const ListProgramsResponseItem = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(listProgramsResponseDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(listProgramsResponseDaysItemExercisesItemTargetSecondsMin).max(listProgramsResponseDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(listProgramsResponseDaysItemExercisesItemTargetValueMin).max(listProgramsResponseDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 })),
   "generatedAt": zod.string(),
@@ -313,7 +358,11 @@ export const ListProgramsResponseItem = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(listProgramsResponseScheduleOneSlotsMin).max(listProgramsResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 export const ListProgramsResponse = zod.array(ListProgramsResponseItem)
 
@@ -329,11 +378,20 @@ export const createManualProgramBodyDaysItemLabelMax = 60;
 
 export const createManualProgramBodyDaysItemFocusMax = 60;
 
+export const createManualProgramBodyDaysItemEstimatedDurationMinutesMax = 300;
+
 export const createManualProgramBodyDaysItemExercisesItemNameMax = 80;
 
 export const createManualProgramBodyDaysItemExercisesItemSetsMax = 50;
 
 export const createManualProgramBodyDaysItemExercisesItemRepsMax = 50;
+
+export const createManualProgramBodyDaysItemExercisesItemKindDefault = `lift`;
+export const createManualProgramBodyDaysItemExercisesItemTargetSecondsMin = 0;
+export const createManualProgramBodyDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const createManualProgramBodyDaysItemExercisesItemTargetValueMin = 0;
+export const createManualProgramBodyDaysItemExercisesItemTargetValueMax = 100000;
 
 
 
@@ -344,6 +402,7 @@ export const CreateManualProgramBody = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(createManualProgramBodyDaysItemLabelMax),
   "focus": zod.string().max(createManualProgramBodyDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(createManualProgramBodyDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(createManualProgramBodyDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(createManualProgramBodyDaysItemExercisesItemSetsMax),
@@ -353,7 +412,13 @@ export const CreateManualProgramBody = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(createManualProgramBodyDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(createManualProgramBodyDaysItemExercisesItemTargetSecondsMin).max(createManualProgramBodyDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(createManualProgramBodyDaysItemExercisesItemTargetValueMin).max(createManualProgramBodyDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 }))
 })
@@ -385,11 +450,20 @@ export const updateProgramBodyDaysItemLabelMax = 60;
 
 export const updateProgramBodyDaysItemFocusMax = 60;
 
+export const updateProgramBodyDaysItemEstimatedDurationMinutesMax = 300;
+
 export const updateProgramBodyDaysItemExercisesItemNameMax = 80;
 
 export const updateProgramBodyDaysItemExercisesItemSetsMax = 50;
 
 export const updateProgramBodyDaysItemExercisesItemRepsMax = 50;
+
+export const updateProgramBodyDaysItemExercisesItemKindDefault = `lift`;
+export const updateProgramBodyDaysItemExercisesItemTargetSecondsMin = 0;
+export const updateProgramBodyDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const updateProgramBodyDaysItemExercisesItemTargetValueMin = 0;
+export const updateProgramBodyDaysItemExercisesItemTargetValueMax = 100000;
 
 
 
@@ -400,6 +474,7 @@ export const UpdateProgramBody = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(updateProgramBodyDaysItemLabelMax),
   "focus": zod.string().max(updateProgramBodyDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(updateProgramBodyDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(updateProgramBodyDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(updateProgramBodyDaysItemExercisesItemSetsMax),
@@ -409,7 +484,13 @@ export const UpdateProgramBody = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(updateProgramBodyDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(updateProgramBodyDaysItemExercisesItemTargetSecondsMin).max(updateProgramBodyDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(updateProgramBodyDaysItemExercisesItemTargetValueMin).max(updateProgramBodyDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 }))
 })
@@ -418,11 +499,23 @@ export const updateProgramResponseDaysItemLabelMax = 60;
 
 export const updateProgramResponseDaysItemFocusMax = 60;
 
+export const updateProgramResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const updateProgramResponseDaysItemExercisesItemNameMax = 80;
 
 export const updateProgramResponseDaysItemExercisesItemSetsMax = 50;
 
 export const updateProgramResponseDaysItemExercisesItemRepsMax = 50;
+
+export const updateProgramResponseDaysItemExercisesItemKindDefault = `lift`;
+export const updateProgramResponseDaysItemExercisesItemTargetSecondsMin = 0;
+export const updateProgramResponseDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const updateProgramResponseDaysItemExercisesItemTargetValueMin = 0;
+export const updateProgramResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const updateProgramResponseScheduleOneSlotsMin = 2;
+export const updateProgramResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -441,6 +534,7 @@ export const UpdateProgramResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(updateProgramResponseDaysItemLabelMax),
   "focus": zod.string().max(updateProgramResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(updateProgramResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(updateProgramResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(updateProgramResponseDaysItemExercisesItemSetsMax),
@@ -450,7 +544,13 @@ export const UpdateProgramResponse = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(updateProgramResponseDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(updateProgramResponseDaysItemExercisesItemTargetSecondsMin).max(updateProgramResponseDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(updateProgramResponseDaysItemExercisesItemTargetValueMin).max(updateProgramResponseDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 })),
   "generatedAt": zod.string(),
@@ -472,7 +572,11 @@ export const UpdateProgramResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(updateProgramResponseScheduleOneSlotsMin).max(updateProgramResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 
@@ -491,11 +595,23 @@ export const setProgramStartDateResponseDaysItemLabelMax = 60;
 
 export const setProgramStartDateResponseDaysItemFocusMax = 60;
 
+export const setProgramStartDateResponseDaysItemEstimatedDurationMinutesMax = 300;
+
 export const setProgramStartDateResponseDaysItemExercisesItemNameMax = 80;
 
 export const setProgramStartDateResponseDaysItemExercisesItemSetsMax = 50;
 
 export const setProgramStartDateResponseDaysItemExercisesItemRepsMax = 50;
+
+export const setProgramStartDateResponseDaysItemExercisesItemKindDefault = `lift`;
+export const setProgramStartDateResponseDaysItemExercisesItemTargetSecondsMin = 0;
+export const setProgramStartDateResponseDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const setProgramStartDateResponseDaysItemExercisesItemTargetValueMin = 0;
+export const setProgramStartDateResponseDaysItemExercisesItemTargetValueMax = 100000;
+
+export const setProgramStartDateResponseScheduleOneSlotsMin = 2;
+export const setProgramStartDateResponseScheduleOneSlotsMax = 14;
 
 
 
@@ -514,6 +630,7 @@ export const SetProgramStartDateResponse = zod.object({
   "dayNumber": zod.number(),
   "label": zod.string().max(setProgramStartDateResponseDaysItemLabelMax),
   "focus": zod.string().max(setProgramStartDateResponseDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(setProgramStartDateResponseDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
   "exercises": zod.array(zod.object({
   "name": zod.string().max(setProgramStartDateResponseDaysItemExercisesItemNameMax),
   "sets": zod.number().min(1).max(setProgramStartDateResponseDaysItemExercisesItemSetsMax),
@@ -523,7 +640,13 @@ export const SetProgramStartDateResponse = zod.object({
   "cue": zod.string().nullish(),
   "muscle": zod.string(),
   "secondaryMuscle": zod.string().nullish(),
-  "isUnilateral": zod.boolean().optional()
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(setProgramStartDateResponseDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(setProgramStartDateResponseDaysItemExercisesItemTargetSecondsMin).max(setProgramStartDateResponseDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(setProgramStartDateResponseDaysItemExercisesItemTargetValueMin).max(setProgramStartDateResponseDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 }))
 })),
   "generatedAt": zod.string(),
@@ -545,7 +668,11 @@ export const SetProgramStartDateResponse = zod.object({
   "bpmMax": zod.number().optional(),
   "level": zod.enum(['low', 'moderate', 'high']).optional()
 }).nullish(),
-  "startDate": zod.string().nullish()
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(setProgramStartDateResponseScheduleOneSlotsMin).max(setProgramStartDateResponseScheduleOneSlotsMax)
+}),zod.null()]).optional()
 })
 
 
@@ -578,6 +705,15 @@ export const listWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax = 1000;
 
 export const listWorkoutsResponseExercisesLoggedItemSetsItemRpeMax = 10;
 
+export const listWorkoutsResponseExercisesLoggedItemNotesMax = 2000;
+
+export const listWorkoutsResponseExercisesLoggedItemKindDefault = `lift`;
+export const listWorkoutsResponseExercisesLoggedItemCompletedRoundsMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemCompletedRoundsMax = 50;
+
+export const listWorkoutsResponseExercisesLoggedItemTargetSecondsMin = 0;
+export const listWorkoutsResponseExercisesLoggedItemTargetSecondsMax = 86400;
+
 
 
 export const ListWorkoutsResponseItem = zod.object({
@@ -600,9 +736,16 @@ export const ListWorkoutsResponseItem = zod.object({
   "rpe": zod.number().min(1).max(listWorkoutsResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
-}))
+})),
+  "notes": zod.string().max(listWorkoutsResponseExercisesLoggedItemNotesMax).nullish(),
+  "kind": zod.enum(['lift', 'checklist']).default(listWorkoutsResponseExercisesLoggedItemKindDefault),
+  "completedRounds": zod.number().min(listWorkoutsResponseExercisesLoggedItemCompletedRoundsMin).max(listWorkoutsResponseExercisesLoggedItemCompletedRoundsMax).nullish(),
+  "targetSeconds": zod.number().min(listWorkoutsResponseExercisesLoggedItemTargetSecondsMin).max(listWorkoutsResponseExercisesLoggedItemTargetSecondsMax).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const ListWorkoutsResponse = zod.array(ListWorkoutsResponseItem)
@@ -632,7 +775,19 @@ export const createWorkoutBodyExercisesLoggedItemSetsItemRepsRightMax = 1000;
 
 export const createWorkoutBodyExercisesLoggedItemSetsItemRpeMax = 10;
 
+export const createWorkoutBodyExercisesLoggedItemNotesMax = 2000;
+
+export const createWorkoutBodyExercisesLoggedItemKindDefault = `lift`;
+export const createWorkoutBodyExercisesLoggedItemCompletedRoundsMin = 0;
+export const createWorkoutBodyExercisesLoggedItemCompletedRoundsMax = 50;
+
+export const createWorkoutBodyExercisesLoggedItemTargetSecondsMin = 0;
+export const createWorkoutBodyExercisesLoggedItemTargetSecondsMax = 86400;
+
 export const createWorkoutBodyNotesMax = 2000;
+
+export const createWorkoutBodyDurationSecondsMin = 0;
+export const createWorkoutBodyDurationSecondsMax = 86400;
 
 
 
@@ -653,9 +808,16 @@ export const CreateWorkoutBody = zod.object({
   "rpe": zod.number().min(1).max(createWorkoutBodyExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
-}))
 })),
-  "notes": zod.string().max(createWorkoutBodyNotesMax).nullish()
+  "notes": zod.string().max(createWorkoutBodyExercisesLoggedItemNotesMax).nullish(),
+  "kind": zod.enum(['lift', 'checklist']).default(createWorkoutBodyExercisesLoggedItemKindDefault),
+  "completedRounds": zod.number().min(createWorkoutBodyExercisesLoggedItemCompletedRoundsMin).max(createWorkoutBodyExercisesLoggedItemCompletedRoundsMax).nullish(),
+  "targetSeconds": zod.number().min(createWorkoutBodyExercisesLoggedItemTargetSecondsMin).max(createWorkoutBodyExercisesLoggedItemTargetSecondsMax).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+})),
+  "notes": zod.string().max(createWorkoutBodyNotesMax).nullish(),
+  "startedAt": zod.coerce.date().nullish(),
+  "durationSeconds": zod.number().min(createWorkoutBodyDurationSecondsMin).max(createWorkoutBodyDurationSecondsMax).nullish()
 })
 
 
@@ -680,6 +842,15 @@ export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRepsRightMax = 
 
 export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemRpeMax = 10;
 
+export const getRecentWorkoutsResponseExercisesLoggedItemNotesMax = 2000;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemKindDefault = `lift`;
+export const getRecentWorkoutsResponseExercisesLoggedItemCompletedRoundsMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemCompletedRoundsMax = 50;
+
+export const getRecentWorkoutsResponseExercisesLoggedItemTargetSecondsMin = 0;
+export const getRecentWorkoutsResponseExercisesLoggedItemTargetSecondsMax = 86400;
+
 
 
 export const GetRecentWorkoutsResponseItem = zod.object({
@@ -702,9 +873,16 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "rpe": zod.number().min(1).max(getRecentWorkoutsResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
-}))
+})),
+  "notes": zod.string().max(getRecentWorkoutsResponseExercisesLoggedItemNotesMax).nullish(),
+  "kind": zod.enum(['lift', 'checklist']).default(getRecentWorkoutsResponseExercisesLoggedItemKindDefault),
+  "completedRounds": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemCompletedRoundsMin).max(getRecentWorkoutsResponseExercisesLoggedItemCompletedRoundsMax).nullish(),
+  "targetSeconds": zod.number().min(getRecentWorkoutsResponseExercisesLoggedItemTargetSecondsMin).max(getRecentWorkoutsResponseExercisesLoggedItemTargetSecondsMax).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const GetRecentWorkoutsResponse = zod.array(GetRecentWorkoutsResponseItem)
@@ -718,6 +896,19 @@ export const GetWorkoutStatsResponse = zod.object({
   "totalLogged": zod.number(),
   "lastSessionDate": zod.string().nullable(),
   "streakDays": zod.number()
+})
+
+
+/**
+ * @summary Average session duration per session type, over sessions eligible to be averaged
+ */
+export const GetSessionDurationStatsResponse = zod.object({
+  "stats": zod.array(zod.object({
+  "dayLabel": zod.string().nullable(),
+  "dayNumber": zod.number(),
+  "averageSeconds": zod.number(),
+  "sampleCount": zod.number().describe('How many eligible sessions the average is drawn from.')
+}))
 })
 
 
@@ -746,6 +937,15 @@ export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRepsRightMa
 
 export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRpeMax = 10;
 
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemNotesMax = 2000;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemKindDefault = `lift`;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemCompletedRoundsMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemCompletedRoundsMax = 50;
+
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemTargetSecondsMin = 0;
+export const getWorkoutsByDayLabelResponseExercisesLoggedItemTargetSecondsMax = 86400;
+
 
 
 export const GetWorkoutsByDayLabelResponseItem = zod.object({
@@ -768,9 +968,16 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "rpe": zod.number().min(1).max(getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemRpeMax).nullish(),
   "completed": zod.boolean(),
   "isNewPr": zod.boolean().nullish()
-}))
+})),
+  "notes": zod.string().max(getWorkoutsByDayLabelResponseExercisesLoggedItemNotesMax).nullish(),
+  "kind": zod.enum(['lift', 'checklist']).default(getWorkoutsByDayLabelResponseExercisesLoggedItemKindDefault),
+  "completedRounds": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemCompletedRoundsMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemCompletedRoundsMax).nullish(),
+  "targetSeconds": zod.number().min(getWorkoutsByDayLabelResponseExercisesLoggedItemTargetSecondsMin).max(getWorkoutsByDayLabelResponseExercisesLoggedItemTargetSecondsMax).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().nullish(),
+  "startedAt": zod.string().nullish().describe('When the session clock started (the log page opening). Null for sessions logged before timing existed.'),
+  "durationSeconds": zod.number().nullish().describe('Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.'),
   "createdAt": zod.string()
 })
 export const GetWorkoutsByDayLabelResponse = zod.array(GetWorkoutsByDayLabelResponseItem)

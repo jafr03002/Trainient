@@ -66,6 +66,8 @@ export interface UserProfile {
   weightLoggingTourSeenAt?: string | null;
   /** @nullable */
   dashboardTourSeenAt?: string | null;
+  /** @nullable */
+  calendarTourSeenAt?: string | null;
   createdAt: string;
 }
 
@@ -218,7 +220,56 @@ export interface UserProfileUpdate {
   weightLoggingTourSeenAt?: string | null;
   /** @nullable */
   dashboardTourSeenAt?: string | null;
+  /** @nullable */
+  calendarTourSeenAt?: string | null;
 }
+
+export type ExerciseKind = typeof ExerciseKind[keyof typeof ExerciseKind];
+
+
+export const ExerciseKind = {
+  lift: 'lift',
+  checklist: 'checklist',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseTargetType = typeof ExerciseTargetType[keyof typeof ExerciseTargetType] | null;
+
+
+export const ExerciseTargetType = {
+  duration: 'duration',
+  count: 'count',
+  distance: 'distance',
+  none: 'none',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseTargetUnit = typeof ExerciseTargetUnit[keyof typeof ExerciseTargetUnit] | null;
+
+
+export const ExerciseTargetUnit = {
+  reps: 'reps',
+  m: 'm',
+  km: 'km',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ExerciseCategory = typeof ExerciseCategory[keyof typeof ExerciseCategory] | null;
+
+
+export const ExerciseCategory = {
+  stretch: 'stretch',
+  mobility: 'mobility',
+  core: 'core',
+  breathing: 'breathing',
+  other: 'other',
+} as const;
 
 export interface Exercise {
   /** @maxLength 80 */
@@ -240,6 +291,25 @@ export interface Exercise {
   /** @nullable */
   secondaryMuscle?: string | null;
   isUnilateral?: boolean;
+  kind?: ExerciseKind;
+  /** @nullable */
+  targetType?: ExerciseTargetType;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     * @nullable
+     */
+  targetValue?: number | null;
+  /** @nullable */
+  targetUnit?: ExerciseTargetUnit;
+  /** @nullable */
+  category?: ExerciseCategory;
 }
 
 export interface ProgramDay {
@@ -248,12 +318,36 @@ export interface ProgramDay {
   label: string;
   /** @maxLength 60 */
   focus: string;
+  /**
+     * The AI's predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.
+     * @minimum 1
+     * @maximum 300
+     * @nullable
+     */
+  estimatedDurationMinutes?: number | null;
   exercises: Exercise[];
 }
 
 export interface ProgramHighlight {
   title: string;
   detail: string;
+}
+
+export type ProgramScheduleMode = typeof ProgramScheduleMode[keyof typeof ProgramScheduleMode];
+
+
+export const ProgramScheduleMode = {
+  fixed: 'fixed',
+  rotating: 'rotating',
+} as const;
+
+export interface ProgramSchedule {
+  mode: ProgramScheduleMode;
+  /**
+     * @minItems 2
+     * @maxItems 14
+     */
+  slots: (number | null)[];
 }
 
 /**
@@ -349,6 +443,7 @@ export interface Program {
   cardioIntensity?: ProgramCardioIntensity;
   /** @nullable */
   startDate?: string | null;
+  schedule?: ProgramSchedule | null;
 }
 
 export interface ProgramStartDateUpdate {
@@ -428,11 +523,53 @@ export interface LoggedSet {
   isNewPr?: boolean | null;
 }
 
+export type LoggedExerciseKind = typeof LoggedExerciseKind[keyof typeof LoggedExerciseKind];
+
+
+export const LoggedExerciseKind = {
+  lift: 'lift',
+  checklist: 'checklist',
+} as const;
+
+/**
+ * @nullable
+ */
+export type LoggedExerciseCategory = typeof LoggedExerciseCategory[keyof typeof LoggedExerciseCategory] | null;
+
+
+export const LoggedExerciseCategory = {
+  stretch: 'stretch',
+  mobility: 'mobility',
+  core: 'core',
+  breathing: 'breathing',
+  other: 'other',
+} as const;
+
 export interface LoggedExercise {
   /** @maxLength 80 */
   name: string;
   muscle: string;
   sets: LoggedSet[];
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+  kind?: LoggedExerciseKind;
+  /**
+     * @minimum 0
+     * @maximum 50
+     * @nullable
+     */
+  completedRounds?: number | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  targetSeconds?: number | null;
+  /** @nullable */
+  category?: LoggedExerciseCategory;
 }
 
 /**
@@ -459,6 +596,16 @@ export interface WorkoutLog {
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
+  /**
+     * When the session clock started (the log page opening). Null for sessions logged before timing existed.
+     * @nullable
+     */
+  startedAt?: string | null;
+  /**
+     * Wall-clock session length. Stored as recorded even when implausible - eligibility for averaging is decided at read time.
+     * @nullable
+     */
+  durationSeconds?: number | null;
   createdAt: string;
 }
 
@@ -478,6 +625,27 @@ export interface WorkoutLogInput {
      * @nullable
      */
   notes?: string | null;
+  /** @nullable */
+  startedAt?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 86400
+     * @nullable
+     */
+  durationSeconds?: number | null;
+}
+
+export interface SessionDurationStat {
+  /** @nullable */
+  dayLabel: string | null;
+  dayNumber: number;
+  averageSeconds: number;
+  /** How many eligible sessions the average is drawn from. */
+  sampleCount: number;
+}
+
+export interface SessionDurationStats {
+  stats: SessionDurationStat[];
 }
 
 export interface WorkoutStats {
