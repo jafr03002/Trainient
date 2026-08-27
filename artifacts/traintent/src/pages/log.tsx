@@ -40,6 +40,16 @@ function isEmptySet(s: any): boolean {
   return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
 }
 
+// "12 Aug" - just enough to place a carried-forward note in time without
+// widening the hint line it sits on. Null for a log with an unreadable date.
+function formatShortDate(date: string | null): string | null {
+  if (!date) return null;
+  const d = new Date(date);
+  return Number.isNaN(d.getTime())
+    ? null
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 /**
  * Rebuilds the session from the CURRENT program day, then folds the user's entered
  * work back in by exercise name.
@@ -267,10 +277,12 @@ export default function Log() {
 
   // Build "last time" lookup from workout history - keep the full set list of the
   // most recent prior log per exercise, so each set row can show its own match.
-  // Also capture that session's note (per-exercise, not per-set) to surface under
-  // the last set's hint.
+  // Also carry that session's note (per-exercise, not per-set) forward, with the
+  // date it was written, so the logger can show it back under the set rows.
+  // Keyed by exercise rather than by program day on purpose: it keeps the note
+  // and the "Last time" numbers above it drawn from one and the same session.
   const lastSetsByExercise: Record<string, any[]> = {};
-  const lastNoteByExercise: Record<string, string> = {};
+  const lastNoteByExercise: Record<string, { text: string; date: string | null }> = {};
   for (const log of (history ?? []) as any[]) {
     for (const ex of (log.exercisesLogged as any[]) ?? []) {
       const key = ex.name?.toLowerCase();
@@ -278,7 +290,8 @@ export default function Log() {
       // Only count sessions where this exercise actually has logged data.
       if (Array.isArray(ex.sets) && ex.sets.some((s: any) => !isEmptySet(s))) {
         lastSetsByExercise[key] = ex.sets;
-        if (ex.notes) lastNoteByExercise[key] = ex.notes;
+        const text = typeof ex.notes === "string" ? ex.notes.trim() : "";
+        if (text) lastNoteByExercise[key] = { text, date: log.date ?? null };
       }
     }
   }
@@ -1014,6 +1027,7 @@ export default function Log() {
 
           const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
           const prevNote = lastNoteByExercise[ex.name.toLowerCase()];
+          const prevNoteDate = formatShortDate(prevNote?.date ?? null);
           const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
           return (
           <motion.div
@@ -1147,14 +1161,28 @@ export default function Log() {
                       Last time: {prevStr}
                     </p>
                   )}
-                  {prevStr && prevNote && setIdx === ex.sets.length - 1 && (
-                    <p className="text-[11px] text-primary/80 pl-8 mt-0.5" data-testid={`last-note-${exIdx}`}>
-                      Note: {prevNote}
-                    </p>
-                  )}
                   </div>
                 );})}
               </div>
+
+              {/* The note left on this exercise last time, carried forward and
+                  parked directly under the set rows. Deliberately quiet - it is
+                  a reminder, not a heading - and dated so it never reads as
+                  something typed in this session. It does NOT depend on a
+                  matching "Last time" line: when the program's set count has
+                  since changed there is no hint on the final row, and the note
+                  used to vanish with it. */}
+              {prevNote && (
+                <p
+                  className="mt-2 pl-8 text-[11px] leading-snug text-muted-foreground/70"
+                  data-testid={`last-note-${exIdx}`}
+                >
+                  <span className="text-muted-foreground/50">
+                    Last session{prevNoteDate ? ` · ${prevNoteDate}` : ""}:{" "}
+                  </span>
+                  {prevNote.text}
+                </p>
+              )}
 
               {/* Actions row */}
               <div className="flex items-center justify-end mt-3">
@@ -1170,7 +1198,10 @@ export default function Log() {
                   data-testid={`button-toggle-notes-${exIdx}`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  {ex.notes ? "Note saved" : "Add note"}
+                  {/* With last session's note sitting right above, a bare "Add
+                      note" reads as if that one were already the entry for
+                      today. "Add a new note" says the old one is history. */}
+                  {ex.notes ? "Note saved" : prevNote ? "Add a new note" : "Add note"}
                   <ChevronDown className={`w-3 h-3 transition-transform ${ex.showNotes ? "rotate-180" : ""}`} />
                 </button>
               </div>
