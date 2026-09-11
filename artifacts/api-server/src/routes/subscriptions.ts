@@ -5,6 +5,13 @@ import { db, subscriptionsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateCheckoutSessionBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import {
+  applyCheckoutCompleted,
+  applyInvoicePaymentFailed,
+  applySubscriptionDeleted,
+  applySubscriptionUpdated,
+  eventTime,
+} from "../lib/stripeSync";
 
 // Constructed lazily, same reasoning as lib/anthropic.ts: this router is always
 // mounted and the Stripe SDK throws on an undefined key, so building the client
@@ -142,43 +149,37 @@ router.post("/subscriptions/webhook", async (req, res) => {
     return;
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.metadata?.userId;
-    if (userId && session.subscription) {
-      const stripeSub = await getStripe().subscriptions.retrieve(session.subscription as string);
-      const periodEnd = (stripeSub as any).current_period_end
-        ? new Date((stripeSub as any).current_period_end * 1000)
-        : null;
-      await db
-        .insert(subscriptionsTable)
-        .values({
-          userId,
-          plan: "pro",
-          status: "active",
-          stripeCustomerId: session.customer as string,
-          stripeSubscriptionId: session.subscription as string,
-          currentPeriodEnd: periodEnd,
-        })
-        .onConflictDoUpdate({
-          target: subscriptionsTable.userId,
-          set: {
-            plan: "pro",
-            status: "active",
-            stripeCustomerId: session.customer as string,
-            stripeSubscriptionId: session.subscription as string,
-            currentPeriodEnd: periodEnd,
-          },
-        });
+  // State transitions live in lib/stripeSync.ts. Every handler ignores an event
+  // older than the last one applied to the row, since Stripe delivers out of order.
+  const eventAt = eventTime(event);
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const userId = session.metadata?.userId;
+      if (userId && session.subscription) {
+        const sub = await getStripe().subscriptions.retrieve(session.subscription as string);
+        await applyCheckoutCompleted({ userId, customerId: session.customer as string, sub, eventAt });
+      }
+      break;
     }
-  }
-
-  if (event.type === "customer.subscription.deleted") {
-    const stripeSub = event.data.object as Stripe.Subscription;
-    await db
-      .update(subscriptionsTable)
-      .set({ plan: "free", status: "cancelled", stripeSubscriptionId: null })
-      .where(eq(subscriptionsTable.stripeSubscriptionId, stripeSub.id));
+    case "customer.subscription.updated": {
+      const changed = await applySubscriptionUpdated(event.data.object, eventAt);
+      if (changed === 0) {
+        logger.warn({ eventId: event.id, subscriptionId: event.data.object.id }, "subscription.updated matched no row (or was stale)");
+      }
+      break;
+    }
+    case "customer.subscription.deleted":
+      await applySubscriptionDeleted(event.data.object, eventAt);
+      break;
+    case "invoice.payment_failed": {
+      const changed = await applyInvoicePaymentFailed(event.data.object, eventAt);
+      logger.warn({ eventId: event.id, invoiceId: event.data.object.id, rowsDowngraded: changed }, "Stripe payment failed");
+      break;
+    }
+    default:
+      // Anything else the endpoint is subscribed to is acknowledged and ignored.
+      break;
   }
 
   res.json({ status: "ok" });
