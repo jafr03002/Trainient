@@ -763,6 +763,48 @@ export interface CheckinResult {
   updatedProgram: Program;
 }
 
+export interface AiJobAccepted {
+  jobId: string;
+}
+
+export type AiJobStatus = typeof AiJobStatus[keyof typeof AiJobStatus];
+
+
+export const AiJobStatus = {
+  pending: 'pending',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+} as const;
+
+export interface ProgramGenerationJob {
+  jobId: string;
+  status: AiJobStatus;
+  result: Program | null;
+  /**
+     * User-facing message; set only when status is failed.
+     * @nullable
+     */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export interface CheckinJob {
+  jobId: string;
+  status: AiJobStatus;
+  result: CheckinResult | null;
+  /**
+     * User-facing message; set only when status is failed.
+     * @nullable
+     */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
 export interface VolumePoint {
   week: number;
   totalSets: number;

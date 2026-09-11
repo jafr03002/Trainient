@@ -10,6 +10,7 @@ import {
   checkinsTable,
   calendarColorsTable,
   subscriptionsTable,
+  aiJobsTable,
 } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import {
@@ -166,6 +167,8 @@ const USER_OWNED_TABLES = [
   calendarColorsTable,
   programsTable,
   subscriptionsTable,
+  // Job rows carry the request payload - check-in answers included.
+  aiJobsTable,
   userProfilesTable,
 ] as const;
 

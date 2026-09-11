@@ -8,37 +8,11 @@ import {
   GenerateProgramBody,
 } from "@workspace/api-zod";
 import { requireAuth, getUserId } from "../lib/auth";
-import { getAnthropic } from "../lib/anthropic";
-import { generateProgramOutputSchema } from "../lib/programSchema";
-import { programGenerationKnowledge } from "../lib/knowledge";
-import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "../lib/programMonitoring";
-import { PHASE_TEMPLATES, INITIAL_PHASE_STATE, energyBalanceForPhase, type LongTermPhase } from "../lib/phaseTemplate";
-import { trainingWeekNumber } from "../lib/trainingWeek";
-import { defaultFixedSchedule } from "../lib/programSchedule";
+import { serializeProgram } from "../lib/serializers";
+import { prepareProgramGeneration } from "../lib/programGeneration";
+import { acceptAiJob, readAiJob } from "../lib/aiJobs";
 
 const router = Router();
-
-// `weekNumber` in the API response is always the live calendar week since
-// onboarding - not the stored column, which is just an insert-order ordinal
-// (used internally for "find the latest program" / check-in versioning).
-// `phaseSegmentIndex`/`weeksInPhaseSegment` themselves are server-internal
-// phase-template bookkeeping (see lib/phaseTemplate.ts) and never leave this
-// server as-is, but the "week N of M within this phase" framing they encode
-// is legitimate product info - `weekInPhase`/`phaseTotalWeeks` below expose
-// that derived value without leaking the raw segment index.
-function serializeProgram(p: typeof programsTable.$inferSelect, onboardingCompletedAt: Date | null | undefined) {
-  const { phaseSegmentIndex, weeksInPhaseSegment, ...rest } = p;
-  const template = p.longTermPhase ? PHASE_TEMPLATES[p.longTermPhase as LongTermPhase] : null;
-  const segment = template && phaseSegmentIndex != null ? template[phaseSegmentIndex] : null;
-  return {
-    ...rest,
-    weekNumber: trainingWeekNumber(onboardingCompletedAt),
-    weekInPhase: weeksInPhaseSegment,
-    phaseTotalWeeks: segment?.maxWeeks ?? null,
-    days: rest.days as object[],
-    generatedAt: p.generatedAt.toISOString(),
-  };
-}
 
 router.get("/programs/current", requireAuth, async (req, res) => {
   const userId = getUserId(req);
@@ -181,6 +155,9 @@ router.patch("/programs/:id", requireAuth, async (req, res) => {
   res.json(serializeProgram(program, profile?.onboardingCompletedAt));
 });
 
+// Blocking generation: holds the request open for the whole Claude call. Kept
+// for the web app. New clients (the native app especially) should use the job
+// endpoints below, which survive a dropped connection.
 router.post("/programs/generate", requireAuth, async (req, res) => {
   const userId = getUserId(req);
   const parsed = GenerateProgramBody.safeParse(req.body);
@@ -188,197 +165,44 @@ router.post("/programs/generate", requireAuth, async (req, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  // Validated (enum-constrained categories, string note) before it is
-  // interpolated into the LLM prompt below.
-  const feedback = parsed.data.feedback;
-
-  const profile = await db.query.userProfilesTable.findFirst({
-    where: eq(userProfilesTable.userId, userId),
-  });
-  if (!profile) {
-    res.status(400).json({ error: "Complete onboarding first" });
+  const prepared = await prepareProgramGeneration(userId, parsed.data);
+  if (!prepared.ok) {
+    res.status(prepared.status).json({ error: prepared.error });
     return;
   }
+  res.status(201).json(await prepared.run());
+});
 
-  const latestProgram = await db.query.programsTable.findFirst({
-    where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
-    orderBy: [desc(programsTable.weekNumber)],
-  });
-  const newWeekNumber = (latestProgram?.weekNumber ?? 0) + 1;
-
-  const hasFeedback = !!feedback && ((feedback.categories?.length ?? 0) > 0 || !!feedback.note);
-  const feedbackBlock = hasFeedback
-    ? `\n\nThe client reviewed a previously generated program and asked for changes before accepting it:
-- Categories to revisit: ${feedback!.categories?.length ? feedback!.categories.join(", ") : "unspecified"}
-- Additional notes: ${feedback!.note || "none"}
-
-Here is the program they are reacting to, for reference:
-${JSON.stringify(latestProgram?.days ?? [])}
-
-Generate a new version of the program that directly addresses this feedback, while still following all the rules above.`
-    : "";
-
-  // Static across every call for every user - persona, house training philosophy, and
-  // output format never change per-request, so this is the part worth prompt-caching.
-  const staticInstructions = `You are an expert strength and conditioning coach with deep knowledge of hypertrophy, powerlifting, and evidence-based training. You write structured, intelligent training programs tailored to the individual.
-
-Reference material - house training philosophy and program-generation rules to apply:
-${programGenerationKnowledge}
-
-Apply these rules:
-- Beginners: full body or upper/lower, compound-focused, lower volume
-- Intermediate: upper/lower or PPL, mix of compounds and isolation
-- Advanced: PPL or specialisation splits, higher volume, more intensity techniques
-- Always respect injuries - avoid or regress exercises that stress injured areas
-- Add extra sets to priority muscle groups (15–20% more volume)
-- Use progressive overload logic: rep ranges are designed to be beaten week over week
-- Recommend a concrete daily step count target (e.g. 6000-12000) per the activity-evaluation
-  guidance above - bump it for clients with low/moderate activity and a weight-loss or
-  general-fitness goal
-- Estimate the client's TDEE from their weight, sex, age, and activity level, then prescribe a
-  concrete daily calorie target (kcal) consistent with their goal: a deficit for weight loss, a
-  surplus for muscle gain, roughly maintenance otherwise. Use sound, conservative rate-of-change
-  assumptions (e.g. a 500 kcal/day deficit for a ~0.5 kg/week loss rate) rather than an aggressive number
-- Recommend a cardio heart-rate zone (bpm_min, bpm_max, and a low/moderate/high level) using
-  your own judgement of what's appropriate for this client's sex, weight, and experience level,
-  per the guidance above
-- Name the program in plain language after its split (e.g. "Push Pull Legs", "Upper/Lower
-  Split") - never append training-method jargon like "Hypertrophy" or "Strength" to the name,
-  and never pad it with redundant generic nouns like "Block", "Program", or "Plan"
-- Give every day an estimated_duration_minutes: how long that session honestly takes from
-  walking in to walking out, counting a warm-up, every working set, and the rest you
-  prescribed between them. The client sees this before deciding to train and their real
-  session length is measured against it, so an optimistic number gets found out. If the
-  arithmetic lands somewhere the client is unlikely to sustain, fix the session rather than
-  the estimate
-
-Also produce exactly 2 "program highlights" - short explanations of why the program looks
-the way it does. Do not write one highlight per input factor (split, priority muscle,
-injury, progression logic, etc all crammed into separate cards) - instead, group the
-relevant factors into 2 broader headlines that each weave together whichever concrete
-inputs from the profile above actually drove that part of the program (e.g. one headline
-covering the split choice + why it fits their training-days/experience/injuries, a second
-covering volume/progression choices + any priority-muscle bump). Do not write generic
-filler - each headline should still reference specific choices this program actually makes,
-just fewer, denser headlines instead of many thin ones.
-
-Return ONLY valid JSON (no markdown, no explanation) structured as:
-{ "program_name": "...", "split_type": "...",
-  "program_highlights": [ { "title": "...", "detail": "..." } ],
-  "days": [ { "day_number": 1, "label": "...", "focus": "...",
-    "estimated_duration_minutes": 55,
-    "exercises": [ { "name": "...", "sets": 4, "reps": "8-10",
-    "rest_seconds": 90, "cue": "...", "muscle": "..." } ] } ],
-  "daily_step_target": 8000,
-  "daily_calorie_target": 1900,
-  "cardio_intensity": { "bpm_min": 120, "bpm_max": 135, "level": "moderate" } }`;
-
-  const userPrompt = `User profile:
-- Goal: ${profile.goal}
-- Experience: ${profile.experience}
-- Training days per week: ${profile.trainingDays}
-- Preferred rest days: ${(profile.preferredRestDays as string[]).length ? (profile.preferredRestDays as string[]).join(", ") : "no preference"}
-- Equipment: ${(profile.equipment as string[]).join(", ")}
-- Age: ${profile.age ?? "not provided"}, Sex: ${profile.sex ?? "not provided"}, Weight: ${profile.weight ?? "not provided"} ${profile.weightUnit ?? "kg"}
-- Long-term goal weight: ${profile.goalWeight != null ? `${profile.goalWeight} ${profile.weightUnit ?? "kg"}` : "not provided"}
-- Daily activity level (outside training): ${profile.activityLevel ?? "not provided"}
-- Injuries/limitations: ${profile.injuries ?? "none"}${profile.injuries && profile.injurySeverity ? ` (severity: ${profile.injurySeverity} - ${
-    profile.injurySeverity === "high"
-      ? "avoid loading the affected area entirely, substitute unaffected-area work"
-      : profile.injurySeverity === "medium"
-        ? "avoid or modify movements that stress the affected area, reduce load/range where needed"
-        : "train around it normally, just avoid aggravating movements"
-  })` : ""}
-- Priority muscle groups: ${(profile.priorityMuscles as string[]).join(", ")}
-
-Generate a weekly training program with exactly ${profile.trainingDays} training days.
-For each day, provide 5–7 exercises. For each exercise provide:
-- Exercise name
-- Sets
-- Rep range (e.g. 8–10)
-- Rest time in seconds
-- One coaching cue (one sentence)
-- Primary muscle group${feedbackBlock}`;
-
-  const completion = await getAnthropic().messages.create({
-    model: "claude-opus-4-8",
-    max_tokens: 4000,
-    thinking: { type: "adaptive" },
-    system: [
-      { type: "text", text: staticInstructions, cache_control: { type: "ephemeral" } },
-    ],
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: generateProgramOutputSchema },
-    },
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const textBlock = completion.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Expected a text block in Claude's program-generation response");
+// Resumable generation (see lib/aiJobs.ts). Same validation and the same 400s
+// as the blocking endpoint, answered immediately. Past those, 202 { jobId }.
+router.post("/programs/generate/jobs", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const parsed = GenerateProgramBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
   }
-  const raw = JSON.parse(textBlock.text);
+  const prepared = await prepareProgramGeneration(userId, parsed.data);
+  if (!prepared.ok) {
+    res.status(prepared.status).json({ error: prepared.error });
+    return;
+  }
+  await acceptAiJob(res, {
+    userId,
+    kind: "program_generation",
+    requestPayload: parsed.data,
+    run: prepared.run,
+  });
+});
 
-  const days = raw.days.map((d: any) => ({
-    dayNumber: d.day_number,
-    label: d.label,
-    focus: d.focus,
-    estimatedDurationMinutes: d.estimated_duration_minutes ?? null,
-    exercises: d.exercises.map((e: any) => ({
-      name: e.name,
-      sets: e.sets,
-      reps: e.reps,
-      rpe: null,
-      restSeconds: e.rest_seconds,
-      cue: e.cue,
-      muscle: e.muscle,
-    })),
-  }));
-
-  const programHighlights = (raw.program_highlights ?? []).map((h: any) => ({
-    title: h.title,
-    detail: h.detail,
-  }));
-
-  // Every generation is a fresh start into the goal's hard phase template -
-  // this route only ever runs before a program has been accepted (see
-  // program.tsx/onboarding.tsx, both only call it while `!program`), so
-  // there's never prior phase state to carry forward.
-  const longTermPhase = longTermPhaseFor(profile.goal);
-  const template = PHASE_TEMPLATES[longTermPhase];
-  const initialPhase = template[INITIAL_PHASE_STATE.segmentIndex]!.phase;
-
-  const [program] = await db
-    .insert(programsTable)
-    .values({
-      userId,
-      weekNumber: newWeekNumber,
-      longTermPhase,
-      shortTermPhase: initialPhase,
-      energyBalance: energyBalanceForPhase(initialPhase),
-      trainingWorkload: trainingWorkloadFor(days),
-      longTermGoalWeight: profile.goalWeight,
-      shortTermGoalWeight: null,
-      dailyStepTarget: raw.daily_step_target,
-      dailyCalorieTarget: raw.daily_calorie_target,
-      cardioIntensity: cardioIntensityFrom(raw.cardio_intensity),
-      phaseSegmentIndex: INITIAL_PHASE_STATE.segmentIndex,
-      weeksInPhaseSegment: INITIAL_PHASE_STATE.weeksInSegment,
-      programName: raw.program_name,
-      splitType: raw.split_type,
-      programHighlights,
-      days,
-      // Derived here rather than asked of the model: the client stated which
-      // weekdays it wants to keep free, and honouring that exactly is arithmetic,
-      // not judgement. Always `fixed` - a rotating cycle drifts straight through
-      // the rest days they just picked.
-      schedule: defaultFixedSchedule(days, (profile.preferredRestDays as string[]) ?? []),
-      aiGenerated: true,
-    })
-    .returning();
-
-  res.status(201).json(serializeProgram(program, profile.onboardingCompletedAt));
+router.get("/programs/generate/jobs/:jobId", requireAuth, async (req, res) => {
+  const userId = getUserId(req);
+  const job = await readAiJob(userId, "program_generation", String(req.params["jobId"] ?? ""));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json(job);
 });
 
 export default router;
