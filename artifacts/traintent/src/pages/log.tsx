@@ -442,6 +442,10 @@ export default function Log() {
               weightUnit={weightUnit}
               showTargets={showTargets}
               showHelp={!isIndependent}
+              // AI mode's forward-looking targets. Gated on showTargets for the
+              // same reason the prescription is: a target is a comparison, and
+              // a first-ever session has nothing to compare against.
+              showProgressionTargets={!isIndependent && showTargets}
               prevSets={lastSetsByExercise[nameKey]}
               prevNote={lastNoteByExercise[nameKey]}
               // The tour's first two steps are about weights, reps and how to

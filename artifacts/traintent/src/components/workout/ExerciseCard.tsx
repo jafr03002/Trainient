@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, ChevronDown, HelpCircle } from "lucide-react";
 import type { LoggedExercise } from "@/lib/workoutSession";
 import { formatPrevSet, formatShortDate, type LastNote } from "@/lib/sessionLogs";
+import { targetFromPreviousSet } from "@/lib/trainingTargets";
 import { SetRow, type SetField } from "@/components/workout/SetRow";
 
 // Refs the log page's coachmark tour hangs off. Only the first lift card gets
@@ -21,6 +22,10 @@ type ExerciseCardProps = {
   // Independent mode hides the "how to perform" help - the program is the
   // user's own, not the coach's.
   showHelp: boolean;
+  // AI mode only: turn each "last time" hint into the target to beat. In
+  // Independent mode nobody asked the app to program for them, so the plain
+  // "last time" line stays.
+  showProgressionTargets: boolean;
   prevSets: any[] | undefined;
   prevNote: LastNote | undefined;
   tourRefs?: ExerciseCardTourRefs;
@@ -38,6 +43,7 @@ export function ExerciseCard({
   weightUnit,
   showTargets,
   showHelp,
+  showProgressionTargets,
   prevSets,
   prevNote,
   tourRefs,
@@ -115,7 +121,17 @@ export function ExerciseCard({
               setIdx={setIdx}
               isUnilateral={ex.isUnilateral}
               gridCols={gridCols}
+              weightUnit={weightUnit}
               prevStr={formatPrevSet(prevSets?.[setIdx], weightUnit, ex.isUnilateral)}
+              target={
+                showProgressionTargets
+                  ? targetFromPreviousSet(prevSets?.[setIdx], {
+                      name: ex.name,
+                      targetReps: ex.targetReps,
+                      weightUnit,
+                    })
+                  : null
+              }
               onChange={(field, value) => onUpdateSet(setIdx, field, value)}
             />
           ))}
