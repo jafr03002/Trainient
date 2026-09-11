@@ -31,7 +31,7 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, gridCols, weightUnit,
       <motion.div
         layout
         className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
-          set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
+          set.isNewPr ? "bg-chart-3/10 -mx-1 px-1" : set.completed ? "opacity-55" : ""
         }`}
         data-testid={`set-row-${exIdx}-${setIdx}`}
       >
@@ -39,19 +39,22 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, gridCols, weightUnit,
           <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
           {set.isNewPr && (
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
-              <Trophy className="w-3 h-3 text-amber-400" />
+              <Trophy className="w-3 h-3 text-chart-3" />
             </motion.div>
           )}
         </div>
         <input
           type="number"
+          // Decimal keypad rather than the full keyboard: 82.5 kg between sets
+          // has to be one-handed.
+          inputMode="decimal"
           min={LOGGED_SET_BOUNDS.weight.min}
           max={LOGGED_SET_BOUNDS.weight.max}
           value={set.weight || ""}
           onChange={(e) => onChange("weight", parseFloat(e.target.value) || 0)}
           placeholder="0"
           className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none transition-colors ${
-            set.isNewPr ? "border-amber-500/40 focus:border-amber-400" : "border-border focus:border-primary"
+            set.isNewPr ? "border-chart-3/40 focus:border-chart-3" : "border-border focus:border-primary"
           }`}
           data-testid={`input-weight-${exIdx}-${setIdx}`}
         />
@@ -59,6 +62,7 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, gridCols, weightUnit,
           <>
             <input
               type="number"
+              inputMode="numeric"
               min={LOGGED_SET_BOUNDS.reps.min}
               max={LOGGED_SET_BOUNDS.reps.max}
               value={set.repsLeft || ""}
@@ -69,6 +73,7 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, gridCols, weightUnit,
             />
             <input
               type="number"
+              inputMode="numeric"
               min={LOGGED_SET_BOUNDS.reps.min}
               max={LOGGED_SET_BOUNDS.reps.max}
               value={set.repsRight || ""}
@@ -81,6 +86,7 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, gridCols, weightUnit,
         ) : (
           <input
             type="number"
+            inputMode="numeric"
             min={LOGGED_SET_BOUNDS.reps.min}
             max={LOGGED_SET_BOUNDS.reps.max}
             value={set.reps || ""}

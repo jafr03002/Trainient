@@ -355,7 +355,7 @@ export default function Log() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 60, scale: 0.9 }}
               transition={{ duration: 0.3 }}
-              className="flex items-center gap-3 bg-amber-500/90 backdrop-blur-sm text-black font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
+              className="flex items-center gap-3 bg-chart-3/90 backdrop-blur-sm text-background font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
             >
               <Trophy className="w-4 h-4 shrink-0" />
               <div>
@@ -384,7 +384,7 @@ export default function Log() {
               </div>
             )}
             {resumedElsewhere && (
-              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
+              <p className="text-xs text-chart-3 bg-chart-3/10 border border-chart-3/20 rounded-lg px-3 py-2 mt-2 inline-block">
                 Resuming your in-progress session - finish it before starting a new one.
               </p>
             )}
@@ -394,7 +394,7 @@ export default function Log() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chart-3/10 border border-chart-3/20 text-chart-3 text-sm font-semibold font-display"
               >
                 <Trophy className="w-4 h-4" />
                 {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
@@ -402,7 +402,7 @@ export default function Log() {
             )}
             <button
               onClick={() => setShowCancelConfirm(true)}
-              className="text-xs text-muted-foreground hover:text-red-400 transition-colors px-2 py-1.5"
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1.5"
               data-testid="button-cancel-workout"
             >
               Cancel workout
@@ -485,7 +485,7 @@ export default function Log() {
         {createWorkout.isPending ? (
           <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
         ) : sessionPrCount > 0 ? (
-          <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+          <><Trophy className="w-5 h-5 text-chart-3" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
         ) : (
           "Finish workout"
         )}
@@ -512,7 +512,7 @@ export default function Log() {
         body="Everything you've logged in this session will be lost - it won't be saved."
         cancelLabel="Keep logging"
         confirmLabel="Discard workout"
-        confirmClassName="bg-red-500/90 text-white hover:bg-red-500"
+        confirmClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
         cancelTestId="button-keep-workout"
         confirmTestId="button-discard-workout"
         onCancel={() => setShowCancelConfirm(false)}
