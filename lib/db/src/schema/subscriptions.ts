@@ -9,6 +9,11 @@ export const subscriptionsTable = pgTable("subscriptions", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  // `created` time of the newest Stripe webhook event applied to this row.
+  // Stripe does not guarantee delivery order, so a late `invoice.payment_failed`
+  // must not undo the `customer.subscription.updated` (active) that followed a
+  // successful retry. Events older than this are ignored. Server-internal.
+  lastStripeEventAt: timestamp("last_stripe_event_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

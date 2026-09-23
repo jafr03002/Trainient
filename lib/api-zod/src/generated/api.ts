@@ -440,6 +440,122 @@ export const GenerateProgramBody = zod.object({
 
 
 /**
+ * Same input and the same 400s as POST /programs/generate, answered immediately. Otherwise returns 202 with a job id to poll. If the caller already has an unfinished generation job, that job's id is returned instead of starting a second one.
+
+ * @summary Start AI program generation as a background job
+ */
+export const startProgramGenerationJobBodyFeedbackNoteMax = 1000;
+
+
+
+export const StartProgramGenerationJobBody = zod.object({
+  "feedback": zod.object({
+  "categories": zod.array(zod.enum(['training_days', 'exercises', 'sets', 'split', 'order', 'session_length', 'equipment', 'priority_muscles', 'overall_volume'])),
+  "note": zod.string().max(startProgramGenerationJobBodyFeedbackNoteMax)
+}).optional()
+})
+
+
+/**
+ * @summary Poll a program generation job
+ */
+export const GetProgramGenerationJobParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const getProgramGenerationJobResponseResultOneDaysItemLabelMax = 60;
+
+export const getProgramGenerationJobResponseResultOneDaysItemFocusMax = 60;
+
+export const getProgramGenerationJobResponseResultOneDaysItemEstimatedDurationMinutesMax = 300;
+
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemNameMax = 80;
+
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemSetsMax = 50;
+
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemRepsMax = 50;
+
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemKindDefault = `lift`;
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetSecondsMin = 0;
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetValueMin = 0;
+export const getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetValueMax = 100000;
+
+export const getProgramGenerationJobResponseResultOneScheduleOneSlotsMin = 2;
+export const getProgramGenerationJobResponseResultOneScheduleOneSlotsMax = 14;
+
+
+
+export const GetProgramGenerationJobResponse = zod.object({
+  "jobId": zod.string(),
+  "status": zod.enum(['pending', 'running', 'succeeded', 'failed']),
+  "result": zod.union([zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "weekNumber": zod.number(),
+  "programName": zod.string(),
+  "splitType": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
+  "aiGenerated": zod.boolean(),
+  "days": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string().max(getProgramGenerationJobResponseResultOneDaysItemLabelMax),
+  "focus": zod.string().max(getProgramGenerationJobResponseResultOneDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(getProgramGenerationJobResponseResultOneDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
+  "exercises": zod.array(zod.object({
+  "name": zod.string().max(getProgramGenerationJobResponseResultOneDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(getProgramGenerationJobResponseResultOneDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(getProgramGenerationJobResponseResultOneDaysItemExercisesItemRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getProgramGenerationJobResponseResultOneDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetSecondsMin).max(getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetValueMin).max(getProgramGenerationJobResponseResultOneDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}))
+})),
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish(),
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(getProgramGenerationJobResponseResultOneScheduleOneSlotsMin).max(getProgramGenerationJobResponseResultOneScheduleOneSlotsMax)
+}),zod.null()]).optional()
+}),zod.null()]),
+  "error": zod.string().nullable().describe('User-facing message; set only when status is failed.'),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullable()
+})
+
+
+/**
  * @summary Update a manual (non-AI) program (add/edit days and exercises); AI-generated programs cannot be edited
  */
 export const updateProgramBodyProgramNameMax = 120;
@@ -1096,6 +1212,159 @@ export const GetCheckinAdherenceResponse = zod.object({
 
 
 /**
+ * Same input and the same 400s as POST /checkins, answered immediately. Otherwise returns 202 with a job id to poll. The check-in is recorded by the job, just before the AI call. If the caller already has an unfinished check-in job, that job's id is returned instead of recording a second check-in.
+
+ * @summary Submit a weekly check-in and run the AI adjustment as a background job
+ */
+export const startCheckinJobBodyEnergyMax = 5;
+
+export const startCheckinJobBodySleepMax = 5;
+
+export const startCheckinJobBodyHungerAppetiteMax = 5;
+
+
+
+export const StartCheckinJobBody = zod.object({
+  "energy": zod.number().min(1).max(startCheckinJobBodyEnergyMax),
+  "sleep": zod.number().min(1).max(startCheckinJobBodySleepMax),
+  "soreness": zod.string(),
+  "hungerAppetite": zod.number().min(1).max(startCheckinJobBodyHungerAppetiteMax),
+  "offDayDeviation": zod.boolean(),
+  "missedSessionReason": zod.union([zod.literal('forgot_to_log'),zod.literal('time'),zod.literal('fatigue'),zod.literal('injury'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "exerciseIssues": zod.string().nullish(),
+  "wentWell": zod.string().nullish(),
+  "didntGoWell": zod.string().nullish(),
+  "sleepDecline": zod.string().nullish(),
+  "digestionIssues": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+
+/**
+ * @summary Poll a check-in job
+ */
+export const GetCheckinJobParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemLabelMax = 60;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemFocusMax = 60;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemEstimatedDurationMinutesMax = 300;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemNameMax = 80;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemSetsMax = 50;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemRepsMax = 50;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemKindDefault = `lift`;
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetSecondsMin = 0;
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetValueMin = 0;
+export const getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetValueMax = 100000;
+
+export const getCheckinJobResponseResultOneUpdatedProgramScheduleOneSlotsMin = 2;
+export const getCheckinJobResponseResultOneUpdatedProgramScheduleOneSlotsMax = 14;
+
+
+
+export const GetCheckinJobResponse = zod.object({
+  "jobId": zod.string(),
+  "status": zod.enum(['pending', 'running', 'succeeded', 'failed']),
+  "result": zod.union([zod.object({
+  "checkin": zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "weekNumber": zod.number(),
+  "energy": zod.number(),
+  "sleep": zod.number(),
+  "soreness": zod.string(),
+  "completion": zod.string().nullish(),
+  "sessionsPlanned": zod.number().nullish(),
+  "sessionsLogged": zod.number().nullish(),
+  "missedSessionReason": zod.string().nullish(),
+  "ratingScaleMax": zod.number().nullish(),
+  "hungerAppetite": zod.number().nullish(),
+  "offDayDeviation": zod.boolean().nullish(),
+  "exerciseIssues": zod.string().nullish(),
+  "wentWell": zod.string().nullish(),
+  "didntGoWell": zod.string().nullish(),
+  "sleepDecline": zod.string().nullish(),
+  "digestionIssues": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "submittedAt": zod.string()
+}),
+  "aiMessage": zod.string(),
+  "updatedProgram": zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "weekNumber": zod.number(),
+  "programName": zod.string(),
+  "splitType": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
+  "aiGenerated": zod.boolean(),
+  "days": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string().max(getCheckinJobResponseResultOneUpdatedProgramDaysItemLabelMax),
+  "focus": zod.string().max(getCheckinJobResponseResultOneUpdatedProgramDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(getCheckinJobResponseResultOneUpdatedProgramDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
+  "exercises": zod.array(zod.object({
+  "name": zod.string().max(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetSecondsMin).max(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetValueMin).max(getCheckinJobResponseResultOneUpdatedProgramDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}))
+})),
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish(),
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(getCheckinJobResponseResultOneUpdatedProgramScheduleOneSlotsMin).max(getCheckinJobResponseResultOneUpdatedProgramScheduleOneSlotsMax)
+}),zod.null()]).optional()
+})
+}),zod.null()]),
+  "error": zod.string().nullable().describe('User-facing message; set only when status is failed.'),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullable()
+})
+
+
+/**
  * @summary Weekly total volume over time (for line chart)
  */
 export const GetVolumeProgressResponseItem = zod.object({
@@ -1369,6 +1638,8 @@ export const CreatePortalSessionResponse = zod.object({
 
 
 /**
+ * Called by Stripe, not by the app. Unauthenticated by Clerk: the request is instead verified against the `Stripe-Signature` header using STRIPE_WEBHOOK_SECRET, and refused (500) if that secret is not configured.
+
  * @summary Stripe webhook endpoint
  */
 export const StripeWebhookResponse = zod.object({

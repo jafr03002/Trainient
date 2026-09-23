@@ -7,6 +7,8 @@
  */
 
 export * from './adherenceDay';
+export * from './aiJobAccepted';
+export * from './aiJobStatus';
 export * from './bodyweightLog';
 export * from './bodyweightLogInput';
 export * from './bodyweightPoint';
@@ -15,6 +17,7 @@ export * from './calendarColorInput';
 export * from './checkin';
 export * from './checkinInput';
 export * from './checkinInputMissedSessionReason';
+export * from './checkinJob';
 export * from './checkinResult';
 export * from './checkoutInput';
 export * from './checkoutSession';
@@ -53,6 +56,7 @@ export * from './programDay';
 export * from './programEnergyBalance';
 export * from './programFeedback';
 export * from './programFeedbackCategoriesItem';
+export * from './programGenerationJob';
 export * from './programHighlight';
 export * from './programLongTermPhase';
 export * from './programSchedule';

@@ -10,23 +10,19 @@ so no CORS in play). Postgres is Neon; auth is Clerk.
 - Create a Neon project. From **Connection Details** copy two URLs:
   - **pooled** (host contains `-pooler`) — used at runtime as `DATABASE_URL`
   - **direct** (no `-pooler`) — used only to run migrations
-- Create the tables. **Nothing in the Vercel build does this** - the build only
-  compiles the API and the frontend, so if you skip this step the deploy will
-  succeed, `/api/healthz` will return 200, and every route that touches the
-  database will 500:
-  ```
-  DATABASE_URL="<direct url>" pnpm run db:push
-  ```
-  PowerShell has no inline env-var prefix, so there it is two statements (and
-  the variable must be cleared afterwards, or it will shadow your local
-  `.env` for the rest of the session):
+- Create the tables by running the migrations. **Nothing in the Vercel build
+  does this** - the build only compiles the API and the frontend, so if you skip
+  this step the deploy will succeed, `/api/healthz` will return 200, and every
+  route that touches the database will 500. See
+  [Changing the database schema](#changing-the-database-schema) below for the
+  command and the rules; the short version is:
   ```powershell
   $env:DATABASE_URL = "<direct url>"
-  pnpm run db:push
+  pnpm --filter @workspace/db run migrate
   Remove-Item Env:\DATABASE_URL
   ```
   Use the **direct** URL here, not the pooled one - schema changes over Neon's
-  pooled connection are unreliable. Re-run this command after any change to
+  pooled connection are unreliable. Re-run after any change to
   `lib/db/src/schema/` (again, deploying does not do it for you).
 
 ### 2. Clerk (auth)
@@ -99,6 +95,79 @@ never gets rewritten by a version Vercel cannot run.
   runtime logs. It re-exports that bundle so
   Vercel never has to resolve the pnpm workspace graph.
 - Non-`/api` routes fall back to `index.html` for client-side routing.
+- `vercel.json` sets `maxDuration: 300` for `api/index.ts`. That ceiling covers
+  the blocking AI endpoints (`POST /programs/generate`, `POST /checkins`) and,
+  more importantly, the async AI jobs: a job endpoint answers `202 { jobId }`
+  and then finishes the Claude call in the same invocation, held open past the
+  response by Vercel's `waitUntil` (see `artifacts/api-server/src/lib/aiJobs.ts`,
+  which explains the choice and the alternatives). A job still unfinished six
+  minutes after it was created is reported to the client as failed, so the
+  ceiling here and that timeout have to move together.
+
+## Changing the database schema
+
+The schema is versioned as **migrations** under `lib/db/migrations/`
+(`0000_baseline.sql` is the schema as it stood when the project moved off
+`drizzle-kit push`). A deployed app binary can be months older than the server,
+so migrations are additive: add columns and tables, don't rename or drop
+anything a released client still reads.
+
+The flow, from the repo root:
+
+1. Edit `lib/db/src/schema/`, and export any new table from
+   `lib/db/src/schema/index.ts` - the drizzle config reads the index, so a table
+   that isn't exported is invisible to both the app and the migration.
+2. Generate the migration (no database needed, but the config still insists on
+   `DATABASE_URL` being set to something):
+   ```powershell
+   $env:DATABASE_URL = "postgresql://traintent:traintent@localhost:5432/traintent"
+   pnpm --filter @workspace/db run generate
+   ```
+3. Read the generated SQL before committing it, and commit it with the schema
+   change.
+4. Apply it - locally, then to Neon with the **direct** URL:
+   ```powershell
+   $env:DATABASE_URL = "<direct url>"
+   pnpm --filter @workspace/db run migrate
+   Remove-Item Env:\DATABASE_URL
+   ```
+   Always clear the variable afterwards, or it shadows your local `.env` for the
+   rest of the session.
+
+`migrate` records each applied file in `drizzle.__drizzle_migrations`, so it is
+safe to re-run; a second run does nothing. An **existing** database (production,
+or any dev database originally built by `push`) needs no special baselining
+step: `0000_baseline.sql` is written entirely as `IF NOT EXISTS`, so on such a
+database it no-ops and simply records itself, and later migrations then apply
+normally. Never edit a migration that has been applied - drizzle hashes them.
+
+On Windows, `pnpm --filter … run <script>` can fail because the root
+`preinstall` guard needs `sh`. If it does, call drizzle-kit directly:
+
+```powershell
+cd lib/db
+node ..\..\node_modules\.pnpm\drizzle-kit@0.31.10\node_modules\drizzle-kit\bin.cjs migrate --config ./drizzle.config.ts
+```
+
+### `push` is no longer the deployment path
+`pnpm --filter @workspace/db run push` still exists, for throwaway local
+databases only. It diffs the schema against the live database rather than
+replaying history, so against a deployed database it will offer to drop
+anything not in the schema - including the two orphan tables described below.
+Two known landmines if you do use it: it needs a TTY when one table both drops
+and adds a column (`--force` does **not** skip that prompt - apply that shape as
+explicit DDL in psql instead), and it perpetually re-applies `SET DEFAULT '{}'`
+on the `user_profiles` array columns, which is a harmless idempotency quirk and
+not real drift.
+
+### Two orphan tables
+`conversations` and `messages` exist in `lib/db/src/schema/` but are not
+exported from its `index.ts`, and nothing in the app reads or writes them. The
+old drizzle config globbed the whole directory, so `push` created both tables in
+every database it built. The migration config points at the index instead, so
+they are **not** in the baseline and a newly migrated database does not get
+them; databases that already have them keep them, untouched and unused. If they
+are confirmed dead, drop them in their own migration.
 
 ## Local development
 - API: `pnpm --filter @workspace/api-server run dev` (needs `DATABASE_URL`,
