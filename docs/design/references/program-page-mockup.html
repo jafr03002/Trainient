@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Program Page Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #000;
+    --page: #0a0a0b;
+    --card: #161618;
+    --card-2: #1f1f22;
+    --card-3: #2a2a2e;
+    --line: rgba(255,255,255,.08);
+    --text: #f5f5f7;
+    --muted: #8e8e93;
+    --dim: #5c5c61;
+    --cyan: #5fe0f0;
+    --lilac: #c4a4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--page);
+    color: var(--text);
+    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 16px 80px;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  /* ---------- page chrome ---------- */
+  .intro { max-width: 1240px; margin: 0 auto 36px; }
+  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .intro h1 { font-weight: 300; font-size: clamp(30px, 5vw, 46px); letter-spacing: -.02em; margin-top: 8px; }
+  .intro p { color: var(--muted); max-width: 720px; margin-top: 12px; line-height: 1.6; font-size: 15px; }
+  .skeleton {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px;
+  }
+  .skeleton span {
+    font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--card); color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .skeleton b { color: var(--text); font-weight: 500; margin-right: 6px; }
+  .toggle { margin-top: 16px; font-size: 13px; color: var(--muted); display: inline-flex; gap: 8px; align-items: center; }
+
+  .grid {
+    max-width: 1240px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 36px 28px;
+  }
+  .option { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+  .opt-head { width: 100%; max-width: 390px; margin-bottom: 16px; min-height: 172px; }
+  .opt-head .tag { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); }
+  .opt-head h2 { font-weight: 300; font-size: 26px; letter-spacing: -.01em; margin-top: 4px; }
+  .opt-head p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin-top: 6px; }
+  .tradeoffs { width: 100%; max-width: 390px; margin-top: 18px; display: grid; gap: 8px; }
+  .tradeoffs div { font-size: 13px; line-height: 1.5; color: var(--muted); padding: 10px 14px; border-radius: 16px; background: var(--card); }
+  .tradeoffs b { color: var(--text); font-weight: 500; }
+
+  /* ---------- phone ---------- */
+  .phone {
+    width: 100%; max-width: 390px; height: 844px; border-radius: 56px; background: var(--bg);
+    border: 1px solid #2c2c2f; box-shadow: 0 0 0 6px #0f0f10, 0 40px 80px rgba(0,0,0,.6);
+    position: relative; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .status { height: 54px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 30px 0 36px; font-size: 15px; font-weight: 500; }
+  .status .island { position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 120px; height: 34px; background: #000; border-radius: 20px; border: 1px solid #111; }
+  .status svg { width: 62px; height: 12px; }
+  .screen { flex: 1; overflow-y: auto; padding: 8px 20px 40px; scrollbar-width: none; }
+  .screen::-webkit-scrollbar { display: none; }
+  .home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: #fff; }
+
+  .ic { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .ic.sm { width: 14px; height: 14px; }
+  .ic.fill { fill: currentColor; stroke: none; }
+
+  /* shared bits in the reference language */
+  .h-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .title { font-weight: 300; font-size: 36px; letter-spacing: -.025em; line-height: 1.08; min-width: 0; }
+  .sub { color: var(--muted); font-size: 13.5px; margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--card-2); color: var(--text); }
+  .badge.ai { color: var(--cyan); background: rgba(95,224,240,.1); }
+  .circle-btn { width: 50px; height: 50px; border-radius: 50%; background: var(--card-2); display: grid; place-items: center; flex-shrink: 0; transition: background .15s; }
+  .circle-btn:hover { background: var(--card-3); }
+  .section-title { font-weight: 300; font-size: 21px; letter-spacing: -.01em; margin: 26px 0 12px; }
+  .caps { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .notice { margin-top: 18px; display: flex; gap: 12px; padding: 14px 16px; border-radius: 22px; background: var(--card); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+  .notice a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* schedule strip = the reference's date picker */
+  .strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 12px; border-radius: 28px; background: var(--card); }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip-cell {
+    flex: 0 0 78px; min-width: 0; padding: 12px 4px 14px; border-radius: 999px; background: var(--card-2);
+    display: flex; flex-direction: column; align-items: center; gap: 10px; transition: background .15s, color .15s;
+  }
+  .strip-cell .wd { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .strip-cell .lb { font-size: 12.5px; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; }
+  .strip-cell.rest .lb { color: var(--dim); font-weight: 400; }
+  .strip-cell.on { background: #fff; color: #000; }
+  .strip-cell.on .wd { color: #555; }
+  .strip-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+
+  /* day tabs */
+  .tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 10px 18px; border-radius: 999px; background: var(--card); color: var(--muted); font-size: 14px; white-space: nowrap; transition: all .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.on { background: #fff; color: #000; font-weight: 500; }
+  .tab.outline { background: transparent; border: 1px solid var(--line); }
+  .tab.outline.on { background: #fff; border-color: #fff; }
+
+  /* numbered skeleton markers */
+  .mk { display: none; }
+  body.show-mk .mk {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--cyan); color: #000;
+    font-size: 10px; font-weight: 600; margin-right: 6px; vertical-align: middle; flex-shrink: 0;
+  }
+  body.show-mk .mk.abs { position: absolute; top: 10px; left: 10px; z-index: 5; margin: 0; }
+
+  /* ======== A: Sessions ======== */
+  .a-hero { position: relative; margin-top: 22px; border-radius: 30px; overflow: hidden; background: var(--card); }
+  .a-glass {
+    position: relative; height: 196px; padding: 18px 20px 20px; display: flex; flex-direction: column; justify-content: space-between;
+    background:
+      radial-gradient(90% 120% at 100% 100%, rgba(95,224,240,.55), transparent 60%),
+      radial-gradient(80% 90% at 55% 20%, rgba(210,220,225,.28), transparent 65%),
+      linear-gradient(135deg, #2b2d30 0%, #3c4347 40%, #3c7584 100%);
+    overflow: hidden;
+  }
+  .a-glass::after { content: ""; position: absolute; inset: 0; backdrop-filter: blur(0px); }
+  .a-watermark {
+    position: absolute; inset: -40px -60px; transform: rotate(-16deg); font-size: 15px; font-weight: 600; letter-spacing: .08em;
+    color: rgba(255,255,255,.07); line-height: 1.9; white-space: nowrap; pointer-events: none; text-transform: uppercase;
+  }
+  .a-top { position: relative; display: flex; justify-content: space-between; align-items: flex-start; z-index: 1; }
+  .a-icon { width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,.35); display: grid; place-items: center; color: var(--cyan); }
+  .a-icon .ic { width: 26px; height: 26px; }
+  .a-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: rgba(255,255,255,.85); }
+  .a-bottom { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .a-bottom h3 { font-weight: 400; font-size: 24px; letter-spacing: -.01em; margin-top: 4px; }
+  .a-bottom .d { font-size: 12px; color: rgba(255,255,255,.75); letter-spacing: .12em; text-transform: uppercase; }
+  .a-stats { display: flex; padding: 16px 20px; gap: 0; }
+  .a-stats > div { flex: 1; min-width: 0; }
+  .a-stats > div + div { border-left: 1px solid var(--line); padding-left: 16px; }
+  .a-stats .n { white-space: nowrap; font-weight: 300; font-size: 24px; letter-spacing: -.02em; display: flex; align-items: center; gap: 6px; }
+  .a-stats .n .ic { color: var(--muted); }
+  .a-cta {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 16px 20px; margin: 0 8px 8px;
+    border-radius: 24px; background: var(--card-2); width: calc(100% - 16px); text-align: left; transition: background .15s;
+  }
+  .a-cta:hover { background: var(--card-3); }
+  .a-cta .t { font-size: 14px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+  .a-cta .s { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .play { width: 52px; height: 52px; border-radius: 50%; background: #fff; color: #000; display: grid; place-items: center; flex-shrink: 0; }
+  .play .ic { width: 20px; height: 20px; margin-left: 3px; }
+
+  .a-list { display: grid; gap: 10px; }
+  .a-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 12px; border-radius: 26px; background: var(--card); min-width: 0; }
+  .a-num { width: 46px; height: 46px; border-radius: 50%; background: var(--card-2); display: grid; place-items: center; font-size: 15px; font-weight: 300; flex-shrink: 0; position: relative; }
+  .a-num i { position: absolute; right: 2px; bottom: 4px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--card); }
+  .a-row .main { flex: 1; min-width: 0; }
+  .a-row .nm { font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .a-row .mu { font-size: 12.5px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill { flex-shrink: 0; font-size: 12px; font-weight: 500; letter-spacing: .04em; padding: 8px 12px; border-radius: 999px; background: var(--card-2); white-space: nowrap; }
+
+
+  /* ---------- layout for this round ---------- */
+  .stage { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 390px) minmax(0, 1fr); gap: 40px; align-items: start; }
+  @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); } .stage .phone-col { justify-self: center; width: 100%; max-width: 390px; } }
+  .phone-col { position: sticky; top: 24px; min-width: 0; }
+  .phone-cap { font-size: 12px; color: var(--muted); margin-top: 14px; text-align: center; }
+  .phone-cap b { color: var(--text); font-weight: 500; }
+  .variants { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 22px; min-width: 0; align-items: start; }
+  .variant { min-width: 0; border-radius: 34px; background: var(--bg); border: 1px solid #1d1d20; padding: 22px 18px 20px; cursor: pointer; transition: border-color .15s; }
+  .variant:hover { border-color: #3a3a3f; }
+  .variant.picked { border-color: #fff; }
+  .v-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .v-head h3 { font-weight: 300; font-size: 21px; }
+  .v-head .tag { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; }
+  .v-note { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin-bottom: 16px; }
+  .day-switch { max-width: 1240px; margin: 0 auto 22px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .day-switch .caps { margin-right: 6px; }
+
+  .nm { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mu { font-size: 12.5px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grow { flex: 1; min-width: 0; }
+
+  /* R1 inset grouped */
+  .r1 { background: var(--card); border-radius: 26px; overflow: hidden; }
+  .r1 .row { display: flex; align-items: center; padding-left: 20px; }
+  .r1 .ckl { display: inline-flex; align-items: center; gap: 6px; }
+  .r1 .lead { width: 32px; height: 32px; border-radius: 50%; background: var(--card-2); display: grid; place-items: center; font-size: 13px; flex-shrink: 0; }
+  .r1 .body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 15px 20px 15px 0; border-bottom: 1px solid var(--line); }
+  .r1 .row:last-child .body { border-bottom: 0; }
+  .r1 .tr { color: var(--muted); font-size: 15px; white-space: nowrap; }
+
+  /* R2 set dots */
+  .r2 { display: grid; gap: 10px; }
+  .r2 .row { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 24px; background: var(--card); min-width: 0; }
+  .r2 .ix { font-size: 12px; color: var(--dim); margin-bottom: 4px; letter-spacing: .08em; }
+  .r2 .tr { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
+  .r2 .dots { display: flex; gap: 5px; }
+  .r2 .dots i { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+  .r2 .reps { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* R3 big index + split stats */
+  .r3 { display: grid; gap: 10px; }
+  .r3 .row { display: flex; align-items: center; gap: 14px; padding: 14px 16px 14px 18px; border-radius: 24px; background: var(--card); min-width: 0; }
+  .r3 .big { font-weight: 200; font-size: 30px; letter-spacing: -.03em; color: var(--dim); width: 38px; flex-shrink: 0; }
+  .r3 .big .ic { width: 22px; height: 22px; color: var(--cyan); }
+  .r3 .stats { display: flex; flex-shrink: 0; background: var(--card-2); border-radius: 16px; padding: 8px 0; }
+  .r3 .stats div { padding: 0 12px; text-align: center; }
+  .r3 .stats div + div { border-left: 1px solid var(--line); }
+  .r3 .stats b { display: block; font-weight: 400; font-size: 16px; white-space: nowrap; }
+  .r3 .stats span { font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+  /* R4 icon circle + muscle capsules */
+  .r4 { display: grid; gap: 10px; }
+  .r4 .row { display: flex; gap: 14px; padding: 14px 14px 14px 12px; border-radius: 26px; background: var(--card); min-width: 0; }
+  .r4 .icn { width: 46px; height: 46px; border-radius: 50%; background: var(--card-2); display: grid; place-items: center; flex-shrink: 0; }
+  .r4 .top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .r4 .caps-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .r4 .cap { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 4px 10px; border-radius: 999px; background: var(--card-2); color: #cfcfd4; }
+  .r4 .cap i { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* R5 timeline */
+  .r5 { position: relative; }
+  .r5 .row { display: flex; gap: 14px; min-width: 0; position: relative; padding-bottom: 20px; }
+  .r5 .row:last-child { padding-bottom: 0; }
+  .r5 .rail { width: 30px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
+  .r5 .node { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #3a3a3f; display: grid; place-items: center; font-size: 12px; background: var(--bg); position: relative; z-index: 1; }
+  .r5 .node.first { background: #fff; color: #000; border-color: #fff; }
+  .r5 .row:not(:last-child) .rail::after { content: ""; position: absolute; top: 30px; bottom: 0; left: 14.5px; width: 1px; background: #2c2c30; }
+  .r5 .content { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding-top: 4px; }
+  .r5 .tr { font-weight: 300; font-size: 17px; white-space: nowrap; }
+  /* ---------- decision ---------- */
+  .decide { max-width: 1240px; margin: 56px auto 0; padding: 28px; border-radius: 32px; background: var(--card); }
+  .decide h2 { font-weight: 300; font-size: 28px; }
+  .decide p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; margin-top: 18px; }
+  .choices label { display: flex; gap: 10px; align-items: center; padding: 14px 16px; border-radius: 20px; background: var(--card-2); cursor: pointer; font-size: 14px; }
+  .choices label:has(input:checked) { background: #fff; color: #000; }
+  .choices input { accent-color: #000; }
+  .decide textarea { width: 100%; margin-top: 12px; min-height: 80px; border-radius: 20px; background: var(--card-2); border: 1px solid var(--line); color: var(--text); padding: 14px 16px; font: inherit; font-size: 14px; resize: vertical; }
+  .decide .submit { margin-top: 14px; height: 50px; padding: 0 26px; border-radius: 999px; background: #fff; color: #000; font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .queued { margin-left: 12px; color: var(--cyan); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header class="intro">
+  <div class="eyebrow">Trainient · /program redesign · round 2</div>
+  <h1>Direction A, plus five exercise-row styles</h1>
+  <p>
+    You picked <b style="color:var(--text);font-weight:500">A · Sessions</b>. The section numbers are gone and the week strip
+    is removed for now. Below are five ways to draw the exercise rows. Click a style and the phone on the left shows it in
+    place. Every style also handles checklist items (like Band Pull-Aparts), which have a target instead of sets × reps.
+  </p>
+</header>
+
+<div class="day-switch" id="daySwitch"><span class="caps">Preview day</span></div>
+
+<div class="stage">
+  <div class="phone-col">
+    <div class="phone" id="phoneA"></div>
+    <div class="phone-cap">Showing row style <b id="capStyle">1 · Inset grouped</b></div>
+  </div>
+  <div class="variants" id="variants"></div>
+</div>
+
+<form class="decide" data-lavish-question="row-style" id="decide">
+  <h2>Which exercise row should A use?</h2>
+  <p>Pick one, or mix. For example: "3's split stats with 4's muscle capsules".</p>
+  <div class="choices" id="choices"></div>
+  <textarea name="notes" placeholder="Anything to change or combine? (optional)"></textarea>
+  <button class="submit" type="submit">Queue my choice</button><span class="queued" id="queued"></span>
+</form>
+
+<script>
+const I = {
+  dumbbell: '<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  rotate: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  check: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  layers: '<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24">${I[n]}</svg>`;
+const play = '<svg class="ic fill" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
+const status = `<div class="status"><span>9:41</span><div class="island"></div>
+  <svg viewBox="0 0 62 12" fill="#fff"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="6" width="3" height="6" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/>
+  <path d="M30 3.5a9 9 0 0 1 12 0l-1.4 1.5a7 7 0 0 0-9.2 0zM32.6 6.4a5 5 0 0 1 6.8 0L36 10z"/><rect x="46" y="1" width="14" height="10" rx="3" fill="none" stroke="#fff" stroke-opacity=".5"/><rect x="47.5" y="2.5" width="11" height="7" rx="1.6"/></svg></div>`;
+
+const MUSCLE = { Chest: '#ef4444', Back: '#3b82f6', Shoulders: '#f59e0b', Biceps: '#8b5cf6', Triceps: '#ec4899', Quads: '#10b981', Hamstrings: '#06b6d4', Glutes: '#f97316', Calves: '#84cc16', Core: '#6366f1' };
+const CHECK = { Mobility: '#5fe0f0', Core: '#6366f1' };
+const DAYS = [
+  { n: 1, label: 'Upper A', focus: 'Chest & Back', color: '#3b82f6', avg: '58 min', ex: [
+    { name: 'Barbell Bench Press', m: 'Chest', s2: 'Triceps', sets: 4, reps: '6-8' },
+    { name: 'Barbell Row', m: 'Back', sets: 4, reps: '8' },
+    { name: 'Incline Dumbbell Press', m: 'Chest', s2: 'Shoulders', sets: 3, reps: '10' },
+    { name: 'Band Pull-Aparts', ck: 'Mobility', target: '× 20' },
+    { name: 'Lat Pulldown', m: 'Back', s2: 'Biceps', sets: 3, reps: '10-12' },
+    { name: 'Cable Lateral Raise', m: 'Shoulders', sets: 3, reps: '15' },
+  ]},
+  { n: 2, label: 'Lower A', focus: 'Quads & Glutes', color: '#10b981', avg: '1h 04m', ex: [
+    { name: 'Back Squat', m: 'Quads', s2: 'Glutes', sets: 4, reps: '5' },
+    { name: 'Romanian Deadlift', m: 'Hamstrings', s2: 'Glutes', sets: 3, reps: '8' },
+    { name: 'Leg Press', m: 'Quads', sets: 3, reps: '12' },
+    { name: 'Walking Lunge', m: 'Glutes', s2: 'Quads', sets: 3, reps: '10' },
+    { name: 'Standing Calf Raise', m: 'Calves', sets: 4, reps: '12' },
+    { name: 'Hip Flexor Stretch', ck: 'Mobility', target: '2:00 × 2' },
+  ]},
+  { n: 3, label: 'Upper B', focus: 'Shoulders & Arms', color: '#f59e0b', avg: null, ex: [
+    { name: 'Overhead Press', m: 'Shoulders', s2: 'Triceps', sets: 4, reps: '6' },
+    { name: 'Chin-Up', m: 'Back', s2: 'Biceps', sets: 3, reps: '8' },
+    { name: 'Weighted Dip', m: 'Chest', s2: 'Triceps', sets: 3, reps: '10' },
+    { name: 'Hammer Curl', m: 'Biceps', sets: 3, reps: '12' },
+    { name: 'Rope Pushdown', m: 'Triceps', sets: 3, reps: '12' },
+  ]},
+  { n: 4, label: 'Lower B', focus: 'Hamstrings & Glutes', color: '#ef4444', avg: null, ex: [
+    { name: 'Conventional Deadlift', m: 'Hamstrings', s2: 'Back', sets: 3, reps: '4' },
+    { name: 'Barbell Hip Thrust', m: 'Glutes', sets: 4, reps: '8' },
+    { name: 'Seated Leg Curl', m: 'Hamstrings', sets: 3, reps: '12' },
+    { name: 'Bulgarian Split Squat', m: 'Quads', s2: 'Glutes', sets: 3, reps: '10' },
+    { name: 'Plank', ck: 'Core', target: '1:00 × 3' },
+  ]},
+];
+// next 7 days from today (Wed 23 Sep), 4-day weekly schedule
+const WEEK = [['Today', 0], ['Thu', 1], ['Fri', null], ['Sat', 2], ['Sun', 3], ['Mon', null], ['Tue', 0]];
+
+const state = { A: 0, B: 0, C: 0 };
+const lifts = d => d.ex.filter(e => !e.ck);
+const setsOf = d => lifts(d).reduce((s, e) => s + e.sets, 0);
+
+function header() {
+  return `<div class="h-row">
+      <div style="min-width:0"><div class="title">Hypertrophy Upper/Lower</div>
+        <div class="sub">Upper / Lower · Week 3 <span class="badge ai">AI Coach</span></div></div>
+      <button class="circle-btn" title="Edit program">${ic('pencil')}</button>
+    </div>
+    <div class="notice">${ic('info', 'sm')}<span>This is your AI Coach program, kept exactly as it was. You're in Independent mode, so workouts log against your own program. <a href="#">Switch mode in Settings</a></span></div>`;
+}
+
+function strip(opt, variant) {
+  const cells = WEEK.map(([wd, di], i) => {
+    const d = di == null ? null : DAYS[di];
+    const on = d && di === state[opt];
+    let style = '';
+    if (variant === 'C' && on) style = `style="--cell:${d.color};--cell-on:${['#f59e0b', '#84cc16'].includes(d.color) ? '#000' : '#fff'}"`;
+    return `<button class="strip-cell${d ? '' : ' rest'}${on ? ' on' : ''}" ${style} ${d ? `data-day="${di}"` : 'disabled'}>
+      <span class="wd">${wd}</span>
+      ${variant === 'C' ? `<span class="dot" style="background:${d ? d.color : 'var(--card-3)'}"></span>` : ''}
+      <span class="lb">${d ? d.label : 'Rest'}</span></button>`;
+  }).join('');
+  return `<div class="section-title">This week</div>
+    <div class="strip-meta caps">${ic('rotate', 'sm')} Every week</div>
+    <div class="strip ${variant === 'C' ? 'c-strip' : ''}">${cells}</div>`;
+}
+
+function tabs(opt, outline) {
+  return `<div class="section-title">Training days</div>
+    <div class="tabs">${DAYS.map((d, i) => `<button class="tab${outline ? ' outline' : ''}${i === state[opt] ? ' on' : ''}" data-day="${i}">${d.label}</button>`).join('')}</div>`;
+}
+
+
+// ---------- five exercise-row styles ----------
+const musc = e => `${e.m}${e.s2 ? ' · ' + e.s2 : ''}`;
+// Lifts are numbered, checklist items aren't (same rule as the real roster).
+function withIndex(d) { let n = 0; return d.ex.map(e => ({ e, n: e.ck ? null : ++n })); }
+
+const STYLES = [
+  { id: 1, name: 'Inset grouped', note: 'iOS Settings-style list: one card with hairline separators and sets × reps as quiet trailing text. No numbers. Checklist items mark themselves with a small check next to their category.',
+    render: d => `<div class="r1">${d.ex.map(e => `<div class="row">
+      <div class="body"><div class="grow"><div class="nm">${e.name}</div>
+      <div class="mu">${e.ck ? `<span class="ckl" style="color:${CHECK[e.ck]}">${ic('check', 'sm')}${e.ck}</span>` : musc(e)}</div></div>
+      <span class="tr">${e.ck ? e.target : e.sets + ' × ' + e.reps}</span></div></div>`).join('')}</div>` },
+
+  { id: 2, name: 'Set dots', note: 'Each exercise is its own card. The set count shows as white dots you can take in at a glance, with the rep range underneath. Volume is readable without doing any maths.',
+    render: d => `<div class="r2">${withIndex(d).map(({ e, n }) => `<div class="row">
+      <div class="grow"><div class="ix">${e.ck ? 'CHECKLIST' : String(n).padStart(2, '0')}</div><div class="nm">${e.name}</div><div class="mu">${e.ck || musc(e)}</div></div>
+      <div class="tr">${e.ck ? `<span style="color:${CHECK[e.ck]}">${ic('check', 'sm')}</span><span class="reps">${e.target}</span>`
+        : `<div class="dots">${'<i></i>'.repeat(e.sets)}</div><span class="reps">${e.reps} reps</span>`}</div></div>`).join('')}</div>` },
+
+  { id: 3, name: 'Split stats', note: "A large thin index on the left, like the reference's big numbers. Sets and reps sit in a small two-part stat block, so each has its own label.",
+    render: d => `<div class="r3">${withIndex(d).map(({ e, n }) => `<div class="row">
+      <span class="big">${e.ck ? ic('check') : String(n).padStart(2, '0')}</span>
+      <div class="grow"><div class="nm">${e.name}</div><div class="mu">${e.ck || musc(e)}</div></div>
+      <div class="stats">${e.ck ? `<div><b>${e.target}</b><span>Target</span></div>`
+        : `<div><b>${e.sets}</b><span>Sets</span></div><div><b>${e.reps}</b><span>Reps</span></div>`}</div></div>`).join('')}</div>` },
+
+  { id: 4, name: 'Muscle capsules', note: "Closest to the reference's Quick Session Ideas rows: a round icon, the name, and the sets × reps pill where \"ADD +\" sits. Muscles become small tags with colour dots.",
+    render: d => `<div class="r4">${withIndex(d).map(({ e }) => {
+      const c = e.ck ? CHECK[e.ck] : MUSCLE[e.m];
+      const caps = e.ck ? [[e.ck, c]] : [[e.m, MUSCLE[e.m]], ...(e.s2 ? [[e.s2, MUSCLE[e.s2]]] : [])];
+      return `<div class="row"><span class="icn" style="color:${c}">${ic(e.ck ? 'check' : 'dumbbell', 'sm')}</span>
+        <div class="grow"><div class="top"><div class="nm grow">${e.name}</div><span class="pill">${e.ck ? e.target : e.sets + ' × ' + e.reps}</span></div>
+        <div class="caps-row">${caps.map(([t, col]) => `<span class="cap"><i style="background:${col}"></i>${t}</span>`).join('')}</div></div></div>`;
+    }).join('')}</div>` },
+
+  { id: 5, name: 'Timeline', note: 'The session read as a sequence: numbered nodes on a thin rail, with the first one filled white to show where you start. No cards at all, just type on black.',
+    render: d => `<div class="r5">${withIndex(d).map(({ e, n }, i) => `<div class="row">
+      <div class="rail"><span class="node${i === 0 ? ' first' : ''}" style="${e.ck ? 'color:' + CHECK[e.ck] : ''}">${e.ck ? ic('check', 'sm') : n}</span></div>
+      <div class="content"><div class="grow"><div class="nm">${e.name}</div><div class="mu">${e.ck || musc(e)}</div></div>
+      <span class="tr">${e.ck ? e.target : e.sets + ' × ' + e.reps}</span></div></div>`).join('')}</div>` },
+];
+
+let picked = 1;
+let dayIx = 0;
+
+function renderA() {
+  const d = DAYS[dayIx];
+  const st = STYLES.find(s => s.id === picked);
+  document.getElementById('phoneA').innerHTML = status + `<div class="screen">${header()}
+    <div class="a-hero">
+      <div class="a-glass">
+        <div class="a-watermark">${Array(9).fill('Train with intent · '.repeat(6)).join('<br>')}</div>
+        <div class="a-top"><div class="a-icon">${ic('dumbbell')}</div><span class="a-chip">${ic('layers', 'sm')} ${lifts(d).length} exercises</span></div>
+        <div class="a-bottom"><div><div class="d">Day ${d.n}</div><h3>${d.focus}</h3></div></div>
+      </div>
+      <div class="a-stats">
+        <div><div class="n">${lifts(d).length}</div><div class="caps">Exercises</div></div>
+        <div><div class="n">${setsOf(d)}</div><div class="caps">Sets</div></div>
+        ${d.avg ? `<div><div class="n">${ic('clock', 'sm')}${d.avg}</div><div class="caps">Avg duration</div></div>` : ''}
+      </div>
+      <button class="a-cta"><div><div class="t">Start workout</div><div class="s">${d.label} · ${d.focus}</div></div><span class="play">${play}</span></button>
+    </div>
+    <div class="section-title">Training days</div>
+    <div class="tabs">${DAYS.map((x, i) => `<button class="tab${i === dayIx ? ' on' : ''}" data-day="${i}">${x.label}</button>`).join('')}</div>
+    <div class="section-title">Exercises</div>${st.render(d)}
+  </div><div class="home-ind"></div>`;
+  document.getElementById('capStyle').textContent = st.id + ' · ' + st.name;
+}
+
+function renderVariants() {
+  const d = DAYS[dayIx];
+  document.getElementById('variants').innerHTML = STYLES.map(s => `<div class="variant${s.id === picked ? ' picked' : ''}" data-style="${s.id}" data-lavish-action>
+    <div class="v-head"><h3>${s.name}</h3><span class="tag">Style ${s.id}</span></div>
+    <p class="v-note">${s.note}</p>${s.render(d)}</div>`).join('');
+}
+
+function renderSwitch() {
+  const el = document.getElementById('daySwitch');
+  el.innerHTML = '<span class="caps">Preview day</span>' + DAYS.map((x, i) => `<button class="tab${i === dayIx ? ' on' : ''}" data-day="${i}">${x.label}</button>`).join('');
+}
+
+function renderAll() { renderA(); renderVariants(); renderSwitch(); }
+
+document.getElementById('choices').innerHTML = STYLES.map(s =>
+  `<label><input type="radio" name="style" value="${s.id} – ${s.name}" ${s.id === picked ? 'checked' : ''}/> ${s.id} · ${s.name}</label>`).join('');
+
+document.addEventListener('click', e => {
+  const v = e.target.closest('[data-style]');
+  if (v) {
+    picked = +v.dataset.style;
+    const r = document.querySelector(`input[name=style][value^="${picked} "]`); if (r) r.checked = true;
+    renderA(); renderVariants(); return;
+  }
+  const b = e.target.closest('[data-day]');
+  if (b && (b.closest('#phoneA') || b.closest('#daySwitch'))) { dayIx = +b.dataset.day; renderAll(); }
+});
+document.getElementById('choices').addEventListener('change', e => {
+  picked = parseInt(e.target.value, 10); renderA(); renderVariants();
+});
+
+renderAll();
+
+document.getElementById('decide').addEventListener('submit', e => {
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+  const choice = fd.get('style'), notes = (fd.get('notes') || '').trim();
+  if (!choice) { document.getElementById('queued').textContent = 'Pick a style first'; return; }
+  window.lavish?.queuePrompt(`Use exercise row style ${choice} for direction A (Sessions).${notes ? ' Notes: ' + notes : ''}`,
+    { tag: 'choice', text: 'Row style: ' + choice, element: e.currentTarget, queueKey: 'row-style', data: { question: 'row-style', answer: choice, notes } });
+  document.getElementById('queued').textContent = 'Queued: ' + choice + '. Press "Send to Agent" to send.';
+});
+</script>
+</body>
+</html>

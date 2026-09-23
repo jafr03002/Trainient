@@ -227,6 +227,78 @@
   --chart-5: 330 85% 62%;
 }
 
+/* ---- Sessions: pure black, neutral greys, thin Inter, white-on-black
+   selection. Scoped to a wrapper so it can be rolled out page by page - see
+   TrainientAppDesign.md. Everything inside re-skins through the same semantic
+   tokens, so shadcn components and bg-card / text-muted-foreground just work. */
+.dark .theme-sessions {
+  --background: 0 0% 0%;
+  --foreground: 240 11% 96%;
+  --border: 240 4% 16%;
+
+  --card: 240 4% 9%;
+  --card-foreground: 240 11% 96%;
+  --card-border: 240 4% 16%;
+
+  --popover: 240 4% 9%;
+  --popover-foreground: 240 11% 96%;
+  --popover-border: 240 4% 16%;
+
+  /* The reference's primary action is white with black text, not a colour. */
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+
+  --secondary: 240 4% 13%;
+  --secondary-foreground: 240 11% 96%;
+
+  --muted: 240 4% 13%;
+  --muted-foreground: 240 2% 57%;
+
+  --accent: 240 4% 17%;
+  --accent-foreground: 240 11% 96%;
+
+  --input: 240 4% 18%;
+  --ring: 0 0% 100%;
+
+  /* The one accent: the teal of the hero glass and the AI badge. */
+  --sessions-cyan: 187 83% 66%;
+
+  --app-font-display: 'Inter', sans-serif;
+  --font-display: 'Inter', sans-serif;
+  --shadow-glow: none;
+}
+
+.theme-sessions h1,
+.theme-sessions h2,
+.theme-sessions h3,
+.theme-sessions h4 {
+  font-family: 'Inter', sans-serif;
+}
+
+/* The frosted grey-to-teal hero card ("Work Time" in the reference). */
+.sessions-glass {
+  background:
+    radial-gradient(90% 120% at 100% 100%, hsl(var(--sessions-cyan) / 0.55), transparent 60%),
+    radial-gradient(80% 90% at 55% 20%, rgb(210 220 225 / 0.28), transparent 65%),
+    linear-gradient(135deg, #2b2d30 0%, #3c4347 40%, #3c7584 100%);
+}
+
+/* Faint diagonal slogan behind the hero - texture, never read. */
+.sessions-watermark {
+  position: absolute;
+  inset: -40px -60px;
+  transform: rotate(-16deg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.9;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(255 255 255 / 0.07);
+  pointer-events: none;
+  user-select: none;
+}
+
 @layer base {
   * {
     @apply border-border;
