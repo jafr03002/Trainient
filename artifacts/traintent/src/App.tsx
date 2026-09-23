@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider, removeOldestQuery } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { hsl, voltageFonts, voltageRadius } from "@/theme/tokens";
 
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,25 +42,28 @@ if (!clerkPubKey) {
 }
 
 // Voltage palette (docs/design/voltage-style.md). Clerk's appearance variables
-// can't read CSS custom properties, so the token HSL values are inlined here —
-// keep them in sync with the `.dark` block in src/index.css.
+// can't read CSS custom properties, so they take literal values - from the same
+// token module that writes the CSS variables, so the two can't drift.
 const clerkAppearance = {
   cssLayerName: "clerk",
   options: {
     logoPlacement: "none" as const,
   },
   variables: {
-    colorPrimary: "hsl(212, 96%, 62%)",
-    colorForeground: "hsl(210, 40%, 98%)",
-    colorMutedForeground: "hsl(214, 22%, 64%)",
-    colorDanger: "hsl(0, 72%, 51%)",
-    colorBackground: "hsl(224, 42%, 7%)",
-    colorInput: "hsl(222, 32%, 18%)",
-    colorInputForeground: "hsl(210, 40%, 98%)",
-    colorNeutral: "hsl(222, 32%, 14%)",
-    fontFamily: "'Inter', sans-serif",
-    borderRadius: "0.75rem",
+    colorPrimary: hsl("primary"),
+    colorForeground: hsl("foreground"),
+    colorMutedForeground: hsl("muted-foreground"),
+    colorDanger: hsl("destructive"),
+    colorBackground: hsl("card"),
+    colorInput: hsl("input"),
+    colorInputForeground: hsl("foreground"),
+    colorNeutral: hsl("muted"),
+    fontFamily: voltageFonts.sans,
+    borderRadius: voltageRadius,
   },
+  // Clerk's own styles win the cascade over these classes, so any override
+  // that has to stick - widths above all: `.cl-cardBox` ships a fixed 25rem
+  // that overflows a phone - carries `!`.
   elements: {
     rootBox: "w-full min-w-0 flex justify-center",
     cardBox: "!bg-transparent !shadow-none !border-0 !w-full !min-w-0 !max-w-[400px] overflow-hidden",
@@ -101,6 +107,11 @@ function SignUpPage() {
   );
 }
 
+// A cache that outlives a user switch is a data leak, and the persisted copy
+// outlives far more than the in-memory one: it survives reloads, sign-outs
+// while the app is closed, and a different person signing in on the same
+// browser. So whose data it holds is recorded next to it, and on every Clerk
+// update it must match the signed-in user - or no user and no cache at all.
 function ClerkQueryClientCacheInvalidator() {
   const { addListener } = useClerk();
   const queryClient = useQueryClient();
@@ -109,12 +120,20 @@ function ClerkQueryClientCacheInvalidator() {
   useEffect(() => {
     const unsubscribe = addListener(({ user }) => {
       const userId = user?.id ?? null;
-      if (
+      const switchedUser =
         prevUserIdRef.current !== undefined &&
-        prevUserIdRef.current !== userId
-      ) {
+        prevUserIdRef.current !== userId;
+      // Covers the cold start, where there is no previous user in memory but
+      // the cache restored from storage may belong to someone else.
+      const owner = readCacheOwner();
+      const foreignCache = owner !== undefined && owner !== userId;
+      if (switchedUser || foreignCache) {
         queryClient.clear();
+        // clear() only empties memory; the persisted copy would otherwise sit
+        // on disk until the next throttled write, restorable by a reload.
+        void queryPersister.removeClient();
       }
+      writeCacheOwner(userId);
       prevUserIdRef.current = userId;
     });
     return unsubscribe;
@@ -145,11 +164,68 @@ function HomeRedirect() {
   );
 }
 
+// Last-known server state survives a reload: a cold start - or a gym basement
+// with no signal - renders the previous data straight away and refetches behind
+// it, instead of a spinner or a blank page.
+const QUERY_CACHE_KEY = "trainient-query-cache";
+const QUERY_CACHE_OWNER_KEY = "trainient-query-cache-owner";
+// A training week: long enough to open last week's program offline.
+const QUERY_CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 7;
+
+// Discards the persisted cache whenever lib/api-spec/openapi.yaml changes (see
+// vite.config.ts), so no page is handed data in a shape it no longer expects.
+declare const __QUERY_CACHE_BUSTER__: string;
+
+// localStorage can be missing or throw (privacy modes, blocked site data). The
+// app then just runs without persistence.
+function getStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+const storage = getStorage();
+
+// undefined = unknown (no storage): the owner check is skipped rather than
+// wiping the in-memory cache on every Clerk update.
+function readCacheOwner(): string | null | undefined {
+  try {
+    return storage ? storage.getItem(QUERY_CACHE_OWNER_KEY) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCacheOwner(userId: string | null) {
+  try {
+    if (userId) storage?.setItem(QUERY_CACHE_OWNER_KEY, userId);
+    else storage?.removeItem(QUERY_CACHE_OWNER_KEY);
+  } catch {
+    // Storage full or blocked - the owner check degrades to the in-memory one.
+  }
+}
+
+const queryPersister = createSyncStoragePersister({
+  storage,
+  key: QUERY_CACHE_KEY,
+  // Over quota: drop the oldest query and try again rather than persist nothing.
+  retry: removeOldestQuery,
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // At least maxAge, or restored queries are garbage-collected straight
+      // back out of the cache they were restored into.
+      gcTime: QUERY_CACHE_MAX_AGE,
+      // Every mount still refetches (TanStack's default, kept on purpose):
+      // pages rely on navigating to a screen to pick up what another screen
+      // changed, and persistence already removes the spinner - cached data
+      // renders immediately while the refetch runs behind it.
+      staleTime: 0,
     },
   },
 });
@@ -168,7 +244,10 @@ function App() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: queryPersister, maxAge: QUERY_CACHE_MAX_AGE, buster: __QUERY_CACHE_BUSTER__ }}
+      >
         <ClerkQueryClientCacheInvalidator />
         <ApiAuthWirer />
         <TooltipProvider>
@@ -215,7 +294,7 @@ function App() {
           </WouterRouter>
           <Toaster />
         </TooltipProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </ClerkProvider>
   );
 }
