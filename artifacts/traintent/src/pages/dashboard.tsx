@@ -3,7 +3,7 @@ import { useUser } from "@clerk/react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Check, Loader2 } from "lucide-react";
+import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetWorkoutStats,
@@ -12,6 +12,7 @@ import {
   useGetPersonalRecords,
   useGetProfile,
   useGetDailyLogsWeek,
+  useListWorkouts,
   useSubmitDailyCheckin,
   useGetGoalProgress,
   useListPrograms,
@@ -28,6 +29,9 @@ import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldS
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
+import { WeekStrip } from "@/components/dashboard/WeekStrip";
+import { greetingLine, nextSessionDay } from "@/lib/greetingLines";
+import { useTourSteps } from "@/hooks/useResolvedTourSteps";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
 import { toast } from "@/hooks/use-toast";
 
@@ -66,22 +70,6 @@ function daysSince(dateStr: string | null | undefined): number {
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-// Rotates daily rather than on every render/refresh, so it feels like a
-// deliberate rotation instead of random flicker.
-const START_WORKOUT_LINES = [
-  "Ready to start your workout?",
-  "Let's get moving.",
-  "Time to put in the work.",
-  "Your workout is waiting.",
-  "Show up. Get stronger.",
-];
-
-function startWorkoutLine(): string {
-  const start = new Date(new Date().getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
-  return START_WORKOUT_LINES[dayOfYear % START_WORKOUT_LINES.length];
-}
-
 const CARDIO_TYPES = ["Run", "Bike", "Row", "Swim", "Walk", "Other"];
 
 export default function Dashboard() {
@@ -93,19 +81,28 @@ export default function Dashboard() {
   const personalRecords = useGetPersonalRecords();
   const profileQuery = useGetProfile();
   const programsQuery = useListPrograms();
+  // Newest-first. The week strip paints the sessions actually logged this week,
+  // and the greeting reads the most recent one to know where the client is up to.
+  const workoutsQuery = useListWorkouts({ limit: 200 });
   const updateProfile = useUpdateProfile();
   const tourDailyCheckinRef = useRef<HTMLDivElement>(null);
   const tourStartWorkoutRef = useRef<HTMLButtonElement>(null);
   const tourBuildProgramRef = useRef<HTMLAnchorElement>(null);
   const tourProgressRef = useRef<HTMLDivElement>(null);
+  // The week strip's "Full month" link - the calendar nudge's target for when
+  // the nav no longer carries a Calendar tab.
+  const tourCalendarLinkRef = useRef<HTMLAnchorElement>(null);
   const programNavTarget = useNavTourTarget("/program");
   const calendarNavTarget = useNavTourTarget("/calendar");
+  const resolveTourSteps = useTourSteps();
+  // Whether the first-run tour is open, held here rather than read back off the
+  // profile: the seen flag is now written when the tour OPENS (see below), and
+  // a tour that disappeared the moment that write landed would never reach its
+  // second step.
+  const [dashboardTourState, setDashboardTourState] = useState<"idle" | "running" | "done">("idle");
 
   function finishDashboardTour() {
-    updateProfile.mutate(
-      { data: { dashboardTourSeenAt: new Date().toISOString() } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
-    );
+    setDashboardTourState("done");
   }
 
   // Skipping out of the calendar prompt retires the whole calendar leg - it's a
@@ -129,7 +126,21 @@ export default function Dashboard() {
   // push the whole tour back to after the user had already built a program.
   // Only the program query settling matters - the hero's tour target depends
   // on whether a program came back (see dashboardTourSteps).
-  const showDashboardTour = !!profile && !profile.dashboardTourSeenAt && !program.isLoading;
+  const tourReady = !!profile && !profile.dashboardTourSeenAt && !program.isLoading;
+  useEffect(() => {
+    if (!tourReady || dashboardTourState !== "idle") return;
+    setDashboardTourState("running");
+    // Marked seen as the tour OPENS, not as it finishes. It used to be written
+    // only when the client tapped Program on the final step, so leaving the
+    // dashboard any other way - the back button, another nav item, a reload -
+    // brought the whole tour back on the next visit.
+    updateProfile.mutate(
+      { data: { dashboardTourSeenAt: new Date().toISOString() } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() }) }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourReady, dashboardTourState]);
+  const showDashboardTour = dashboardTourState === "running";
   useNavTourClick("/program", showDashboardTour ? finishDashboardTour : null);
 
   // Second leg of the walkthrough, deliberately held back until the user has
@@ -140,9 +151,19 @@ export default function Dashboard() {
     !!profile &&
     !!profile.dashboardTourSeenAt &&
     !profile.calendarTourSeenAt &&
+    // The dashboard leg now marks itself seen as it opens, so this has to check
+    // the tour isn't still running - otherwise both would be on screen at once.
+    dashboardTourState !== "running" &&
     (stats.data?.totalLogged ?? 0) > 0;
+  // Prefer the real nav link; when Calendar isn't in the bar, hand the client
+  // the week strip's "Full month" link instead - same destination, and the step
+  // still ends with them tapping something real.
   const calendarPromptSteps: CoachmarkStep[] = [
-    { kind: "navClick", target: calendarNavTarget, text: "Your first session is in the books - open up your calendar." },
+    {
+      kind: "navClick",
+      target: calendarNavTarget.current ? calendarNavTarget : tourCalendarLinkRef,
+      text: "Your first session is in the books - open up your calendar.",
+    },
   ];
 
   const todayStr = todayDateString();
@@ -308,7 +329,12 @@ export default function Dashboard() {
 
   const recentPrCount = (personalRecords.data ?? []).filter((pr) => daysSince(pr.date) <= 7).length;
 
-  const nextDay = program.data?.days?.[0] as any;
+  // The session the client is up to: the one after whatever they last finished,
+  // not simply day one. Drives the greeting line and the CTA alike.
+  const nextDay = nextSessionDay(
+    (program.data?.days ?? []) as any[],
+    workoutsQuery.data?.[0]?.dayNumber,
+  ) as any;
 
   // The hero renders one of three things - Start workout, the build/generate
   // link, or nothing - so the second step points at whichever is actually
@@ -329,8 +355,17 @@ export default function Dashboard() {
     { target: tourDailyCheckinRef, text: "This is your daily check-in that you need to do every day." },
     ...(heroTourStep ? [heroTourStep] : []),
     { target: tourProgressRef, text: "And down here you can track your progress." },
+    // A clear end rather than the tour simply vanishing on the last tap: it
+    // says the dashboard leg is over and names what comes next, so the hand-off
+    // to the program page reads as the end of something.
+    {
+      kind: "center",
+      text: "That's your dashboard - check in daily, and your week fills itself in as you log. One last stop: your program.",
+    },
     { kind: "navClick", target: programNavTarget, text: "This is where you'll find your programs — tap it to continue." },
   ];
+  const resolvedDashboardSteps = resolveTourSteps("dashboard", dashboardTourSteps, showDashboardTour);
+  const resolvedCalendarSteps = resolveTourSteps("calendar", calendarPromptSteps, showCalendarPrompt);
 
   // No program has been generated yet (e.g. "Generate program later" during
   // onboarding) - daily targets don't exist yet, so today's check-in is
@@ -358,9 +393,9 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold text-foreground mt-1 font-display" data-testid="text-greeting">
               {profile?.name || user?.firstName || "Coach"}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">
+            <p className="text-muted-foreground text-sm mt-1" data-testid="text-greeting-line">
               {program.data && nextDay
-                ? startWorkoutLine()
+                ? greetingLine(nextDay.label)
                 : stats.data
                 ? `Week ${stats.data.currentWeek} of your program.`
                 : "Start logging your workouts here and get to work."}
@@ -399,11 +434,14 @@ export default function Dashboard() {
             <Link href="/program">
               <button
                 ref={tourStartWorkoutRef}
-                className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
+                className="h-11 px-5 max-w-full rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
                 data-testid="button-start-workout"
               >
-                Start workout
-                <ChevronRight className="w-4 h-4" />
+                {/* Named, so the button says which session it opens. A long
+                    day label is clipped rather than allowed to push the chevron
+                    off the card on a phone. */}
+                <span className="truncate">Start {nextDay.label}</span>
+                <ChevronRight className="w-4 h-4 shrink-0" />
               </button>
             </Link>
           ) : null}
@@ -427,6 +465,20 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* The week, directly under the greeting: what has been trained, what is
+          still to come, and every daily number behind a tap. */}
+      <WeekStrip
+        program={program.data}
+        weekLogs={weekLogs.data}
+        workouts={workoutsQuery.data ?? []}
+        weekStartStr={weekStartStr}
+        todayStr={todayStr}
+        weightUnit={weightUnit}
+        isIndependent={isIndependent}
+        isLoading={weekLogs.isLoading || program.isLoading}
+        calendarLinkRef={tourCalendarLinkRef}
+      />
+
       {/* Check-in banner - AI mode only, after day 6 */}
       {showCheckinBanner && (
         <motion.div
@@ -448,77 +500,6 @@ export default function Dashboard() {
           </Link>
         </motion.div>
       )}
-
-      {/* Weekly table */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
-        className="p-5 rounded-xl bg-card border border-border"
-        data-testid="card-week-table"
-      >
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">This week</h2>
-        {weekLogs.isLoading ? (
-          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
-        ) : (
-          <div className="overflow-x-auto -mx-1">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                  <th className="text-left font-semibold py-2 pl-1">Day</th>
-                  <th className="text-right font-semibold py-2">Calories</th>
-                  <th className="text-right font-semibold py-2">Steps</th>
-                  <th className="text-center font-semibold py-2">Cardio</th>
-                  {!isIndependent && <th className="text-right font-semibold py-2 pr-1">Phase</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {weekLogs.data?.days.map((day) => {
-                  const isToday = day.date === todayStr;
-                  const parsed = parseLocalDateString(day.date);
-                  const shortTermPhase = weekLogs.data!.shortTermPhase;
-                  return (
-                    <tr
-                      key={day.date}
-                      className={`border-b border-border/50 last:border-0 ${isToday ? "bg-primary/5" : ""}`}
-                      data-testid={`week-row-${day.date}`}
-                    >
-                      <td className={`py-2 pl-1 font-medium ${isToday ? "text-primary" : "text-foreground"}`}>
-                        {format(parsed, "EEE d")}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {day.calories != null ? day.calories.toLocaleString() : <span className="text-muted-foreground">-</span>}
-                      </td>
-                      <td className="py-2 text-right tabular-nums">
-                        {day.steps != null ? day.steps.toLocaleString() : <span className="text-muted-foreground">-</span>}
-                      </td>
-                      <td className="py-2 text-center">
-                        {day.cardioType ? (
-                          <Check className="w-3.5 h-3.5 inline text-chart-2" />
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      {!isIndependent && (
-                        <td className="py-2 pr-1 text-right">
-                          {shortTermPhase && (
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap capitalize"
-                              style={{ background: phaseSoft(shortTermPhase), color: phaseSolid(shortTermPhase) }}
-                            >
-                              {shortTermPhase.replace(/_/g, " ")}
-                            </span>
-                          )}
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
 
       {/* This week narrative */}
       {!isIndependent && program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.dailyCalorieTarget != null || program.data?.dailyStepTarget != null) && (
@@ -598,6 +579,8 @@ export default function Dashboard() {
               <input
                 type="number"
                 step="0.1"
+                // Decimal keypad on a phone: bodyweight is 82.5, not 82.
+                inputMode="decimal"
                 value={weightInput}
                 onChange={(e) => setWeightInput(e.target.value)}
                 placeholder="0.0"
@@ -615,6 +598,7 @@ export default function Dashboard() {
             }`}>
               <input
                 type="number"
+                inputMode="numeric"
                 value={caloriesInput}
                 onChange={(e) => setCaloriesInput(e.target.value)}
                 placeholder="0"
@@ -632,6 +616,7 @@ export default function Dashboard() {
             }`}>
               <input
                 type="number"
+                inputMode="numeric"
                 value={stepsInput}
                 onChange={(e) => setStepsInput(e.target.value)}
                 placeholder="0"
@@ -660,6 +645,7 @@ export default function Dashboard() {
               </select>
               <input
                 type="number"
+                inputMode="numeric"
                 value={cardioMinutesInput}
                 onChange={(e) => setCardioMinutesInput(e.target.value)}
                 placeholder="min"
@@ -707,7 +693,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-end justify-between mb-3">
               <div>
-                <div className="text-3xl font-bold text-foreground">
+                <div className="text-3xl font-bold text-foreground font-display tabular-nums">
                   {goal.currentTrendWeight.toFixed(1)}
                   <span className="text-base font-medium text-muted-foreground"> {weightUnit}</span>
                 </div>
@@ -717,7 +703,7 @@ export default function Dashboard() {
               </div>
               {goal.goalWeight != null && kgToGo != null && (
                 <div className="text-right">
-                  <div className="text-lg font-bold text-chart-2">
+                  <div className="text-lg font-bold text-chart-2 font-display tabular-nums">
                     {kgToGo.toFixed(1)} {weightUnit} to go
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">goal {goal.goalWeight} {weightUnit}</div>
@@ -747,17 +733,19 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {showDashboardTour && (
+      {/* Steps whose target isn't on the page (a nav tab that no longer exists)
+          are dropped rather than left pointing at nothing - see useTourSteps. */}
+      {resolvedDashboardSteps.length > 0 && (
         <CoachmarkTour
-          steps={dashboardTourSteps}
+          steps={resolvedDashboardSteps}
           onDone={finishDashboardTour}
           testIdPrefix="dashboard-tour"
           intro={{ text: "We're starting a quick tour to show you how the app works." }}
         />
       )}
 
-      {showCalendarPrompt && (
-        <CoachmarkTour steps={calendarPromptSteps} onDone={skipCalendarLeg} testIdPrefix="calendar-prompt" />
+      {resolvedCalendarSteps.length > 0 && (
+        <CoachmarkTour steps={resolvedCalendarSteps} onDone={skipCalendarLeg} testIdPrefix="calendar-prompt" />
       )}
     </div>
   );

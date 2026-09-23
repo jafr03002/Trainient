@@ -14,7 +14,10 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Top of the screen on a phone, clear of the notch / status bar. From sm
+      // it moves to the bottom, where the mobile tab bar (and the home
+      // indicator under it) is still showing until md.
+      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:bottom-[calc(4rem+env(safe-area-inset-bottom))] sm:right-0 sm:top-auto sm:flex-col sm:pt-4 md:bottom-0 md:max-w-[420px]",
       className
     )}
     {...props}

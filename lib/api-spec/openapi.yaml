@@ -7,6 +7,14 @@ info:
 servers:
   - url: /api
     description: Base API path
+# Every route requires a signed-in Clerk user unless it overrides this with
+# `security: []` (only /healthz and the Stripe webhook do). Either scheme works:
+# the web app rides Clerk's same-origin session cookie, and a native client
+# sends the session token as a Bearer header (see custom-fetch.ts's
+# setAuthTokenGetter). A request with neither gets 401 { error: "Unauthorized" }.
+security:
+  - clerkBearer: []
+  - clerkSessionCookie: []
 tags:
   - name: health
     description: Health operations
@@ -33,6 +41,7 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
+      security: []
       responses:
         "200":
           description: Healthy
@@ -178,6 +187,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Program"
+
+  # Resumable variant of POST /programs/generate for clients that can't hold a
+  # request open for a minute (the native app): 202 straight away, then poll.
+  /programs/generate/jobs:
+    post:
+      operationId: startProgramGenerationJob
+      tags: [programs]
+      summary: Start AI program generation as a background job
+      description: >
+        Same input and the same 400s as POST /programs/generate, answered
+        immediately. Otherwise returns 202 with a job id to poll. If the caller
+        already has an unfinished generation job, that job's id is returned
+        instead of starting a second one.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateProgramInput"
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiJobAccepted"
+        "400":
+          description: Invalid input, or onboarding not complete
+
+  /programs/generate/jobs/{jobId}:
+    get:
+      operationId: getProgramGenerationJob
+      tags: [programs]
+      summary: Poll a program generation job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job state; `result` is the generated Program once status is succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramGenerationJob"
+        "404":
+          description: No such job for this user
 
   /programs/:id:
     put:
@@ -410,6 +467,55 @@ paths:
                 $ref: "#/components/schemas/SessionAdherence"
         "404":
           description: No AI-generated program to measure against
+
+  # Resumable variant of POST /checkins - see /programs/generate/jobs.
+  /checkins/jobs:
+    post:
+      operationId: startCheckinJob
+      tags: [checkins]
+      summary: Submit a weekly check-in and run the AI adjustment as a background job
+      description: >
+        Same input and the same 400s as POST /checkins, answered immediately.
+        Otherwise returns 202 with a job id to poll. The check-in is recorded by
+        the job, just before the AI call. If the caller already has an
+        unfinished check-in job, that job's id is returned instead of recording
+        a second check-in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckinInput"
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiJobAccepted"
+        "400":
+          description: Invalid input, or no AI program to adjust
+
+  /checkins/jobs/{jobId}:
+    get:
+      operationId: getCheckinJob
+      tags: [checkins]
+      summary: Poll a check-in job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job state; `result` is the CheckinResult once status is succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinJob"
+        "404":
+          description: No such job for this user
 
   # ── Progress ──────────────────────────────────────────────────────────────────
   /progress/volume:
@@ -685,6 +791,11 @@ paths:
       operationId: stripeWebhook
       tags: [subscriptions]
       summary: Stripe webhook endpoint
+      description: >
+        Called by Stripe, not by the app. Unauthenticated by Clerk: the request
+        is instead verified against the `Stripe-Signature` header using
+        STRIPE_WEBHOOK_SECRET, and refused (500) if that secret is not configured.
+      security: []
       responses:
         "200":
           description: OK
@@ -694,6 +805,28 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 
 components:
+  securitySchemes:
+    clerkBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Clerk session token (what a native client sends).
+    clerkSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: Clerk's same-origin session cookie (what the web app sends).
+
+  # ⚠ UNKNOWN FIELDS ARE SILENTLY DROPPED. Orval turns every schema below into a
+  # plain zod.object() - no .strict(), no .passthrough() - and zod's default is
+  # to strip keys it doesn't know. Routes safeParse the body and then spread
+  # `...parsed.data` into the insert (e.g. workouts.ts, checkinSubmission.ts),
+  # so a field a client sends that is missing here never reaches the database:
+  # no 400, no log line, the column just stays null. Nested objects strip too:
+  # a new per-set field in WorkoutLogInput.exercisesLogged[].sets[] vanishes
+  # from the JSONB the same way (LoggedExercise.notes was lost like this).
+  # Adding a field to a request means adding it HERE first and re-running
+  # codegen, in the same change as the client that sends it.
   schemas:
     HealthStatus:
       type: object
@@ -1170,6 +1303,48 @@ components:
         aiMessage:      { type: string }
         updatedProgram:
           $ref: "#/components/schemas/Program"
+
+    # ── Async AI jobs ────────────────────────────────────────────────────────
+    # Poll every few seconds until status is succeeded or failed. A job left
+    # unfinished past the server's time limit is reported as failed, so polling
+    # always ends. `result` is exactly what the blocking endpoint returns.
+    AiJobAccepted:
+      type: object
+      required: [jobId]
+      properties:
+        jobId: { type: string }
+
+    AiJobStatus:
+      type: string
+      enum: [pending, running, succeeded, failed]
+
+    ProgramGenerationJob:
+      type: object
+      required: [jobId, status, result, error, createdAt, completedAt]
+      properties:
+        jobId:       { type: string }
+        status:      { $ref: "#/components/schemas/AiJobStatus" }
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/Program"
+            - type: "null"
+        error:       { type: ["string", "null"], description: "User-facing message; set only when status is failed." }
+        createdAt:   { type: string }
+        completedAt: { type: ["string", "null"] }
+
+    CheckinJob:
+      type: object
+      required: [jobId, status, result, error, createdAt, completedAt]
+      properties:
+        jobId:       { type: string }
+        status:      { $ref: "#/components/schemas/AiJobStatus" }
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/CheckinResult"
+            - type: "null"
+        error:       { type: ["string", "null"], description: "User-facing message; set only when status is failed." }
+        createdAt:   { type: string }
+        completedAt: { type: ["string", "null"] }
 
     # ── Progress ──────────────────────────────────────────────────────────────
     VolumePoint:

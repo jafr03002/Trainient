@@ -6,3 +6,4 @@ export * from "./subscriptions";
 export * from "./calendarColors";
 export * from "./bodyweightLogs";
 export * from "./dailyLogs";
+export * from "./aiJobs";

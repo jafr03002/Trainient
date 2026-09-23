@@ -2,7 +2,15 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- viewport-fit=cover lets the app draw under the notch and home indicator;
+         the shell pads itself with env(safe-area-inset-*). No maximum-scale:
+         pinch-zoom must keep working. The theme-color meta and manifest link
+         are injected at build from src/theme/tokens.ts (vite.config.ts). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Trainient" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>Trainient | Train With Intent</title>
     <meta name="description" content="Trainient - train with intent. AI coaching and manual training tools for serious lifters." />
     <meta name="robots" content="index, follow" />
@@ -13,6 +21,7 @@
     <meta name="twitter:title" content="Trainient" />
     <meta name="twitter:description" content="Trainient - train with intent. AI coaching and manual training tools for serious lifters." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">

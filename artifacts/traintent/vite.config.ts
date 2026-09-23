@@ -1,7 +1,35 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "path";
+import { hex, voltageCss } from "./src/theme/tokens";
+
+// Writes the Voltage tokens (src/theme/tokens.ts) into src/index.css at the
+// marker, so the CSS custom properties and every other consumer of the palette
+// read one source. Runs before Tailwind (both are `pre`; array order decides),
+// which then sees ordinary hand-written-looking CSS. Editing tokens.ts restarts
+// the dev server, since it is imported by this config.
+const TOKENS_MARKER = "/* @voltage-tokens */";
+function voltageTokens(): Plugin {
+  return {
+    name: "traintent:voltage-tokens",
+    enforce: "pre",
+    transform(code, id) {
+      if (!id.split("?")[0].endsWith("/src/index.css")) return;
+      if (!code.includes(TOKENS_MARKER)) {
+        // Fail loudly: without the tokens every colour in the app is unset.
+        this.error(`src/index.css lost its ${TOKENS_MARKER} marker - the Voltage tokens have nowhere to go.`);
+      }
+      return { code: code.replace(TOKENS_MARKER, voltageCss()), map: null };
+    },
+    transformIndexHtml() {
+      return [{ tag: "meta", attrs: { name: "theme-color", content: hex("background") }, injectTo: "head" }];
+    },
+  };
+}
 
 export default defineConfig(({ command, mode }) => {
   // The dev-only settings below are read with an empty prefix so they come from
@@ -66,9 +94,95 @@ export default defineConfig(({ command, mode }) => {
     }
   }
 
+  // The react-query cache is persisted to localStorage (src/App.tsx). Restoring
+  // a cache written against an older API contract could hand a page data in a
+  // shape it no longer expects, so the persisted cache is keyed to the contract
+  // itself: it's discarded exactly when openapi.yaml changes, and survives
+  // every other deploy - including the one that updates the service worker the
+  // night before a session in a gym with no signal.
+  const apiSpec = readFileSync(path.resolve(import.meta.dirname, "..", "..", "lib", "api-spec", "openapi.yaml"));
+  const queryCacheBuster = createHash("sha256").update(apiSpec).digest("hex").slice(0, 12);
+
+  const apiProxy = {
+    "/api": {
+      target: apiProxyTarget,
+      changeOrigin: true,
+    },
+  };
+
   return {
     base: basePath,
-    plugins: [react(), tailwindcss()],
+    define: {
+      __QUERY_CACHE_BUSTER__: JSON.stringify(queryCacheBuster),
+    },
+    plugins: [
+      voltageTokens(),
+      react(),
+      tailwindcss(),
+      VitePWA({
+        // Installs the new service worker as soon as it's downloaded, but the
+        // plain registration script never reloads the page - an update lands on
+        // the next launch, not mid-set.
+        registerType: "autoUpdate",
+        injectRegister: "script-defer",
+        includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+        manifest: {
+          id: basePath,
+          name: "Trainient",
+          short_name: "Trainient",
+          description: "Trainient - train with intent. AI coaching and manual training tools for serious lifters.",
+          start_url: basePath,
+          scope: basePath,
+          display: "standalone",
+          theme_color: hex("background"),
+          background_color: hex("background"),
+          icons: [
+            { src: "pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: "pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+            { src: "pwa-maskable-192x192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+            { src: "pwa-maskable-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          ],
+        },
+        workbox: {
+          // The app shell: every built asset, so a cold start with no network
+          // still renders. API responses are deliberately NOT cached here - the
+          // react-query persister owns last-known data, and it is wiped when the
+          // signed-in user changes; a service-worker cache would not be.
+          globPatterns: ["**/*.{js,css,html,svg,png,webmanifest,woff2}"],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          navigateFallback: `${basePath}index.html`,
+          navigateFallbackDenylist: [/^\/api\//],
+          cleanupOutdatedCaches: true,
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.origin === "https://fonts.googleapis.com",
+              handler: "StaleWhileRevalidate",
+              options: { cacheName: "google-fonts-css" },
+            },
+            {
+              urlPattern: ({ url }) => url.origin === "https://fonts.gstatic.com",
+              handler: "CacheFirst",
+              options: {
+                cacheName: "google-fonts",
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              // Clerk's browser bundle, loaded from Clerk's CDN at startup. Public
+              // code only - Clerk's session API (/v1/*) is never cached.
+              urlPattern: ({ url }) => url.pathname.includes("/npm/@clerk/") && url.pathname.endsWith(".js"),
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "clerk-js",
+                expiration: { maxEntries: 40 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+          ],
+        },
+      }),
+    ],
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "src"),
@@ -92,17 +206,16 @@ export default defineConfig(({ command, mode }) => {
       // Local dev only: forward API calls to the Express server running
       // separately. In deployment the API is served from the same origin, so no
       // proxying is involved.
-      proxy: {
-        "/api": {
-          target: apiProxyTarget,
-          changeOrigin: true,
-        },
-      },
+      proxy: apiProxy,
     },
+    // Same proxy for `vite preview`, the only local way to run the production
+    // build - and with it the service worker, which the dev server never serves.
     preview: {
       port,
+      strictPort: true,
       host: "0.0.0.0",
       allowedHosts: true,
+      proxy: apiProxy,
     },
   };
 });

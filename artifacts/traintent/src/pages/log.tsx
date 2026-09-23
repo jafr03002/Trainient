@@ -1,174 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, MessageSquare, ChevronDown, HelpCircle, Dumbbell, Check, Clock } from "lucide-react";
+import { Loader2, Trophy, Dumbbell, Clock } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
-import {
-  CHECKLIST_ACCENT,
-  categoryMeta,
-  describeTarget,
-  parseCategory,
-  type ChecklistCategory,
-} from "@/lib/checklistItems";
-import { ChecklistLogCard } from "@/components/ChecklistLogCard";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import { formatClock } from "@/lib/sessionDuration";
-import {
-  type LoggedExercise,
-  type ActiveSessionPointer,
-  draftKey,
-  saveDraft,
-  clearDraft,
-  saveActiveSession,
-  clearActiveSession,
-  resolveActiveSession,
-  startSession,
-} from "@/lib/workoutSession";
+import type { LoggedExercise } from "@/lib/workoutSession";
+import { buildLastSessionLookup } from "@/lib/sessionLogs";
+import { useWorkoutSession } from "@/hooks/useWorkoutSession";
+import { usePrDetection } from "@/hooks/usePrDetection";
+import { useSessionTimers } from "@/hooks/useSessionTimers";
 import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog";
+import { ExerciseCard } from "@/components/workout/ExerciseCard";
+import { ChecklistItemCard } from "@/components/workout/ChecklistItemCard";
+import { ConfirmSheet } from "@/components/workout/ConfirmSheet";
+import type { SetField } from "@/components/workout/SetRow";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
-
-type PrFlash = { id: number; exercise: string; weight: number };
-
-// A set with no real data (weight and all rep fields zero/empty) - e.g. an
-// abandoned/empty session - should not count as "last time" or as "started".
-function isEmptySet(s: any): boolean {
-  if (!s) return true;
-  return !(s.weight) && !(s.reps) && !(s.repsLeft) && !(s.repsRight);
-}
-
-// "12 Aug" - just enough to place a carried-forward note in time without
-// widening the hint line it sits on. Null for a log with an unreadable date.
-function formatShortDate(date: string | null): string | null {
-  if (!date) return null;
-  const d = new Date(date);
-  return Number.isNaN(d.getTime())
-    ? null
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-/**
- * Rebuilds the session from the CURRENT program day, then folds the user's entered
- * work back in by exercise name.
- *
- * A draft is just a JSON blob in localStorage with a 24h life, so it can easily
- * predate the shape the app now expects - a session left open across the release
- * that added checklist items restores entries with no `kind`, which then render as
- * lift cards with an empty muscle chip and a nonsense "Target: 1 x". Taking the
- * structure from the program and only the DATA from the draft fixes that, and as a
- * side effect also handles the program being edited mid-session (an added or
- * removed exercise no longer leaves the logger showing a stale list).
- */
-/**
- * Identifies the shape of a day's exercise list - what is in it and how much of
- * each - so an edit to the program can be told apart from a plain refetch of it.
- * Deliberately ignores anything the logger doesn't build its rows from (muscle,
- * cue, category), since a change there shouldn't disturb an open session.
- */
-function dayStructureKey(day: any): string {
-  return ((day?.exercises as any[]) ?? [])
-    .map((ex) => `${ex?.kind ?? "lift"}:${ex?.name ?? ""}:${ex?.sets ?? ""}:${ex?.reps ?? ""}:${ex?.targetSeconds ?? ""}`)
-    .join("|");
-}
-
-function reconcileDraftLogs(draftLogs: LoggedExercise[], day: any): LoggedExercise[] {
-  const byName = new Map<string, LoggedExercise>();
-  for (const entry of draftLogs ?? []) {
-    if (entry?.name) byName.set(entry.name.toLowerCase(), entry);
-  }
-
-  return buildFreshLogs(day).map((fresh) => {
-    const saved = byName.get(fresh.name.toLowerCase());
-    if (!saved) return fresh;
-
-    if (fresh.kind === "checklist") {
-      return {
-        ...fresh,
-        notes: saved.notes ?? "",
-        showNotes: !!saved.showNotes,
-        // Clamp: the program's round count may have been lowered since.
-        completedRounds: Math.min(fresh.targetRounds, saved.completedRounds ?? 0),
-        // A countdown is only restored while it is still in the future; one that
-        // expired while the tab was closed is dropped rather than replayed.
-        timerEndsAt: saved.timerEndsAt != null && saved.timerEndsAt > Date.now() ? saved.timerEndsAt : null,
-        timerPausedRemaining: saved.timerPausedRemaining ?? null,
-      };
-    }
-
-    return {
-      ...fresh,
-      notes: saved.notes ?? "",
-      showNotes: !!saved.showNotes,
-      // Keep the fresh row count (the program is the authority on how many sets
-      // are prescribed) and copy across whatever the user actually logged.
-      sets: fresh.sets.map((s, i) => {
-        const savedSet = saved.sets?.[i];
-        return savedSet ? { ...s, ...savedSet, setNumber: s.setNumber } : s;
-      }),
-    };
-  });
-}
-
-function buildFreshLogs(day: any): LoggedExercise[] {
-  return day.exercises.map((ex: any) => {
-    const isChecklistItem = ex.kind === "checklist";
-    const targetRounds = Math.max(1, ex.sets ?? 1);
-    return {
-      name: ex.name,
-      muscle: ex.muscle,
-      isUnilateral: !!ex.isUnilateral,
-      targetSets: ex.sets,
-      targetReps: ex.reps,
-      notes: "",
-      showNotes: false,
-      kind: isChecklistItem ? "checklist" : "lift",
-      targetType: ex.targetType ?? null,
-      targetSeconds: ex.targetSeconds ?? null,
-      targetValue: ex.targetValue ?? null,
-      targetUnit: ex.targetUnit ?? null,
-      category: parseCategory(ex.category),
-      completedRounds: 0,
-      targetRounds,
-      timerEndsAt: null,
-      timerPausedRemaining: null,
-      // Deliberately empty for a checklist item: a placeholder set would be picked
-      // up by the volume and PR maths as soon as anything wrote a number into it.
-      sets: isChecklistItem
-        ? []
-        : Array.from({ length: ex.sets }, (_, i) => ({
-            setNumber: i + 1,
-            weight: 0,
-            reps: 0,
-            repsLeft: 0,
-            repsRight: 0,
-            completed: false,
-            isNewPr: false,
-          })),
-    };
-  });
-}
-
-// Estimated one-rep max (Epley-style) - PRs are judged on this, not raw
-// weight, so a heavier low-rep set and a lighter high-rep set can be compared.
-function estimatedOneRepMax(weight: number, reps: number): number {
-  return weight * (1 + reps / 30);
-}
-
-// Section 10: format a single previous set for the per-set "last time" hint.
-// `isUnilateral` is the exercise's *current* flag: when it's on but the historic
-// set was logged bilaterally (single rep value), we tag the hint so the lone
-// number doesn't look like a bug next to the new L/R input columns.
-function formatPrevSet(s: any, weightUnit: string, isUnilateral: boolean): string | null {
-  if (isEmptySet(s)) return null;
-  if (s.repsLeft != null || s.repsRight != null) {
-    return `${s.weight ?? 0} ${weightUnit} × ${s.repsLeft ?? 0}L / ${s.repsRight ?? 0}R`;
-  }
-  const base = `${s.weight ?? 0} ${weightUnit} × ${s.reps ?? 0}`;
-  return isUnilateral ? `${base} (both sides)` : base;
-}
 
 export default function Log() {
   const [, setLocation] = useLocation();
@@ -188,27 +39,12 @@ export default function Log() {
   // mode is exempt: those numbers are the user's own, typed into their program.
   const showTargets = isIndependent || (history != null && history.length > 0);
   const createWorkout = useCreateWorkout();
-  const [logs, setLogs] = useState<LoggedExercise[]>([]);
-  const [activeDay, setActiveDay] = useState<any>(null);
-  // Whether a session is open, once we've been able to look: null while the
-  // program/user are still loading (nothing has been resolved yet), false when
-  // there is genuinely nothing in progress - the idle screen.
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-  // A Start workout press reached this page and the session still couldn't be
-  // written - localStorage is where a session lives, so a browser refusing it
-  // (private mode, storage turned off, a full quota) means no workout can be
-  // logged at all. Kept apart from `hasSession` because the idle screen's
-  // "go and press Start workout" is exactly the wrong advice in that case.
-  const [startFailed, setStartFailed] = useState(false);
-  const [resumedElsewhere, setResumedElsewhere] = useState(false);
-  const [prFlashes, setPrFlashes] = useState<PrFlash[]>([]);
+  const { logs, setLogs, activeDay, hasSession, startFailed, resumedElsewhere, startedAt, endSession } =
+    useWorkoutSession({ program, userId: user?.id, setLocation });
+  const { prFlashes, judgeSet } = usePrDetection(history as any[] | undefined, personalRecords);
+  const { elapsedSeconds, startTimer, pauseTimer, resetTimer } = useSessionTimers(logs, setLogs, startedAt);
   const [showIncompleteConfirm, setShowIncompleteConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  // Epoch ms the session clock started, and the seconds since, recomputed each
-  // tick. Null until the user logs their first real set.
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null);
-  const flashIdRef = useRef(0);
   const queryClient = useQueryClient();
   const updateProfile = useUpdateProfile();
   // The sets block (column headers + rows) is what the first tour step rings;
@@ -228,287 +64,11 @@ export default function Log() {
     setLocation("/dashboard");
   }
 
-  // Tracks which draft key `logs` currently reflects, so a refetch of
-  // `program` (e.g. on network reconnect) doesn't clobber in-progress data -
-  // the seed/rehydrate effect below only runs again if the day actually changes.
-  const initializedKeyRef = useRef<string | null>(null);
-  const currentDraftKeyRef = useRef<string | null>(null);
-  const activeSessionRef = useRef<ActiveSessionPointer | null>(null);
-  // Set the moment the session is deliberately ended (finished or cancelled),
-  // so nothing re-seeds or re-saves it in the frames before we navigate away.
-  const endingRef = useRef(false);
-
-  // Prior all-time best score per exercise, plus the set of exercises that have
-  // ever been logged before - both drawn from saved history (previous sessions
-  // only; the in-progress session isn't saved yet). A set can only be a PR if
-  // it beats a set from an earlier session, so an exercise the user has never
-  // logged has no baseline to beat and its first sets are never PRs.
-  const prBaselineRef = useRef<Record<string, number>>({});
-  const priorLoggedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const best: Record<string, number> = {};
-    const seen = new Set<string>();
-    for (const log of (history ?? []) as any[]) {
-      for (const ex of (log.exercisesLogged as any[]) ?? []) {
-        const key = ex.name?.toLowerCase();
-        if (!key || !Array.isArray(ex.sets)) continue;
-        for (const s of ex.sets) {
-          if (isEmptySet(s)) continue;
-          seen.add(key);
-          const reps = s.repsLeft != null || s.repsRight != null
-            ? Math.min(s.repsLeft ?? 0, s.repsRight ?? 0)
-            : (s.reps ?? 0);
-          const score = estimatedOneRepMax(s.weight ?? 0, reps);
-          if (score > (best[key] ?? 0)) best[key] = score;
-        }
-      }
-    }
-    // Genuine PRs from the server may reach back past history's 200-log window;
-    // fold them in so the baseline never regresses for very active users.
-    for (const pr of personalRecords ?? []) {
-      const key = pr.exercise.toLowerCase();
-      seen.add(key);
-      const score = estimatedOneRepMax(pr.maxWeight, pr.reps ?? 0);
-      if (score > (best[key] ?? 0)) best[key] = score;
-    }
-    prBaselineRef.current = best;
-    priorLoggedRef.current = seen;
-  }, [history, personalRecords]);
-
-  // Build "last time" lookup from workout history - keep the full set list of the
-  // most recent prior log per exercise, so each set row can show its own match.
-  // Also carry that session's note (per-exercise, not per-set) forward, with the
-  // date it was written, so the logger can show it back under the set rows.
-  // Keyed by exercise rather than by program day on purpose: it keeps the note
-  // and the "Last time" numbers above it drawn from one and the same session.
-  const lastSetsByExercise: Record<string, any[]> = {};
-  const lastNoteByExercise: Record<string, { text: string; date: string | null }> = {};
-  for (const log of (history ?? []) as any[]) {
-    for (const ex of (log.exercisesLogged as any[]) ?? []) {
-      const key = ex.name?.toLowerCase();
-      if (!key || lastSetsByExercise[key]) continue; // history is newest-first; keep first seen
-      // Only count sessions where this exercise actually has logged data.
-      if (Array.isArray(ex.sets) && ex.sets.some((s: any) => !isEmptySet(s))) {
-        lastSetsByExercise[key] = ex.sets;
-        const text = typeof ex.notes === "string" ? ex.notes.trim() : "";
-        if (text) lastNoteByExercise[key] = { text, date: log.date ?? null };
-      }
-    }
-  }
-
-  const sessionBestRef = useRef<Record<string, number>>({});
-
-  // Which program day to log - passed as ?day=<dayNumber> from the program page -
-  // and whether the client got here by pressing Start workout (`&start=1`) as
-  // opposed to opening the logger from the nav. The two say different things:
-  // `day` is which day is wanted, `start` is that a session was actually asked
-  // for, and only the second one licenses beginning one (see the effect below).
-  const { targetDayNumber, startRequested } = (() => {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get("day");
-    const n = raw ? parseInt(raw) : NaN;
-    return {
-      targetDayNumber: Number.isFinite(n) ? n : null,
-      startRequested: params.get("start") === "1",
-    };
-  })();
-
-  function resolveDay(days: any[]): any {
-    if (targetDayNumber != null) {
-      const found = days.find((d) => d.dayNumber === targetDayNumber);
-      if (found) return found;
-    }
-    return days[0];
-  }
-
-  // A session begins on a deliberate press of Start workout, and this page
-  // hangs off the pointer that press writes (see startSession) rather than off
-  // the `?day=` in the URL. Opening /log by itself - the nav item, a bookmark -
-  // asks for no session and gets none: the idle screen renders instead, so the
-  // logger can be looked at without quietly starting a workout.
-  //
-  // The one exception is a press that arrives here having failed to leave a
-  // pointer behind. `start=1` is that press, and honouring it is the difference
-  // between landing in a running session and landing on "No logging ongoing"
-  // one tap after Start workout - which reads as the button being broken, and
-  // gives the client nowhere to go but the button they just pressed. The URL
-  // carrying the request is dropped the moment it is served, so a later
-  // refresh or Back can't replay it into a second session.
-  useEffect(() => {
-    if (!program?.days || !user?.id) return;
-    // Finishing or cancelling clears the session and navigates away; a refetch
-    // landing in that gap must not flash the idle screen over the leaving page.
-    if (endingRef.current) return;
-
-    // `resolveActiveSession` already dropped the pointer if its draft is gone,
-    // so anything it returns is a live session on some day.
-    let active = resolveActiveSession(user.id);
-
-    const dayOf = (pointer: ActiveSessionPointer) =>
-      String(pointer.programId) === String(program.id)
-        ? (program.days as any[]).find((d) => d.dayNumber === pointer.dayNumber)
-        : undefined;
-
-    let sessionDay = active ? dayOf(active.pointer) : undefined;
-
-    // Belongs to another program, or to a day this program no longer has -
-    // nothing on this page can render it.
-    if (active && !sessionDay) {
-      clearActiveSession(user.id);
-      active = null;
-    }
-
-    // Nothing in progress, but the client pressed Start workout on this day to
-    // get here. Begin it, rather than showing them an idle screen that tells
-    // them to go and press the button they just pressed. Checked after the
-    // pointer above so a live session always wins: a press that collides with
-    // one never reaches this page (the program page raises its discard dialog
-    // first), and a resumed session must not be restarted from empty.
-    if (!active && startRequested && targetDayNumber != null) {
-      const wanted = (program.days as any[]).find((d) => d.dayNumber === targetDayNumber);
-      if (wanted) {
-        // startSession reports whether the session survived the write; false
-        // means storage itself refused it, which is the one case where there
-        // genuinely is nothing to log and the client deserves to know why.
-        setStartFailed(!startSession(user.id, program.id, wanted.dayNumber));
-        active = resolveActiveSession(user.id);
-        sessionDay = active ? dayOf(active.pointer) : undefined;
-      }
-    }
-
-    if (!sessionDay) {
-      setHasSession(false);
-      setActiveDay(null);
-      setLogs([]);
-      setStartedAt(null);
-      setResumedElsewhere(false);
-      initializedKeyRef.current = null;
-      currentDraftKeyRef.current = null;
-      activeSessionRef.current = null;
-      return;
-    }
-
-    const day = sessionDay;
-    setHasSession(true);
-    setActiveDay(day);
-
-    // `?day=` only says which day the client asked for; the open session decides
-    // which one they get. Landing on a different one (or on a bare /log) means
-    // they were sent back to the session already running, which the banner says.
-    const requestedDay = resolveDay(program.days as any[]);
-    const wasRedirected = !!requestedDay && requestedDay.dayNumber !== day.dayNumber;
-    setResumedElsewhere(wasRedirected);
-    // Replaces rather than pushes, which also spends the `start=1` request: it
-    // has been served, and leaving it in the history entry would let a refresh -
-    // or a Back out of the session the client just finished - ask for the day to
-    // be started all over again.
-    if (wasRedirected || startRequested) {
-      setLocation(`/log?day=${day.dayNumber}`, { replace: true });
-    }
-
-    const key = draftKey(user.id, program.id, day.dayNumber);
-    activeSessionRef.current = { programId: program.id, dayNumber: day.dayNumber };
-
-    // The seed key covers the day AND the shape of its exercise list. Keying on
-    // the day alone meant an edit to the program could never reach an open
-    // logger: saving invalidates the program query, but this page often mounts
-    // and seeds from the cached copy BEFORE that refetch lands, and every later
-    // run then early-returned because the day hadn't changed. The added item was
-    // invisible until the draft was discarded - and discarding only helped when
-    // it happened to come after the refetch, which is why it took a few tries.
-    const seedKey = `${key}::${dayStructureKey(day)}`;
-    if (initializedKeyRef.current === seedKey) return;
-
-    // Same day, different structure: the program was edited while this session
-    // was open. Re-seed from the new structure but keep what the user has
-    // already entered - reconcile folds it back in by exercise name.
-    const structureChangedMidSession = currentDraftKeyRef.current === key;
-
-    initializedKeyRef.current = seedKey;
-    currentDraftKeyRef.current = key;
-
-    if (structureChangedMidSession) {
-      setLogs((prev) => reconcileDraftLogs(prev, day));
-      return;
-    }
-
-    // The draft always exists here - `resolveActiveSession` checked, and a
-    // freshly started session's is simply empty, which reconciles to a blank
-    // sheet built from the day. Resume its clock rather than restarting it: a
-    // refresh or a reconnect mid-session must not reset the elapsed time to
-    // zero. Drafts written before session timing existed have no start, so
-    // adopt now.
-    setLogs(reconcileDraftLogs(active!.draft.logs, day));
-    setStartedAt(active!.draft.startedAt ?? Date.now());
-  }, [program, user?.id]);
-
-  // The session clock. Recomputed from the start timestamp on every tick rather
-  // than incremented, so a throttled background tab can't make it drift.
-  useEffect(() => {
-    if (startedAt == null) {
-      setElapsedSeconds(null);
-      return;
-    }
-    const update = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [startedAt]);
-
-  // Mirror every change to localStorage so a reconnect/reload can restore the
-  // in-progress session instead of losing it. No "has anything been typed yet"
-  // test any more: the draft exists from the moment Start workout is tapped
-  // (startSession writes it), so a started session is a session whether or not
-  // a number has been entered - and nothing lands here without one.
-  useEffect(() => {
-    const key = currentDraftKeyRef.current;
-    if (!key || logs.length === 0 || endingRef.current) return;
-    // Persist the running clock alongside the logs so a refresh resumes the
-    // same start.
-    saveDraft(key, logs, startedAt ?? Date.now());
-    if (user?.id && activeSessionRef.current) {
-      saveActiveSession(user.id, activeSessionRef.current);
-    }
-  }, [logs]);
-
-  // Drives the countdown display. Only runs while a timer is actually going, so an
-  // ordinary lifting session schedules nothing. The remaining time is always
-  // derived from `timerEndsAt` rather than counted down here, so a throttled or
-  // frozen tab (backgrounded phone, locked screen) resumes showing the correct
-  // value instead of however far the interval got.
-  const hasRunningTimer = logs.some((ex) => ex.timerEndsAt != null);
-  const [nowTs, setNowTs] = useState(() => Date.now());
-  useEffect(() => {
-    if (!hasRunningTimer) return;
-    const id = window.setInterval(() => setNowTs(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, [hasRunningTimer]);
-
-  // A finished countdown ticks its own round off, so a completed hold needs no
-  // extra tap. `nowTs` must stay in the dep list: `logs` does not change while a
-  // countdown runs, so depending on it alone would leave an expired timer frozen
-  // at 0:00 instead of completing its round. Comparing against the clock (rather
-  // than counting down) also catches a timer that expired while the tab was hidden.
-  useEffect(() => {
-    const now = Date.now();
-    const expired = logs.some((ex) => ex.timerEndsAt != null && ex.timerEndsAt <= now);
-    if (!expired) return;
-    setLogs((prev) =>
-      prev.map((ex) => {
-        if (ex.timerEndsAt == null || ex.timerEndsAt > now) return ex;
-        return {
-          ...ex,
-          completedRounds: Math.min(ex.targetRounds, ex.completedRounds + 1),
-          timerEndsAt: null,
-          timerPausedRemaining: null,
-        };
-      }),
-    );
-  }, [logs, nowTs]);
+  const { lastSetsByExercise, lastNoteByExercise } = buildLastSessionLookup(history as any[] | undefined);
 
   // Sets are saved implicitly by typing - no separate "confirm" step. Weight
   // and reps together mark a set as logged, and PR detection runs inline.
-  function updateSet(exIdx: number, setIdx: number, field: "weight" | "reps" | "repsLeft" | "repsRight", value: number) {
+  function updateSet(exIdx: number, setIdx: number, field: SetField, value: number) {
     const ex = logs[exIdx];
     const set = ex.sets[setIdx];
     // Clamped to the bands the API accepts, so a stray minus sign or a held-down
@@ -519,27 +79,7 @@ export default function Log() {
 
     const hasReps = ex.isUnilateral ? merged.repsLeft > 0 && merged.repsRight > 0 : merged.reps > 0;
     const completed = merged.weight > 0 && hasReps;
-
-    let isNewPr = false;
-    if (completed) {
-      const nameKey = ex.name.toLowerCase();
-      const reps = ex.isUnilateral ? Math.min(merged.repsLeft, merged.repsRight) : merged.reps;
-      const score = estimatedOneRepMax(merged.weight, reps);
-      const baseline = prBaselineRef.current[nameKey] ?? 0;
-      const sessionBest = sessionBestRef.current[nameKey] ?? 0;
-      const currentBest = Math.max(baseline, sessionBest);
-      // Only a PR when it beats a set from an earlier session. The first time an
-      // exercise is ever logged there is nothing to beat, so it is not a PR.
-      const hasPrior = priorLoggedRef.current.has(nameKey);
-      isNewPr = hasPrior && score > currentBest;
-
-      if (isNewPr && !set.isNewPr) {
-        sessionBestRef.current[nameKey] = score;
-        const id = ++flashIdRef.current;
-        setPrFlashes((f) => [...f, { id, exercise: ex.name, weight: merged.weight }]);
-        setTimeout(() => setPrFlashes((f) => f.filter((x) => x.id !== id)), 4000);
-      }
-    }
+    const isNewPr = completed ? judgeSet(ex.name, ex.isUnilateral, merged, set.isNewPr) : false;
 
     setLogs((prev) => {
       const next = [...prev];
@@ -587,26 +127,6 @@ export default function Log() {
       timerEndsAt: null,
       timerPausedRemaining: null,
     });
-  }
-
-  function startTimer(exIdx: number) {
-    const ex = logs[exIdx];
-    const seconds = ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
-    if (seconds <= 0) return;
-    patchItem(exIdx, { timerEndsAt: Date.now() + seconds * 1000, timerPausedRemaining: null });
-  }
-
-  function pauseTimer(exIdx: number) {
-    const ex = logs[exIdx];
-    if (ex.timerEndsAt == null) return;
-    patchItem(exIdx, {
-      timerEndsAt: null,
-      timerPausedRemaining: Math.max(0, Math.ceil((ex.timerEndsAt - Date.now()) / 1000)),
-    });
-  }
-
-  function resetTimer(exIdx: number) {
-    patchItem(exIdx, { timerEndsAt: null, timerPausedRemaining: null });
   }
 
   function updateNotes(exIdx: number, notes: string) {
@@ -678,9 +198,7 @@ export default function Log() {
       });
       return;
     }
-    endingRef.current = true;
-    if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
-    if (user?.id) clearActiveSession(user.id);
+    endSession();
     const loggedCount = logs.filter((ex) => ex.name.trim()).length;
     toast({
       title: "Workout saved 🎉",
@@ -710,9 +228,7 @@ export default function Log() {
   }
 
   function cancelWorkout() {
-    endingRef.current = true;
-    if (currentDraftKeyRef.current) clearDraft(currentDraftKeyRef.current);
-    if (user?.id) clearActiveSession(user.id);
+    endSession();
     setShowCancelConfirm(false);
     setLocation("/program");
   }
@@ -839,7 +355,7 @@ export default function Log() {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 60, scale: 0.9 }}
               transition={{ duration: 0.3 }}
-              className="flex items-center gap-3 bg-amber-500/90 backdrop-blur-sm text-black font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
+              className="flex items-center gap-3 bg-chart-3/90 backdrop-blur-sm text-background font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
             >
               <Trophy className="w-4 h-4 shrink-0" />
               <div>
@@ -868,7 +384,7 @@ export default function Log() {
               </div>
             )}
             {resumedElsewhere && (
-              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mt-2 inline-block">
+              <p className="text-xs text-chart-3 bg-chart-3/10 border border-chart-3/20 rounded-lg px-3 py-2 mt-2 inline-block">
                 Resuming your in-progress session - finish it before starting a new one.
               </p>
             )}
@@ -878,7 +394,7 @@ export default function Log() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chart-3/10 border border-chart-3/20 text-chart-3 text-sm font-semibold font-display"
               >
                 <Trophy className="w-4 h-4" />
                 {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
@@ -886,7 +402,7 @@ export default function Log() {
             )}
             <button
               onClick={() => setShowCancelConfirm(true)}
-              className="text-xs text-muted-foreground hover:text-red-400 transition-colors px-2 py-1.5"
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1.5"
               data-testid="button-cancel-workout"
             >
               Cancel workout
@@ -901,336 +417,54 @@ export default function Log() {
 
       <div className="mt-6 space-y-6">
         {logs.map((ex, exIdx) => {
-          // The tour's first two steps are about weights, reps and how to
-          // perform a lift, so they hang off the first *lift* card rather than
-          // the first card: a day that opens with a checklist item (a warmup
-          // sits above the first lift) would otherwise leave their targets
-          // unmounted and the steps with nothing to point at.
-          const isFirstLift = exIdx === firstLiftIdx;
-          // Checklist items render in program order, inline among the exercise
-          // cards - a warmup item appears above the first lift because that is
-          // where it sits in the day.
           if (ex.kind === "checklist") {
-            const meta = categoryMeta(ex.category);
-            const accent = meta?.token ?? CHECKLIST_ACCENT;
-            const allDone = ex.completedRounds >= ex.targetRounds;
-            const isRunning = ex.timerEndsAt != null;
-            const timed = (ex.targetSeconds ?? 0) > 0 && ex.targetType === "duration";
-            const remaining = isRunning
-              ? Math.max(0, Math.ceil((ex.timerEndsAt! - Date.now()) / 1000))
-              : ex.timerPausedRemaining ?? ex.targetSeconds ?? 0;
-            const total = ex.targetSeconds ?? 0;
-            // The countdown on a timed card is the control itself, not a target,
-            // so it stays; this is only the "2:30" / "x 20" written next to the
-            // item's name.
-            const target = showTargets ? describeTarget(ex) : null;
-
-            // A timed item gets the filling card with swipe-to-complete. Every
-            // other checklist item keeps the tick, which is still the right
-            // control when there is no duration to visualise.
-            if (timed && !allDone) {
-              return (
-                <motion.div
-                  key={`${ex.name}-${exIdx}`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: exIdx * 0.06 }}
-                  data-testid={`log-checklist-${exIdx}`}
-                >
-                  <ChecklistLogCard
-                    name={ex.name}
-                    accent={accent}
-                    label={meta ? meta.label : "Checklist"}
-                    completedRounds={ex.completedRounds}
-                    targetRounds={ex.targetRounds}
-                    remaining={remaining}
-                    total={total}
-                    isRunning={isRunning}
-                    isPaused={ex.timerPausedRemaining != null}
-                    onCompleteRound={() => completeChecklistRound(exIdx)}
-                    onStart={() => startTimer(exIdx)}
-                    onPause={() => pauseTimer(exIdx)}
-                    onReset={() => resetTimer(exIdx)}
-                    testId={`checklist-${exIdx}`}
-                  />
-                </motion.div>
-              );
-            }
-
             return (
-              <motion.div
+              <ChecklistItemCard
                 key={`${ex.name}-${exIdx}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: exIdx * 0.06 }}
-                // Same neutral card fill as an exercise card; the accent border,
-                // icon and timer carry the distinction without a colour wash.
-                className="rounded-xl overflow-hidden border bg-card"
-                style={{ borderColor: `color-mix(in srgb, ${accent} 32%, transparent)` }}
-                data-testid={`log-checklist-${exIdx}`}
-              >
-                <div className="p-4 flex items-center gap-3">
-                  <button
-                    onClick={() => toggleChecklistRound(exIdx)}
-                    aria-pressed={allDone}
-                    // An untouched tick renders no text, so without an explicit
-                    // label this button reaches a screen reader unnamed.
-                    aria-label={
-                      allDone
-                        ? `${ex.name} — done, tap to clear`
-                        : `${ex.name} — mark round ${Math.min(ex.completedRounds + 1, ex.targetRounds)} of ${ex.targetRounds} done`
-                    }
-                    className={`shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-                      allDone
-                        ? "bg-chart-2/15 border-chart-2/50 text-chart-2"
-                        : "bg-secondary/30 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                    }`}
-                    title={allDone ? "Mark as not done" : "Mark a round done"}
-                    data-testid={`checklist-tick-${exIdx}`}
-                  >
-                    {allDone ? (
-                      <Check className="w-4 h-4" />
-                    ) : ex.completedRounds > 0 ? (
-                      <span className="text-[11px] font-display font-bold tabular-nums">
-                        {ex.completedRounds}/{ex.targetRounds}
-                      </span>
-                    ) : null}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <h3
-                      className={`font-semibold text-foreground truncate ${allDone ? "opacity-55 line-through" : ""}`}
-                    >
-                      {ex.name}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                      <span className="font-medium" style={{ color: accent }}>
-                        {meta ? meta.label : "Checklist"}
-                      </span>
-                      {ex.targetRounds > 1 && (
-                        <> · round {Math.min(ex.completedRounds + 1, ex.targetRounds)} of {ex.targetRounds}</>
-                      )}
-                      {target && ex.targetRounds === 1 && <> · {target}</>}
-                    </p>
-                  </div>
-
-                  {!timed && target && (
-                    <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap shrink-0">
-                      {target}
-                    </span>
-                  )}
-                </div>
-
-              </motion.div>
+                ex={ex}
+                exIdx={exIdx}
+                showTargets={showTargets}
+                onCompleteRound={() => completeChecklistRound(exIdx)}
+                onToggleRound={() => toggleChecklistRound(exIdx)}
+                onStart={() => startTimer(exIdx)}
+                onPause={() => pauseTimer(exIdx)}
+                onReset={() => resetTimer(exIdx)}
+              />
             );
           }
 
-          const prevSets = lastSetsByExercise[ex.name.toLowerCase()];
-          const prevNote = lastNoteByExercise[ex.name.toLowerCase()];
-          const prevNoteDate = formatShortDate(prevNote?.date ?? null);
-          const gridCols = ex.isUnilateral ? "grid-cols-[2rem_1fr_1fr_1fr]" : "grid-cols-[2rem_1fr_1fr]";
+          const nameKey = ex.name.toLowerCase();
           return (
-          <motion.div
-            key={ex.name}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: exIdx * 0.06 }}
-            className="bg-card border border-border rounded-xl overflow-hidden"
-            data-testid={`log-exercise-${exIdx}`}
-          >
-            <div
-              ref={isFirstLift ? tourExerciseHeadRef : undefined}
-              className="p-4 border-b border-border/50 flex items-start justify-between gap-2"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
-                    {ex.muscle}
-                  </span>
-                  {ex.isUnilateral && (
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">Unilateral</span>
-                  )}
-                </div>
-                <h3 className="font-semibold text-foreground mt-1">{ex.name}</h3>
-                {showTargets && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Target: {ex.targetSets} × {ex.targetReps}
-                  </p>
-                )}
-              </div>
-              {!isIndependent && (
-                <button
-                  ref={isFirstLift ? tourHelpRef : undefined}
-                  onClick={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
-                  className="shrink-0 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                  title="How to perform this exercise"
-                  data-testid={`button-exercise-help-${exIdx}`}
-                >
-                  <HelpCircle className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="p-4" ref={isFirstLift ? tourSetsBlockRef : undefined}>
-              {/* Column headers */}
-              {ex.isUnilateral ? (
-                <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
-                  <span>Set</span>
-                  <span>Weight</span>
-                  <span>Reps (L)</span>
-                  <span>Reps (R)</span>
-                </div>
-              ) : (
-                <div className={`grid ${gridCols} gap-2 mb-2 text-xs text-muted-foreground font-medium`}>
-                  <span>Set</span>
-                  <span>Weight</span>
-                  <span>Reps</span>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {ex.sets.map((set, setIdx) => {
-                  const prevStr = formatPrevSet(prevSets?.[setIdx], weightUnit, ex.isUnilateral);
-                  return (
-                  <div key={set.setNumber}>
-                  <motion.div
-                    layout
-                    className={`grid ${gridCols} gap-2 items-center py-1 rounded-lg transition-all ${
-                      set.isNewPr ? "bg-amber-500/8 -mx-1 px-1" : set.completed ? "opacity-55" : ""
-                    }`}
-                    data-testid={`set-row-${exIdx}-${setIdx}`}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm text-muted-foreground font-medium">{set.setNumber}</span>
-                      {set.isNewPr && (
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
-                          <Trophy className="w-3 h-3 text-amber-400" />
-                        </motion.div>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      min={LOGGED_SET_BOUNDS.weight.min}
-                      max={LOGGED_SET_BOUNDS.weight.max}
-                      value={set.weight || ""}
-                      onChange={(e) => updateSet(exIdx, setIdx, "weight", parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                      className={`w-full px-2 py-1.5 rounded-lg border bg-secondary/20 text-foreground text-sm text-center focus:outline-none transition-colors ${
-                        set.isNewPr ? "border-amber-500/40 focus:border-amber-400" : "border-border focus:border-primary"
-                      }`}
-                      data-testid={`input-weight-${exIdx}-${setIdx}`}
-                    />
-                    {ex.isUnilateral ? (
-                      <>
-                        <input
-                          type="number"
-                          min={LOGGED_SET_BOUNDS.reps.min}
-                          max={LOGGED_SET_BOUNDS.reps.max}
-                          value={set.repsLeft || ""}
-                          onChange={(e) => updateSet(exIdx, setIdx, "repsLeft", parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
-                          data-testid={`input-reps-left-${exIdx}-${setIdx}`}
-                        />
-                        <input
-                          type="number"
-                          min={LOGGED_SET_BOUNDS.reps.min}
-                          max={LOGGED_SET_BOUNDS.reps.max}
-                          value={set.repsRight || ""}
-                          onChange={(e) => updateSet(exIdx, setIdx, "repsRight", parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
-                          data-testid={`input-reps-right-${exIdx}-${setIdx}`}
-                        />
-                      </>
-                    ) : (
-                      <input
-                        type="number"
-                        min={LOGGED_SET_BOUNDS.reps.min}
-                        max={LOGGED_SET_BOUNDS.reps.max}
-                        value={set.reps || ""}
-                        onChange={(e) => updateSet(exIdx, setIdx, "reps", parseInt(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-full px-2 py-1.5 rounded-lg border border-border bg-secondary/20 text-foreground text-sm text-center focus:outline-none focus:border-primary"
-                        data-testid={`input-reps-${exIdx}-${setIdx}`}
-                      />
-                    )}
-                  </motion.div>
-                  {prevStr && (
-                    <p className="text-[11px] text-muted-foreground/60 pl-8 mt-0.5" data-testid={`last-set-${exIdx}-${setIdx}`}>
-                      Last time: {prevStr}
-                    </p>
-                  )}
-                  </div>
-                );})}
-              </div>
-
-              {/* The note left on this exercise last time, carried forward and
-                  parked directly under the set rows. Deliberately quiet - it is
-                  a reminder, not a heading - and dated so it never reads as
-                  something typed in this session. It does NOT depend on a
-                  matching "Last time" line: when the program's set count has
-                  since changed there is no hint on the final row, and the note
-                  used to vanish with it. */}
-              {prevNote && (
-                <p
-                  className="mt-2 pl-8 text-[11px] leading-snug text-muted-foreground/70"
-                  data-testid={`last-note-${exIdx}`}
-                >
-                  <span className="text-muted-foreground/50">
-                    Last session{prevNoteDate ? ` · ${prevNoteDate}` : ""}:{" "}
-                  </span>
-                  {prevNote.text}
-                </p>
-              )}
-
-              {/* Actions row */}
-              <div className="flex items-center justify-end mt-3">
-                <button
-                  onClick={() => toggleNotes(exIdx)}
-                  className={`flex items-center gap-1.5 text-xs transition-colors ${
-                    ex.notes
-                      ? "text-primary"
-                      : ex.showNotes
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  data-testid={`button-toggle-notes-${exIdx}`}
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  {/* With last session's note sitting right above, a bare "Add
-                      note" reads as if that one were already the entry for
-                      today. "Add a new note" says the old one is history. */}
-                  {ex.notes ? "Note saved" : prevNote ? "Add a new note" : "Add note"}
-                  <ChevronDown className={`w-3 h-3 transition-transform ${ex.showNotes ? "rotate-180" : ""}`} />
-                </button>
-              </div>
-
-              {/* Notes textarea */}
-              <AnimatePresence>
-                {ex.showNotes && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.18 }}
-                    className="overflow-hidden"
-                  >
-                    <textarea
-                      value={ex.notes}
-                      onChange={(e) => updateNotes(exIdx, e.target.value)}
-                      placeholder="How did this feel? e.g. felt strong, elbow pain, grip gave out..."
-                      rows={2}
-                      autoFocus
-                      className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
-                      data-testid={`textarea-notes-${exIdx}`}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        );})}
+            <ExerciseCard
+              key={ex.name}
+              ex={ex}
+              exIdx={exIdx}
+              weightUnit={weightUnit}
+              showTargets={showTargets}
+              showHelp={!isIndependent}
+              // AI mode's forward-looking targets. Gated on showTargets for the
+              // same reason the prescription is: a target is a comparison, and
+              // a first-ever session has nothing to compare against.
+              showProgressionTargets={!isIndependent && showTargets}
+              prevSets={lastSetsByExercise[nameKey]}
+              prevNote={lastNoteByExercise[nameKey]}
+              // The tour's first two steps are about weights, reps and how to
+              // perform a lift, so they hang off the first *lift* card rather
+              // than the first card: a day that opens with a checklist item (a
+              // warmup sits above the first lift) would otherwise leave their
+              // targets unmounted and the steps with nothing to point at.
+              tourRefs={
+                exIdx === firstLiftIdx
+                  ? { head: tourExerciseHeadRef, help: tourHelpRef, setsBlock: tourSetsBlockRef }
+                  : undefined
+              }
+              onHelp={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
+              onUpdateSet={(setIdx, field, value) => updateSet(exIdx, setIdx, field, value)}
+              onUpdateNotes={(notes) => updateNotes(exIdx, notes)}
+              onToggleNotes={() => toggleNotes(exIdx)}
+            />
+          );
+        })}
       </div>
 
       {/* Finishing lives at the end of the list, in normal flow - not in a bar
@@ -1251,7 +485,7 @@ export default function Log() {
         {createWorkout.isPending ? (
           <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
         ) : sessionPrCount > 0 ? (
-          <><Trophy className="w-5 h-5 text-amber-300" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+          <><Trophy className="w-5 h-5 text-chart-3" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
         ) : (
           "Finish workout"
         )}
@@ -1259,95 +493,31 @@ export default function Log() {
 
       {showLogTour && <CoachmarkTour steps={logTourSteps} onDone={finishLogTour} testIdPrefix="log-tour" />}
 
-      {/* Incomplete-sets confirmation */}
-      <AnimatePresence>
-        {showIncompleteConfirm && (
-          <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowIncompleteConfirm(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ duration: 0.22 }}
-              className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
-            >
-              <div>
-                <h3 className="font-semibold text-foreground">Not every set is logged</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Looks like some sets are still missing a weight or rep count. Finish anyway, or go back and fill them in?
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowIncompleteConfirm(false)}
-                  className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium hover:bg-secondary/30 transition-colors"
-                  data-testid="button-keep-logging"
-                >
-                  Keep logging
-                </button>
-                <button
-                  onClick={() => { setShowIncompleteConfirm(false); finishWorkout(); }}
-                  className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-                  data-testid="button-finish-anyway"
-                >
-                  Finish anyway
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ConfirmSheet
+        open={showIncompleteConfirm}
+        title="Not every set is logged"
+        body="Looks like some sets are still missing a weight or rep count. Finish anyway, or go back and fill them in?"
+        cancelLabel="Keep logging"
+        confirmLabel="Finish anyway"
+        confirmClassName="bg-primary text-primary-foreground hover:bg-primary/90"
+        cancelTestId="button-keep-logging"
+        confirmTestId="button-finish-anyway"
+        onCancel={() => setShowIncompleteConfirm(false)}
+        onConfirm={() => { setShowIncompleteConfirm(false); finishWorkout(); }}
+      />
 
-      {/* Cancel-workout confirmation */}
-      <AnimatePresence>
-        {showCancelConfirm && (
-          <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowCancelConfirm(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 40 }}
-              transition={{ duration: 0.22 }}
-              className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
-            >
-              <div>
-                <h3 className="font-semibold text-foreground">Discard this workout?</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Everything you've logged in this session will be lost - it won't be saved.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowCancelConfirm(false)}
-                  className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium hover:bg-secondary/30 transition-colors"
-                  data-testid="button-keep-workout"
-                >
-                  Keep logging
-                </button>
-                <button
-                  onClick={cancelWorkout}
-                  className="flex-1 h-11 rounded-xl bg-red-500/90 text-white font-semibold hover:bg-red-500 transition-colors"
-                  data-testid="button-discard-workout"
-                >
-                  Discard workout
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <ConfirmSheet
+        open={showCancelConfirm}
+        title="Discard this workout?"
+        body="Everything you've logged in this session will be lost - it won't be saved."
+        cancelLabel="Keep logging"
+        confirmLabel="Discard workout"
+        confirmClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        cancelTestId="button-keep-workout"
+        confirmTestId="button-discard-workout"
+        onCancel={() => setShowCancelConfirm(false)}
+        onConfirm={cancelWorkout}
+      />
     </div>
   );
 }

@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AiJobAccepted,
   BodyweightLog,
   BodyweightLogInput,
   BodyweightPoint,
@@ -27,6 +28,7 @@ import type {
   CalendarColorInput,
   Checkin,
   CheckinInput,
+  CheckinJob,
   CheckinResult,
   CheckoutInput,
   CheckoutSession,
@@ -47,6 +49,7 @@ import type {
   PersonalRecord,
   PortalSession,
   Program,
+  ProgramGenerationJob,
   ProgramStartDateUpdate,
   SessionAdherence,
   SessionDurationStats,
@@ -743,6 +746,156 @@ export const useGenerateProgram = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getGenerateProgramMutationOptions(options));
     }
+
+export const getStartProgramGenerationJobUrl = () => {
+
+
+
+
+  return `/api/programs/generate/jobs`
+}
+
+/**
+ * Same input and the same 400s as POST /programs/generate, answered immediately. Otherwise returns 202 with a job id to poll. If the caller already has an unfinished generation job, that job's id is returned instead of starting a second one.
+
+ * @summary Start AI program generation as a background job
+ */
+export const startProgramGenerationJob = async (generateProgramInput?: GenerateProgramInput, options?: RequestInit): Promise<AiJobAccepted> => {
+
+  return customFetch<AiJobAccepted>(getStartProgramGenerationJobUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateProgramInput,)
+  }
+);}
+
+
+
+
+export const getStartProgramGenerationJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProgramGenerationJob>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startProgramGenerationJob>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext> => {
+
+const mutationKey = ['startProgramGenerationJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startProgramGenerationJob>>, {data?: BodyType<GenerateProgramInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startProgramGenerationJob(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartProgramGenerationJobMutationResult = NonNullable<Awaited<ReturnType<typeof startProgramGenerationJob>>>
+    export type StartProgramGenerationJobMutationBody = BodyType<GenerateProgramInput> | undefined
+    export type StartProgramGenerationJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Start AI program generation as a background job
+ */
+export const useStartProgramGenerationJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startProgramGenerationJob>>, TError,{data?: BodyType<GenerateProgramInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startProgramGenerationJob>>,
+        TError,
+        {data?: BodyType<GenerateProgramInput>},
+        TContext
+      > => {
+      return useMutation(getStartProgramGenerationJobMutationOptions(options));
+    }
+
+export const getGetProgramGenerationJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/programs/generate/jobs/${jobId}`
+}
+
+/**
+ * @summary Poll a program generation job
+ */
+export const getProgramGenerationJob = async (jobId: string, options?: RequestInit): Promise<ProgramGenerationJob> => {
+
+  return customFetch<ProgramGenerationJob>(getGetProgramGenerationJobUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProgramGenerationJobQueryKey = (jobId: string,) => {
+    return [
+    `/api/programs/generate/jobs/${jobId}`
+    ] as const;
+    }
+
+
+export const getGetProgramGenerationJobQueryOptions = <TData = Awaited<ReturnType<typeof getProgramGenerationJob>>, TError = ErrorType<void>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProgramGenerationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProgramGenerationJobQueryKey(jobId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProgramGenerationJob>>> = ({ signal }) => getProgramGenerationJob(jobId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(jobId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProgramGenerationJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProgramGenerationJobQueryResult = NonNullable<Awaited<ReturnType<typeof getProgramGenerationJob>>>
+export type GetProgramGenerationJobQueryError = ErrorType<void>
+
+
+/**
+ * @summary Poll a program generation job
+ */
+
+export function useGetProgramGenerationJob<TData = Awaited<ReturnType<typeof getProgramGenerationJob>>, TError = ErrorType<void>>(
+ jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProgramGenerationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProgramGenerationJobQueryOptions(jobId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getUpdateProgramUrl = () => {
 
@@ -1717,6 +1870,156 @@ export function useGetCheckinAdherence<TData = Awaited<ReturnType<typeof getChec
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCheckinAdherenceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStartCheckinJobUrl = () => {
+
+
+
+
+  return `/api/checkins/jobs`
+}
+
+/**
+ * Same input and the same 400s as POST /checkins, answered immediately. Otherwise returns 202 with a job id to poll. The check-in is recorded by the job, just before the AI call. If the caller already has an unfinished check-in job, that job's id is returned instead of recording a second check-in.
+
+ * @summary Submit a weekly check-in and run the AI adjustment as a background job
+ */
+export const startCheckinJob = async (checkinInput: CheckinInput, options?: RequestInit): Promise<AiJobAccepted> => {
+
+  return customFetch<AiJobAccepted>(getStartCheckinJobUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      checkinInput,)
+  }
+);}
+
+
+
+
+export const getStartCheckinJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCheckinJob>>, TError,{data: BodyType<CheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startCheckinJob>>, TError,{data: BodyType<CheckinInput>}, TContext> => {
+
+const mutationKey = ['startCheckinJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startCheckinJob>>, {data: BodyType<CheckinInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startCheckinJob(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartCheckinJobMutationResult = NonNullable<Awaited<ReturnType<typeof startCheckinJob>>>
+    export type StartCheckinJobMutationBody = BodyType<CheckinInput>
+    export type StartCheckinJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a weekly check-in and run the AI adjustment as a background job
+ */
+export const useStartCheckinJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCheckinJob>>, TError,{data: BodyType<CheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startCheckinJob>>,
+        TError,
+        {data: BodyType<CheckinInput>},
+        TContext
+      > => {
+      return useMutation(getStartCheckinJobMutationOptions(options));
+    }
+
+export const getGetCheckinJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/checkins/jobs/${jobId}`
+}
+
+/**
+ * @summary Poll a check-in job
+ */
+export const getCheckinJob = async (jobId: string, options?: RequestInit): Promise<CheckinJob> => {
+
+  return customFetch<CheckinJob>(getGetCheckinJobUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCheckinJobQueryKey = (jobId: string,) => {
+    return [
+    `/api/checkins/jobs/${jobId}`
+    ] as const;
+    }
+
+
+export const getGetCheckinJobQueryOptions = <TData = Awaited<ReturnType<typeof getCheckinJob>>, TError = ErrorType<void>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCheckinJobQueryKey(jobId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckinJob>>> = ({ signal }) => getCheckinJob(jobId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(jobId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCheckinJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCheckinJobQueryResult = NonNullable<Awaited<ReturnType<typeof getCheckinJob>>>
+export type GetCheckinJobQueryError = ErrorType<void>
+
+
+/**
+ * @summary Poll a check-in job
+ */
+
+export function useGetCheckinJob<TData = Awaited<ReturnType<typeof getCheckinJob>>, TError = ErrorType<void>>(
+ jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCheckinJobQueryOptions(jobId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2960,6 +3263,8 @@ export const getStripeWebhookUrl = () => {
 }
 
 /**
+ * Called by Stripe, not by the app. Unauthenticated by Clerk: the request is instead verified against the `Stripe-Signature` header using STRIPE_WEBHOOK_SECRET, and refused (500) if that secret is not configured.
+
  * @summary Stripe webhook endpoint
  */
 export const stripeWebhook = async ( options?: RequestInit): Promise<HealthStatus> => {
