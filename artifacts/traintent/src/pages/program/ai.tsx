@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
-import { InactiveLineageNotice, ProgramWeekView } from "./shared";
+import { InactiveLineageNotice, ProgramWeekView, ProgramPageShell, ProgramBadge } from "./shared";
 
 // The AI Coach program page. Reads and writes the AI lineage (aiGenerated=true)
 // exclusively - the explicit lineage param means this page shows the same
@@ -92,36 +92,36 @@ export default function AiProgram() {
 
   if (isLoading || profileQuery.isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-64">
-        <div className="text-muted-foreground text-sm">Loading your program...</div>
-      </div>
+      <ProgramPageShell>
+        <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">Loading your program...</div>
+      </ProgramPageShell>
     );
   }
 
   if (!program) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <ProgramPageShell>
         <div className="text-center py-16">
           <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
           {!aiProfileReady ? (
             <>
-              <h2 className="text-xl font-bold text-foreground mb-2">A few things to set before AI can build your program</h2>
+              <h2 className="mb-2 text-2xl font-light tracking-[-0.01em] text-foreground">A few things to set before AI can build your program</h2>
               <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
                 We don't have your goal, experience, or equipment yet - the AI coach needs those to write a program.
               </p>
               <Link href="/onboarding">
-                <button className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
+                <button className="h-[52px] rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90">
                   Set up AI coaching
                 </button>
               </Link>
             </>
           ) : isAiModeActive ? (
             <>
-              <h2 className="text-xl font-bold text-foreground mb-2">No AI program yet</h2>
+              <h2 className="mb-2 text-2xl font-light tracking-[-0.01em] text-foreground">No AI program yet</h2>
               <p className="text-muted-foreground mb-8">Your AI coach has what it needs - generate your first program to get started.</p>
               <button
                 onClick={handleGenerate}
-                className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+                className="inline-flex h-[52px] items-center gap-2 rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
               >
                 Generate my program
               </button>
@@ -131,21 +131,21 @@ export default function AiProgram() {
             </>
           ) : (
             <>
-              <h2 className="text-xl font-bold text-foreground mb-2">No AI program yet</h2>
+              <h2 className="mb-2 text-2xl font-light tracking-[-0.01em] text-foreground">No AI program yet</h2>
               <p className="text-muted-foreground max-w-sm mx-auto">
                 You're in Independent mode. Switch to AI Coach mode in{" "}
-                <Link href="/settings" className="text-primary hover:underline">Settings</Link>{" "}
+                <Link href="/settings" className="text-foreground underline underline-offset-[3px]">Settings</Link>{" "}
                 to have a program generated for you - your own program stays untouched either way.
               </p>
             </>
           )}
         </div>
-      </div>
+      </ProgramPageShell>
     );
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <ProgramPageShell>
       {!isAiModeActive && (
         <InactiveLineageNotice>
           This is your AI Coach program, kept exactly as it was. You're training in Independent
@@ -157,12 +157,8 @@ export default function AiProgram() {
         program={program}
         canStartWorkout={isAiModeActive}
         tourEnabled={isAiModeActive}
-        badge={
-          <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-            AI Coach
-          </span>
-        }
+        badge={<ProgramBadge kind="ai" />}
       />
-    </div>
+    </ProgramPageShell>
   );
 }

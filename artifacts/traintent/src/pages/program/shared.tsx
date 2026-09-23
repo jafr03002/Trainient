@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays, Layers, Play } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
@@ -16,8 +16,8 @@ import {
 import { formatSessionLength, MIN_SESSIONS_FOR_AVERAGE } from "@/lib/sessionDuration";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { MUSCLE_OPTIONS, MUSCLE_COLORS } from "@/lib/muscles";
-import { buildDayColorOrder, dayColorAt, dayColorHex, dayTones } from "@/lib/dayColors";
+import { MUSCLE_OPTIONS } from "@/lib/muscles";
+import { dayColorAt, dayTones } from "@/lib/dayColors";
 import {
   CHECKLIST_ACCENT,
   CHECKLIST_CATEGORIES,
@@ -91,18 +91,6 @@ export type ProgramDay = {
   exercises: Exercise[];
 };
 
-// A muscle's accent for a roster row: `solid` colors the edge bar, `glow` is
-// the same hue at low alpha for the bar's outer glow. Falls back to null for
-// unrecognized (blank/legacy) muscle values, where the row uses primary blue.
-function muscleAccent(muscle: string): { solid: string; glow: string } | null {
-  const solid = MUSCLE_COLORS[muscle];
-  if (!solid) return null;
-  return {
-    solid,
-    glow: `hsla(${solid.slice(4, -1)}, 0.55)`,
-  };
-}
-
 // The user's own per-day colour picks from Settings, keyed by day label. The
 // calendar honours these, so every day-coloured surface here has to as well -
 // otherwise a day recoloured in Settings would only change on the calendar.
@@ -113,63 +101,39 @@ function useDayColorOverrides(): Record<string, string> {
   return map;
 }
 
-function RosterRow({ ex, index }: { ex: Exercise; index: number }) {
-  // A checklist row has no muscle and no sets×reps, so it gets its own line-up:
-  // the category colour on the edge bar, the category name where the muscle would
-  // be, and the target ("2:30", "× 20") where the set count would be.
-  if (isChecklist(ex)) {
-    const meta = categoryMeta(ex.category);
-    const barColor = meta?.token ?? CHECKLIST_ACCENT;
-    const target = describeTargetWithRounds({ ...ex, rounds: ex.sets });
-    return (
-      <div className="flex items-center gap-3 py-3 pl-2.5 pr-4 min-w-0">
-        <div
-          className="w-1 self-stretch rounded-full shrink-0"
-          style={{ backgroundColor: barColor, boxShadow: `0 0 8px ${barColor}` }}
-        />
-        <ListChecks className="w-3.5 h-3.5 shrink-0" style={{ color: barColor }} />
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm text-foreground truncate">{ex.name}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            <span className="font-medium" style={{ color: barColor }}>
-              {meta ? meta.label : "Checklist"}
-            </span>
-          </p>
-        </div>
-        {target && (
-          <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
-            {target}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  const accent = muscleAccent(ex.muscle);
-  const barColor = accent?.solid ?? "hsl(var(--primary))";
-  const barGlow = accent?.glow ?? "hsl(var(--primary) / 0.55)";
+// One row of the inset-grouped roster: name over muscles, sets × reps as quiet
+// trailing text, a hairline under every row but the last. The separator lives on
+// the inner block so it starts at the text inset, the way iOS grouped lists do.
+function RosterRow({ ex }: { ex: Exercise }) {
+  // A checklist row has no muscle and no sets×reps: the category (with a small
+  // check in its colour) sits where the muscles would be, and the target
+  // ("2:30", "× 20") where the sets × reps would be.
+  const checklist = isChecklist(ex);
+  const meta = checklist ? categoryMeta(ex.category) : null;
+  const checkColor = meta?.token ?? CHECKLIST_ACCENT;
+  const trailing = checklist ? describeTargetWithRounds({ ...ex, rounds: ex.sets }) : `${ex.sets} × ${ex.reps}`;
 
   return (
-    <div className="flex items-center gap-3 py-3 pl-2.5 pr-4 min-w-0">
-      <div
-        className="w-1 self-stretch rounded-full shrink-0"
-        style={{ backgroundColor: barColor, boxShadow: `0 0 8px ${barGlow}` }}
-      />
-      <span className="font-display text-xs text-muted-foreground w-4 text-center shrink-0">
-        {index + 1}
-      </span>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-sm text-foreground truncate">{ex.name}</h3>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-          <span className="font-medium" style={accent ? { color: accent.solid } : undefined}>
-            {ex.muscle || "—"}
-          </span>
-          {ex.secondaryMuscle && <> · {ex.secondaryMuscle}</>}
-        </p>
+    <div className="group flex items-center pl-5">
+      <div className="flex min-w-0 flex-1 items-center gap-3 border-b border-border py-[15px] pr-5 group-last:border-b-0">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[15px] font-normal text-foreground">{ex.name}</h3>
+          <p className="mt-[3px] truncate text-[12.5px] text-muted-foreground">
+            {checklist ? (
+              <span className="inline-flex items-center gap-1.5" style={{ color: checkColor }}>
+                <ListChecks className="h-3.5 w-3.5 shrink-0" />
+                {meta ? meta.label : "Checklist"}
+              </span>
+            ) : (
+              <>
+                {ex.muscle || "—"}
+                {ex.secondaryMuscle && <> · {ex.secondaryMuscle}</>}
+              </>
+            )}
+          </p>
+        </div>
+        {trailing && <span className="whitespace-nowrap text-[15px] text-muted-foreground">{trailing}</span>}
       </div>
-      <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap">
-        {ex.sets} × {ex.reps}
-      </span>
     </div>
   );
 }
@@ -1199,6 +1163,10 @@ export function ManualProgramBuilder({ onSaved, onCancel, editProgram }: Builder
 // predates the feature. It is not what keeps the strip off the manual lineage,
 // though - that is the caller's job, since a manual row can still carry a stale
 // schedule. See the call site in ProgramWeekView.
+//
+// Parked (2026-09-23): the Sessions redesign of the program page took the week
+// strip out for now, so nothing renders this. Kept because a reworked week view
+// is expected back; restore it in ProgramWeekView between the hero and the tabs.
 export function ScheduleStrip({
   schedule,
   startDate,
@@ -1280,13 +1248,40 @@ export function ScheduleStrip({
 // explains why workout logging isn't offered there.
 export function InactiveLineageNotice({ children }: { children: ReactNode }) {
   return (
-    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-3" data-testid="inactive-lineage-notice">
-      <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-      <p className="text-sm text-muted-foreground leading-relaxed">
+    <div className="flex items-start gap-3 rounded-[22px] bg-card px-4 py-3.5" data-testid="inactive-lineage-notice">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <p className="text-[12.5px] leading-relaxed text-muted-foreground">
         {children}{" "}
-        <Link href="/settings" className="text-primary hover:underline">Switch mode in Settings</Link>
+        <Link href="/settings" className="text-foreground underline underline-offset-[3px]">Switch mode in Settings</Link>
       </p>
     </div>
+  );
+}
+
+// Every program page state (loading, empty, builder, the program itself) sits
+// in this wrapper, so the whole route wears the Sessions look: black canvas,
+// neutral grey cards, thin Inter. See TrainientAppDesign.md.
+export function ProgramPageShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="theme-sessions min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-3xl space-y-6 p-6">{children}</div>
+    </div>
+  );
+}
+
+// Titles on the program pages: large and light, as in the reference.
+export const PROGRAM_TITLE_CLASS = "text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground";
+
+// The two lineage badges shown after "Split · Week N".
+export function ProgramBadge({ kind }: { kind: "ai" | "custom" }) {
+  return kind === "ai" ? (
+    <span className="rounded-full bg-[hsl(var(--sessions-cyan)/0.1)] px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[hsl(var(--sessions-cyan))]">
+      AI Coach
+    </span>
+  ) : (
+    <span className="rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground">
+      Custom
+    </span>
   );
 }
 
@@ -1320,7 +1315,6 @@ type ProgramWeekViewProps = {
 
 export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourEnabled = false }: ProgramWeekViewProps) {
   const profileQuery = useGetProfile();
-  const colorOverrides = useDayColorOverrides();
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const [activeDay, setActiveDay] = useState(0);
@@ -1373,12 +1367,6 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
   // stats read purely as lifting volume (matching trainingWorkloadFor server-side).
   const liftExercises = day ? day.exercises.filter((ex) => !isChecklist(ex)) : [];
   const totalSets = liftExercises.reduce((sum, ex) => sum + (ex.sets || 0), 0);
-
-  // Each day's colour, from the same order the calendar and the editor use, so
-  // the day that's blue here is blue in its calendar pills and in its edit card.
-  const colorOrder = buildDayColorOrder(days.map((d) => d.label));
-  const dayColor = (d: ProgramDay) => dayColorHex(d.label, colorOrder, colorOverrides);
-  const hero = dayTones(day ? dayColor(day) : dayColorAt(0));
 
   // How long this session takes - measured, or not shown at all. There is no
   // estimate tier any more: the tile appears once this day has been trained
@@ -1436,162 +1424,155 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
       ? days.find((d) => d.dayNumber === conflict.dayNumber)?.label ?? "your other workout"
       : "your other workout";
 
-  const startWorkoutButton = (
-    <button
-      ref={tourStartWorkoutRef}
-      onClick={handleStartWorkout}
-      // The button is the biggest block of colour inside the hero, so leaving it
-      // primary blue made every day's card read blue no matter what the wash
-      // behind it was doing. It wears the day's colour too, with a foreground
-      // picked for that colour rather than assumed white.
-      style={{ backgroundColor: hero.solid, color: hero.on, boxShadow: `0 0 24px ${hero.glow}` }}
-      className="w-full mt-4 h-11 rounded-xl text-sm font-semibold transition-[filter] hover:brightness-110"
-      data-testid="button-start-workout-program"
-    >
-      Start workout
-    </button>
-  );
-
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">{program.programName}</h1>
-            <p className="text-muted-foreground mt-0.5 text-sm">
-              {formatSplitType(program.splitType)} · Week {program.weekNumber}
+          <div className="min-w-0">
+            <h1 className={PROGRAM_TITLE_CLASS}>{program.programName}</h1>
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-[13.5px] text-muted-foreground">
+              <span>
+                {formatSplitType(program.splitType)} · Week {program.weekNumber}
+              </span>
               {badge}
             </p>
           </div>
           {onEdit && (
             <button
               onClick={onEdit}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+              aria-label="Edit program"
+              title="Edit program"
+              className="grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-accent"
               data-testid="button-edit-program"
             >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
+              <Pencil className="h-5 w-5" strokeWidth={1.6} />
             </button>
           )}
         </div>
       </motion.div>
 
-      {/* Day hero - gradient wash + border tinted by the day's own color */}
+      {/* Day hero - the frosted "Work Time" card: glass top with the day, a
+          stats band, and Start workout as the bottom-sheet row with the white
+          play button. */}
       {day && (
         <motion.div
           key={`hero-${activeDay}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          style={{ "--hero": hero.parts } as CSSProperties}
-          className="relative overflow-hidden rounded-2xl border border-[hsl(var(--hero)/0.3)] bg-[radial-gradient(120%_140%_at_0%_0%,hsl(var(--hero)/0.20),transparent_55%),linear-gradient(135deg,hsl(var(--hero)/0.07),transparent_45%)] bg-card p-5"
+          className="relative overflow-hidden rounded-[30px] bg-card"
           data-testid="program-day-hero"
         >
-          <p
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: hero.text }}
-          >
-            Day {day.dayNumber}
-          </p>
-          <h2 className="font-display text-2xl font-bold text-foreground mt-1">{day.focus}</h2>
-          <div className="flex mt-4 pt-3 border-t border-border">
-            <div className="flex-1 min-w-0">
-              <p className="font-display text-xl font-bold text-foreground">{liftExercises.length}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Exercises</p>
+          <div className="sessions-glass relative flex h-[196px] flex-col justify-between overflow-hidden px-5 pb-5 pt-[18px]">
+            <div className="sessions-watermark" aria-hidden="true">
+              {Array.from({ length: 9 }, (_, i) => (
+                <div key={i}>{"Train with intent · ".repeat(6)}</div>
+              ))}
             </div>
-            <div className="flex-1 min-w-0 border-l border-border pl-4">
-              <p className="font-display text-xl font-bold text-foreground">{totalSets}</p>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">Sets</p>
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="grid h-[60px] w-[60px] place-items-center rounded-full bg-black/35 text-[hsl(var(--sessions-cyan))]">
+                <Dumbbell className="h-[26px] w-[26px]" strokeWidth={1.6} />
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[11.5px] text-white/85">
+                <Layers className="h-3.5 w-3.5" strokeWidth={1.6} />
+                {liftExercises.length} {liftExercises.length === 1 ? "exercise" : "exercises"}
+              </span>
+            </div>
+            <div className="relative min-w-0">
+              <p className="text-xs uppercase tracking-[0.12em] text-white/75">Day {day.dayNumber}</p>
+              <h2 className="mt-1 truncate text-2xl font-normal tracking-[-0.01em] text-white">{day.focus}</h2>
+            </div>
+          </div>
+
+          <div className="flex px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-2xl font-light tracking-[-0.02em] text-foreground">{liftExercises.length}</p>
+              <p className="text-[11px] uppercase leading-snug tracking-[0.1em] text-muted-foreground">Exercises</p>
+            </div>
+            <div className="min-w-0 flex-1 border-l border-border pl-3.5">
+              <p className="text-2xl font-light tracking-[-0.02em] text-foreground">{totalSets}</p>
+              <p className="text-[11px] uppercase leading-snug tracking-[0.1em] text-muted-foreground">Sets</p>
             </div>
             {sessionDuration && (
-              <div className="flex-1 min-w-0 border-l border-border pl-4" data-testid="stat-session-duration">
-                <p className="font-display text-xl font-bold text-foreground flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1 border-l border-border pl-3.5" data-testid="stat-session-duration">
+                <p className="flex items-center gap-1.5 whitespace-nowrap text-2xl font-light tracking-[-0.02em] text-foreground">
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{sessionDuration.text}</span>
                 </p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
+                <p className="text-[11px] uppercase leading-snug tracking-[0.1em] text-muted-foreground">
                   {sessionDuration.label}
                 </p>
               </div>
             )}
           </div>
-          {startWorkoutButton}
+
+          <button
+            ref={tourStartWorkoutRef}
+            onClick={handleStartWorkout}
+            className="mx-2 mb-2 flex w-[calc(100%-1rem)] items-center justify-between gap-3 rounded-3xl bg-secondary py-4 pl-5 pr-4 text-left transition-colors hover:bg-accent"
+            data-testid="button-start-workout-program"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-medium uppercase tracking-[0.06em] text-foreground">Start workout</span>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                {day.label} · {day.focus}
+              </span>
+            </span>
+            <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full bg-white text-black">
+              <Play className="ml-0.5 h-5 w-5 fill-current" />
+            </span>
+          </button>
         </motion.div>
       )}
 
-      {/* Manual lineage never shows a week. Scheduling is an AI-mode idea, and
-          the builder no longer offers one, so a manual program is just a list of
-          days trained whenever the user likes. Gated on the lineage rather than
-          on `schedule` being null, because rows saved while the builder briefly
-          offered a schedule still carry one and only get blanked the next time
-          PUT /programs/:id runs - until then a program built months ago went on
-          showing a week it has no way to edit. */}
-      <ScheduleStrip
-        schedule={program.aiGenerated ? ((program.schedule as StoredSchedule | null) ?? null) : null}
-        startDate={program.startDate ?? null}
-        days={days}
-        colorFor={dayColor}
-        onPickDay={(dayNumber) => {
-          const index = days.findIndex((d) => d.dayNumber === dayNumber);
-          if (index >= 0) setActiveDay(index);
-        }}
-      />
+      {/* The week strip (ScheduleStrip) is parked for now - see its comment. */}
 
       {/* Day switcher + roster. Grouped so the first-run tour can spotlight both
           at once: its step says "your training days and exercises", and the
-          roster is what the second half of that sentence refers to. The wrapper
-          repeats the parent's space-y-6, so the two still sit exactly as far
-          apart as they did as loose siblings. The schedule strip stays outside
-          it: that step describes the days and their exercises, not the week
-          they land on, so spotlighting the strip too would overshoot the copy. */}
+          roster is what the second half of that sentence refers to. */}
       <div ref={tourProgramBodyRef} className="space-y-6">
-      {/* Day switcher */}
-      <div
-        className="flex gap-1.5 rounded-xl border border-border bg-secondary/60 p-1 overflow-x-auto"
-        data-testid="program-day-tabs"
-      >
-        {days.map((d, i) => {
-          const tone = dayTones(dayColor(d));
-          const isActive = activeDay === i;
-          return (
-            <button
-              key={d.dayNumber}
-              onClick={() => setActiveDay(i)}
-              data-testid={`tab-day-${d.dayNumber}`}
-              // The active tab wears the day's own colour rather than a blanket
-              // primary blue - a solid fill is out, since the palette runs light
-              // enough (amber, lime) that white-on-fill stops being readable.
-              style={isActive ? { backgroundColor: tone.soft, color: tone.text, boxShadow: `inset 0 0 0 1px ${tone.solid}` } : undefined}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                isActive ? "font-semibold" : "text-muted-foreground hover:text-foreground font-medium"
-              }`}
-            >
-              {d.label}
-            </button>
-          );
-        })}
-      </div>
+        <div>
+          <h2 className="mb-3 text-[21px] font-light tracking-[-0.01em] text-foreground">Training days</h2>
+          <div
+            className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            data-testid="program-day-tabs"
+          >
+            {days.map((d, i) => {
+              const isActive = activeDay === i;
+              return (
+                <button
+                  key={d.dayNumber}
+                  onClick={() => setActiveDay(i)}
+                  data-testid={`tab-day-${d.dayNumber}`}
+                  aria-pressed={isActive}
+                  className={`shrink-0 whitespace-nowrap rounded-full px-[18px] py-2.5 text-sm transition-colors ${
+                    isActive ? "bg-white font-medium text-black" : "bg-card text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* Exercise roster */}
-      {day && day.exercises.length > 0 && (
-        <motion.div
-          key={activeDay}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.2 }}
-          className="rounded-2xl border border-border bg-card divide-y divide-border/60 overflow-hidden"
-        >
-          {/* Numbering counts lifts only, so a checklist item sitting between two
-              exercises doesn't consume a number and leave a gap ("...5, 7"). */}
-          {(() => {
-            let liftIndex = -1;
-            return day.exercises.map((ex, i) => {
-              if (!isChecklist(ex)) liftIndex++;
-              return <RosterRow key={`${ex.name}-${i}`} ex={ex} index={liftIndex} />;
-            });
-          })()}
-        </motion.div>
-      )}
+        {/* Exercise roster - one inset-grouped card, no numbering. */}
+        {day && day.exercises.length > 0 && (
+          <div>
+            <h2 className="mb-3 text-[21px] font-light tracking-[-0.01em] text-foreground">Exercises</h2>
+            <motion.div
+              key={activeDay}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden rounded-[26px] bg-card"
+            >
+              {day.exercises.map((ex, i) => (
+                <RosterRow key={`${ex.name}-${i}`} ex={ex} />
+              ))}
+            </motion.div>
+          </div>
+        )}
       </div>
 
       {showProgramTour && <CoachmarkTour steps={programTourSteps} onDone={finishProgramTour} testIdPrefix="program-tour" />}

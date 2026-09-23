@@ -6,6 +6,9 @@ import { useGetCurrentProgram, useGetProfile } from "@workspace/api-client-react
 import {
   InactiveLineageNotice,
   ProgramWeekView,
+  ProgramPageShell,
+  ProgramBadge,
+  PROGRAM_TITLE_CLASS,
   ManualProgramBuilder,
   programDraftKey,
   loadProgramDraft,
@@ -66,17 +69,17 @@ export default function MyProgram() {
 
   if (isLoading || profileQuery.isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-64">
-        <div className="text-muted-foreground text-sm">Loading your program...</div>
-      </div>
+      <ProgramPageShell>
+        <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">Loading your program...</div>
+      </ProgramPageShell>
     );
   }
 
   if (!program) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <ProgramPageShell>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold text-foreground">My Program</h1>
+          <h1 className={PROGRAM_TITLE_CLASS}>My Program</h1>
           <p className="text-muted-foreground mt-1">Build your own training program.</p>
         </motion.div>
 
@@ -88,12 +91,12 @@ export default function MyProgram() {
               className="text-center py-20"
             >
               <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-foreground mb-2">No program yet</h2>
+              <h2 className="mb-2 text-2xl font-light tracking-[-0.01em] text-foreground">No program yet</h2>
               <p className="text-muted-foreground mb-8">Create your first training program with your own days and exercises.</p>
               <button
                 ref={tourCreateRef}
                 onClick={() => setBuilding(true)}
-                className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
+                className="h-[52px] rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90"
                 data-testid="button-create-program"
               >
                 Create your program
@@ -113,7 +116,7 @@ export default function MyProgram() {
             testIdPrefix="program-empty-tour"
           />
         )}
-      </div>
+      </ProgramPageShell>
     );
   }
 
@@ -123,9 +126,9 @@ export default function MyProgram() {
   // manual (aiGenerated=false) rows.
   if (editing) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <ProgramPageShell>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold text-foreground">Edit program</h1>
+          <h1 className={PROGRAM_TITLE_CLASS}>Edit program</h1>
           <p className="text-muted-foreground mt-1">Change days, exercises, sets and muscles. Past sessions stay as they were.</p>
         </motion.div>
         <ManualProgramBuilder
@@ -133,12 +136,12 @@ export default function MyProgram() {
           onSaved={() => setEditing(false)}
           onCancel={() => setEditing(false)}
         />
-      </div>
+      </ProgramPageShell>
     );
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <ProgramPageShell>
       {!isIndependent && (
         <InactiveLineageNotice>
           This is your own program, kept exactly as you built it. You're training in AI Coach
@@ -151,12 +154,8 @@ export default function MyProgram() {
         canStartWorkout={isIndependent}
         tourEnabled={isIndependent}
         onEdit={() => setEditing(true)}
-        badge={
-          <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-secondary border border-border">
-            Custom
-          </span>
-        }
+        badge={<ProgramBadge kind="custom" />}
       />
-    </div>
+    </ProgramPageShell>
   );
 }
