@@ -74,16 +74,16 @@ export function DayDetailSheet({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.22 }}
-          className="relative z-10 w-full max-w-lg bg-card border border-border rounded-t-2xl md:rounded-2xl overflow-hidden"
+          className="relative z-10 w-full max-w-lg bg-card rounded-t-[30px] md:rounded-[30px] overflow-hidden"
           data-testid="week-day-sheet"
         >
           <div className="pt-2.5 pb-1 flex justify-center shrink-0 md:hidden">
-            <div className="w-10 h-1.5 rounded-full bg-border" />
+            <div className="w-10 h-1.5 rounded-full bg-white/20" />
           </div>
           <div className="px-5 pb-4 pt-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <span className="font-bold text-foreground text-base">{dateLabel}</span>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <span className="text-[17px] font-normal tracking-[-0.01em] text-foreground">{dateLabel}</span>
+              <p className="text-[12.5px] text-muted-foreground mt-0.5">
                 {sessions.length > 0
                   ? `${sessions.length} session${sessions.length === 1 ? "" : "s"} logged`
                   : planned
@@ -108,30 +108,30 @@ export function DayDetailSheet({
                 <Link
                   key={session.id}
                   href="/calendar"
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-chart-2/30 bg-chart-2/5 text-left hover:bg-chart-2/10 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-3xl bg-secondary text-left hover:bg-accent transition-colors"
                   data-testid={`week-day-session-${session.id}`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: colorFor(label) }} />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-foreground truncate">{label}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-[15px] text-foreground truncate">{label}</span>
+                    <span className="block text-[12.5px] text-muted-foreground">
                       {exerciseCount(session)} exercise{exerciseCount(session) === 1 ? "" : "s"}
                     </span>
                   </span>
-                  <Check className="w-4 h-4 text-chart-2 shrink-0" />
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <Check className="w-4 h-4 text-chart-2 shrink-0" strokeWidth={1.6} />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" strokeWidth={1.6} />
                 </Link>
               );
             })}
             {sessions.length === 0 && planned && (
               <div
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl border border-border bg-secondary/20"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-3xl bg-secondary/60"
                 data-testid="week-day-planned"
               >
                 <span className="w-2.5 h-2.5 rounded-full shrink-0 opacity-60" style={{ background: planned.color }} />
                 <span className="min-w-0">
-                  <span className="block font-medium text-foreground/80 truncate">{planned.label}</span>
-                  <span className="block text-xs text-muted-foreground">On your program for this day</span>
+                  <span className="block text-[15px] text-foreground/80 truncate">{planned.label}</span>
+                  <span className="block text-[12.5px] text-muted-foreground">On your program for this day</span>
                 </span>
               </div>
             )}
@@ -139,9 +139,9 @@ export function DayDetailSheet({
 
           <dl className="px-5 pb-6 pt-4 grid grid-cols-2 gap-3">
             {stats.map((stat) => (
-              <div key={stat.label} className="rounded-xl border border-border bg-secondary/20 px-3 py-2.5">
-                <dt className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{stat.label}</dt>
-                <dd className="font-display font-semibold text-foreground tabular-nums mt-0.5 truncate">{stat.value}</dd>
+              <div key={stat.label} className="rounded-[22px] bg-secondary px-4 py-3">
+                <dt className="text-[10.5px] uppercase tracking-[0.1em] text-muted-foreground">{stat.label}</dt>
+                <dd className="text-lg font-light tracking-[-0.01em] text-foreground tabular-nums mt-0.5 truncate">{stat.value}</dd>
               </div>
             ))}
           </dl>

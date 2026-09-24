@@ -133,8 +133,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 rounded-xl bg-card border-l-4 border border-border"
-          style={{ borderLeftColor: draftAccent }}
+          className="p-5 rounded-[26px] bg-card"
           data-testid="card-independent-targets-edit"
         >
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Edit your targets</h2>
@@ -273,10 +272,10 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                     type="button"
                     onClick={() => toggleDay(d)}
                     aria-pressed={on}
-                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                    className={`px-3.5 py-2 rounded-full border text-xs font-medium transition-all ${
                       on
-                        ? "border-primary/40 bg-primary/15 text-primary"
-                        : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
+                        ? "border-white bg-white text-black"
+                        : "border-transparent bg-secondary text-muted-foreground hover:text-foreground"
                     }`}
                     data-testid={`targets-cardio-day-${d.toLowerCase()}`}
                   >
@@ -311,7 +310,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
             <button
               onClick={() => setEditing(false)}
               disabled={updateProfile.isPending}
-              className="h-9 px-4 rounded-lg bg-secondary text-foreground font-semibold text-xs hover:bg-secondary/80 transition-colors disabled:opacity-50"
+              className="h-9 px-4 rounded-full bg-secondary text-foreground font-semibold text-xs hover:bg-accent transition-colors disabled:opacity-50"
               data-testid="button-targets-cancel"
             >
               Cancel
@@ -319,7 +318,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
             <button
               onClick={handleSave}
               disabled={updateProfile.isPending || !!goalError || hasRangeError}
-              className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-9 px-5 rounded-full bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-targets-save"
             >
               {updateProfile.isPending ? "Saving..." : "Save targets"}
@@ -373,8 +372,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-xl bg-card border-l-4 border border-border"
-      style={{ borderLeftColor: accent }}
+      className="p-5 rounded-[26px] bg-card"
       data-testid="card-independent-targets"
     >
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -385,7 +383,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
         </div>
         <button
           onClick={openEditor}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-secondary text-foreground text-xs font-semibold border border-border hover:border-primary/50 hover:text-primary transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-secondary text-foreground text-xs font-medium hover:bg-accent transition-colors shrink-0"
           data-testid="button-targets-edit"
         >
           <Pencil className="w-3 h-3" />
@@ -427,7 +425,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
               {(profile.cardioDays?.length ?? 0) > 0 ? (
                 <span className="inline-flex flex-wrap gap-1.5 justify-end items-center">
                   {orderCardioDays(profile.cardioDays!).map((d) => (
-                    <span key={d} className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">{d}</span>
+                    <span key={d} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-foreground">{d}</span>
                   ))}
                   {profile.cardioMinutes != null && (
                     <span className="text-xs text-muted-foreground font-medium">· {profile.cardioMinutes} min each</span>

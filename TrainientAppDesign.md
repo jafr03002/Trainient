@@ -181,12 +181,27 @@ with black text. Secondary actions are either an outlined pill
 5. Remove glows, gradient borders and coloured edge bars.
 6. Render at 390px and desktop: no horizontal overflow, nothing clipped, and the icon-only buttons labelled.
 
+**Date arc + wash (dashboard):** the top of the dashboard (`WeekStrip` in
+`components/dashboard/`) is the week on a shallow arc, taken from the calendar row
+of [calendar_dashboard_example.jpg](docs/design/references/calendar_dashboard_example.jpg)
+but recoloured to Sessions. Seven circles, Monday-first. A logged session fills its
+circle (`bg-white/[0.16]`), a planned session is outlined, a rest day is dashed,
+and today is larger with a thin white ring. The ring shows no progress; it only
+marks the day. The outer days sink (`1.5px × offset²`) and fade slightly. Above the arc,
+the white Intent sun (`src/assets/intent-sun.png`, from [intent-logo.png](docs/design/references/intent-logo.png))
+and the word "Intent" sit on the left, with a "Full month" chip on the right. Behind it,
+`.sessions-wash` is a grey-to-teal light that fades into black, and the greeting
+sits straight on it with no card. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
+[desktop](docs/design/references/dashboard-desktop.png).
+
 ## 8. Not yet migrated / open
 
 - `/program` (AI + My program pages, including the builder and empty states),
-  `/progress` and `/log` (the workout logger, its confirm sheets and empty states)
-  use Sessions so far. The log page reuses `ProgramPageShell`. The sidebar, mobile
-  tab bar and other pages are still Voltage.
+  `/progress`, `/log` (the workout logger, its confirm sheets and empty states)
+  and the dashboard (`/`, including the day sheet and Independent targets card)
+  use Sessions so far. The log page reuses `ProgramPageShell`, and the dashboard
+  has its own `DashboardShell` (it adds the wash). The sidebar, mobile tab bar
+  and other pages are still Voltage.
 - `/progress` shows the metric-card pattern: a caps label, a big light number
   and a muted delta, above a minimal axis-less chart. Its volume card is
   monochrome (top three bars white, the rest grey, cyan only for increases)
