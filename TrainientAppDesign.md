@@ -183,10 +183,16 @@ with black text. Secondary actions are either an outlined pill
 
 ## 8. Not yet migrated / open
 
-- `/program` (AI + My program pages, including the builder and empty states)
-  and `/log` (the workout logger, its confirm sheets and empty states) use Sessions.
-  The log page reuses `ProgramPageShell`. The sidebar, mobile tab bar and other pages are still Voltage.
-  Log page screenshots: [mobile](docs/design/references/log-page-mobile.png) · [desktop](docs/design/references/log-page-desktop.png)
+- `/program` (AI + My program pages, including the builder and empty states),
+  `/progress` and `/log` (the workout logger, its confirm sheets and empty states)
+  use Sessions so far. The log page reuses `ProgramPageShell`. The sidebar, mobile
+  tab bar and other pages are still Voltage.
+- `/progress` shows the metric-card pattern: a caps label, a big light number
+  and a muted delta, above a minimal axis-less chart. Its volume card is
+  monochrome (top three bars white, the rest grey, cyan only for increases)
+  instead of the multi-colour muscle palette.
+- `/log` shows the stat-band input row (see §5). Screenshots:
+  [mobile](docs/design/references/log-page-mobile.png) · [desktop](docs/design/references/log-page-desktop.png)
 - The program page's **week strip** (`ScheduleStrip`) is parked. It's still in the
   code but nothing renders it, until a reworked week view is designed.
 - Per-day colours (Settings → calendar colours) still paint the calendar and the
