@@ -147,6 +147,15 @@ The trailing value (sets × reps, a target) is quiet muted text, not a chip.
 **Notice / info card:** `rounded-[22px] bg-card px-4 py-3.5`, a muted 16px
 icon, `text-[12.5px]` muted copy, and links as `text-foreground underline underline-offset-[3px]`.
 
+**Stat-band input row (`SetRow`, log page):** for entering numbers mid-set.
+Each row is `border-t border-border px-5`, with a 52px leading column (big light
+number over a caps label) and then `flex-1` columns split by `border-l border-border`.
+Each column holds a **boxless** input (`bg-transparent text-[26px] font-light`,
+`–` placeholder, `focus:border-b` underline) over a `text-[10px]` caps label.
+The number goes from muted to white once the row is filled in. A caps hint line
+("Target 80 kg × 8" plus a delta pill) sits under the band. A PR row gets a faint
+cyan wash from the left and a cyan trophy.
+
 **Primary button (standalone):** `h-[52px] rounded-full bg-primary px-8 text-sm
 font-semibold uppercase tracking-[0.06em] text-primary-foreground`, which is white
 with black text. Secondary actions are either an outlined pill
@@ -187,9 +196,18 @@ sits straight on it with no card. Screenshots: [mobile](docs/design/references/d
 
 ## 8. Not yet migrated / open
 
-- `/program` (AI + My program pages, including the builder and empty states)
+- `/program` (AI + My program pages, including the builder and empty states),
+  `/progress`, `/log` (the workout logger, its confirm sheets and empty states)
   and the dashboard (`/`, including the day sheet and Independent targets card)
-  use Sessions. The sidebar, mobile tab bar and other pages are still Voltage.
+  use Sessions so far. The log page reuses `ProgramPageShell`, and the dashboard
+  has its own `DashboardShell` (it adds the wash). The sidebar, mobile tab bar
+  and other pages are still Voltage.
+- `/progress` shows the metric-card pattern: a caps label, a big light number
+  and a muted delta, above a minimal axis-less chart. Its volume card is
+  monochrome (top three bars white, the rest grey, cyan only for increases)
+  instead of the multi-colour muscle palette.
+- `/log` shows the stat-band input row (see §5). Screenshots:
+  [mobile](docs/design/references/log-page-mobile.png) · [desktop](docs/design/references/log-page-desktop.png)
 - The program page's **week strip** (`ScheduleStrip`) is parked. It's still in the
   code but nothing renders it, until a reworked week view is designed.
 - Per-day colours (Settings → calendar colours) still paint the calendar and the
