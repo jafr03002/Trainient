@@ -44,23 +44,24 @@ export function ConfirmSheet({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.22 }}
-            className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+            className="relative z-10 w-full max-w-sm space-y-5 rounded-t-[30px] bg-card px-5 pb-8 pt-3 md:rounded-[30px] md:pb-5"
           >
+            <div aria-hidden className="mx-auto h-[5px] w-9 rounded-full bg-accent md:hidden" />
             <div>
-              <h3 className="font-semibold text-foreground">{title}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{body}</p>
+              <h3 className="text-2xl font-light tracking-[-0.01em] text-foreground">{title}</h3>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">{body}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2.5">
               <button
                 onClick={onCancel}
-                className="flex-1 h-11 rounded-xl border border-border text-foreground font-medium hover:bg-secondary/30 transition-colors"
+                className="h-12 flex-1 rounded-full bg-secondary text-sm font-medium text-foreground transition-colors hover:bg-accent"
                 data-testid={cancelTestId}
               >
                 {cancelLabel}
               </button>
               <button
                 onClick={onConfirm}
-                className={`flex-1 h-11 rounded-xl font-semibold transition-colors ${confirmClassName}`}
+                className={`h-12 flex-1 rounded-full text-sm font-semibold transition-colors ${confirmClassName}`}
                 data-testid={confirmTestId}
               >
                 {confirmLabel}
