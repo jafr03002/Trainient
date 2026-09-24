@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Trophy, Dumbbell, Clock } from "lucide-react";
+import { Loader2, Trophy, Dumbbell, Clock, X, Info } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
 import { isPreCalibrationLocked } from "@/lib/calibration";
@@ -20,6 +20,7 @@ import { ConfirmSheet } from "@/components/workout/ConfirmSheet";
 import type { SetField } from "@/components/workout/SetRow";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
+import { ProgramPageShell, PROGRAM_TITLE_CLASS } from "@/pages/program/shared";
 
 export default function Log() {
   const [, setLocation] = useLocation();
@@ -235,13 +236,15 @@ export default function Log() {
 
   if (program && isPreCalibrationLocked(program, new Date())) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-64">
+      <ProgramPageShell>
+        <div className="flex min-h-64 items-center justify-center">
         <WorkoutLogLockDialog
           open
           programId={program.id}
           onCancel={() => setLocation("/dashboard")}
         />
-      </div>
+        </div>
+      </ProgramPageShell>
     );
   }
 
@@ -252,25 +255,19 @@ export default function Log() {
   // on "Loading..." forever.
   if (!isProgramLoading && !program && profile) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="text-center py-20">
-          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">No program to log yet</h2>
-          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-            {isIndependent
+      <ProgramPageShell>
+        <LogEmptyState
+          title="No program to log yet"
+          body={
+            isIndependent
               ? "You haven't built a program yet. Create one to start logging your workouts."
-              : "You don't have a program yet. Generate one with your AI coach to start logging your workouts."}
-          </p>
-          <Link href={isIndependent ? "/program/my" : "/program/ai"}>
-            <button
-              className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-              data-testid="button-log-no-program-cta"
-            >
-              {isIndependent ? "Create your program" : "Generate my program"}
-            </button>
-          </Link>
-        </div>
-      </div>
+              : "You don't have a program yet. Generate one with your AI coach to start logging your workouts."
+          }
+          href={isIndependent ? "/program/my" : "/program/ai"}
+          cta={isIndependent ? "Create your program" : "Generate my program"}
+          ctaTestId="button-log-no-program-cta"
+        />
+      </ProgramPageShell>
     );
   }
 
@@ -282,35 +279,30 @@ export default function Log() {
   // the button would just repeat the failure.
   if (hasSession === false) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="text-center py-20" data-testid="log-no-session">
-          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">
-            {startFailed ? "Couldn't start your workout" : "No logging ongoing"}
-          </h2>
-          <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-            {startFailed
+      <ProgramPageShell>
+        <LogEmptyState
+          testId="log-no-session"
+          title={startFailed ? "Couldn't start your workout" : "No logging ongoing"}
+          body={
+            startFailed
               ? "This browser won't let the app store your session on this device, so there's nowhere to log to. Turn on site data (or leave private browsing) and try again."
-              : "Head to your program page and hit Start workout on the day you're training - your session opens here."}
-          </p>
-          <Link href="/program">
-            <button
-              className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-              data-testid="button-log-no-session-cta"
-            >
-              Go to my program
-            </button>
-          </Link>
-        </div>
-      </div>
+              : "Head to your program page and hit Start workout on the day you're training - your session opens here."
+          }
+          href="/program"
+          cta="Go to my program"
+          ctaTestId="button-log-no-session-cta"
+        />
+      </ProgramPageShell>
     );
   }
 
   if (!program || !activeDay) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-64">
-        <div className="text-muted-foreground text-sm">Loading workout...</div>
-      </div>
+      <ProgramPageShell>
+        <div className="flex min-h-64 items-center justify-center">
+          <div className="text-sm text-muted-foreground">Loading workout...</div>
+        </div>
+      </ProgramPageShell>
     );
   }
 
@@ -344,78 +336,81 @@ export default function Log() {
   ];
 
   return (
-    <div className="p-6 max-w-3xl mx-auto pb-12">
-      {/* PR Toast Stack */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 pointer-events-none">
+    <ProgramPageShell>
+      {/* PR toast stack - pills dropping in at the top centre, iOS style */}
+      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2 px-4">
         <AnimatePresence>
           {prFlashes.map((flash) => (
             <motion.div
               key={flash.id}
-              initial={{ opacity: 0, x: 60, scale: 0.9 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 60, scale: 0.9 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center gap-3 bg-chart-3/90 backdrop-blur-sm text-background font-semibold text-sm px-4 py-3 rounded-xl shadow-xl"
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.2 }}
+              className="flex max-w-full items-center gap-3 rounded-full bg-secondary/95 py-2.5 pl-2.5 pr-5 backdrop-blur-md"
             >
-              <Trophy className="w-4 h-4 shrink-0" />
-              <div>
-                <div className="text-xs font-medium opacity-80">New personal record!</div>
-                <div>{flash.exercise} - {flash.weight} {weightUnit}</div>
+              <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[hsl(var(--sessions-cyan)/0.12)] text-[hsl(var(--sessions-cyan))]">
+                <Trophy className="h-4 w-4" strokeWidth={1.6} />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">New personal record</div>
+                <div className="truncate text-[13.5px] font-medium text-foreground">
+                  {flash.exercise} - {flash.weight} {weightUnit}
+                </div>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{day?.label ?? "Workout"}</h1>
-            {/* Ambient information, not an achievement - deliberately not given
-                the PR pill's treatment, and kept out of the corner the PR badge
-                and "Cancel workout" already share. */}
-            {elapsedSeconds != null && (
-              <div
-                className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5"
-                data-testid="text-session-duration"
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span className="font-medium tabular-nums">{formatClock(elapsedSeconds)}</span>
-              </div>
-            )}
-            {resumedElsewhere && (
-              <p className="text-xs text-chart-3 bg-chart-3/10 border border-chart-3/20 rounded-lg px-3 py-2 mt-2 inline-block">
-                Resuming your in-progress session - finish it before starting a new one.
-              </p>
-            )}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className={PROGRAM_TITLE_CLASS}>{day?.label ?? "Workout"}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+              {/* Ambient information, not an achievement - kept as plain meta
+                  text rather than given the PR badge's treatment. */}
+              {elapsedSeconds != null && (
+                <span className="flex items-center gap-1.5" data-testid="text-session-duration">
+                  <Clock className="h-3.5 w-3.5" strokeWidth={1.6} />
+                  <span className="tabular-nums">{formatClock(elapsedSeconds)}</span>
+                </span>
+              )}
+              {sessionPrCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--sessions-cyan)/0.1)] px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[hsl(var(--sessions-cyan))]"
+                >
+                  <Trophy className="h-3 w-3" strokeWidth={1.6} />
+                  {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
+                </motion.span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {sessionPrCount > 0 && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-chart-3/10 border border-chart-3/20 text-chart-3 text-sm font-semibold font-display"
-              >
-                <Trophy className="w-4 h-4" />
-                {sessionPrCount} PR{sessionPrCount > 1 ? "s" : ""}
-              </motion.div>
-            )}
-            <button
-              onClick={() => setShowCancelConfirm(true)}
-              className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1.5"
-              data-testid="button-cancel-workout"
-            >
-              Cancel workout
-            </button>
-          </div>
+          <button
+            onClick={() => setShowCancelConfirm(true)}
+            aria-label="Cancel workout"
+            title="Cancel workout"
+            className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition-colors hover:bg-accent"
+            data-testid="button-cancel-workout"
+          >
+            <X className="h-5 w-5" strokeWidth={1.6} />
+          </button>
         </div>
+        {resumedElsewhere && (
+          <div className="flex gap-2.5 rounded-[22px] bg-card px-4 py-3.5 text-[12.5px] leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.6} />
+            <span>Resuming your in-progress session - finish it before starting a new one.</span>
+          </div>
+        )}
       </motion.div>
 
       {/* No day picker here on purpose: the page logs exactly the one day named
           above. Switching days happens on the program page, which prompts to
           discard this session first (see DiscardSessionDialog). */}
 
-      <div className="mt-6 space-y-6">
+      <div className="space-y-3.5">
         {logs.map((ex, exIdx) => {
           if (ex.kind === "checklist") {
             return (
@@ -479,13 +474,13 @@ export default function Log() {
         ref={tourFinishRef}
         onClick={handleFinishClick}
         disabled={createWorkout.isPending}
-        className="w-full h-12 mt-8 rounded-xl bg-primary text-primary-foreground font-semibold text-base hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+        className="!mt-8 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
         data-testid="button-finish-workout"
       >
         {createWorkout.isPending ? (
           <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
         ) : sessionPrCount > 0 ? (
-          <><Trophy className="w-5 h-5 text-chart-3" /> Finish - {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}!</>
+          <><Trophy className="h-4 w-4" strokeWidth={1.8} /> Finish · {sessionPrCount} new PR{sessionPrCount > 1 ? "s" : ""}</>
         ) : (
           "Finish workout"
         )}
@@ -518,6 +513,41 @@ export default function Log() {
         onCancel={() => setShowCancelConfirm(false)}
         onConfirm={cancelWorkout}
       />
+    </ProgramPageShell>
+  );
+}
+
+// The page when there is nothing to log: no program yet, or no session open.
+function LogEmptyState({
+  title,
+  body,
+  href,
+  cta,
+  ctaTestId,
+  testId,
+}: {
+  title: string;
+  body: string;
+  href: string;
+  cta: string;
+  ctaTestId: string;
+  testId?: string;
+}) {
+  return (
+    <div className="py-20 text-center" data-testid={testId}>
+      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-card text-muted-foreground">
+        <Dumbbell className="h-6 w-6" strokeWidth={1.6} />
+      </div>
+      <h2 className="text-[28px] font-light tracking-[-0.02em] text-foreground">{title}</h2>
+      <p className="mx-auto mb-7 mt-2.5 max-w-xs text-[13.5px] leading-relaxed text-muted-foreground">{body}</p>
+      <Link href={href}>
+        <button
+          className="h-[52px] rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90"
+          data-testid={ctaTestId}
+        >
+          {cta}
+        </button>
+      </Link>
     </div>
   );
 }

@@ -78,13 +78,12 @@ export function ChecklistItemCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: exIdx * 0.06 }}
-      // Same neutral card fill as an exercise card; the accent border,
-      // icon and timer carry the distinction without a colour wash.
-      className="rounded-xl overflow-hidden border bg-card"
-      style={{ borderColor: `color-mix(in srgb, ${accent} 32%, transparent)` }}
+      // Same card as an exercise. The category colour only tints the small
+      // label below the name - Sessions keeps colour to small signals.
+      className="overflow-hidden rounded-[26px] bg-card"
       data-testid={`log-checklist-${exIdx}`}
     >
-      <div className="p-4 flex items-center gap-3">
+      <div className="flex items-center gap-3 py-3.5 pl-4 pr-5">
         <button
           onClick={onToggleRound}
           aria-pressed={allDone}
@@ -95,18 +94,17 @@ export function ChecklistItemCard({
               ? `${ex.name} — done, tap to clear`
               : `${ex.name} — mark round ${Math.min(ex.completedRounds + 1, ex.targetRounds)} of ${ex.targetRounds} done`
           }
-          className={`shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all ${
-            allDone
-              ? "bg-chart-2/15 border-chart-2/50 text-chart-2"
-              : "bg-secondary/30 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+          // Done is white with a black tick - the Sessions "selected" state.
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+            allDone ? "bg-white text-black" : "bg-secondary text-muted-foreground hover:bg-accent hover:text-foreground"
           }`}
           title={allDone ? "Mark as not done" : "Mark a round done"}
           data-testid={`checklist-tick-${exIdx}`}
         >
           {allDone ? (
-            <Check className="w-4 h-4" />
+            <Check className="w-4 h-4" strokeWidth={2} />
           ) : ex.completedRounds > 0 ? (
-            <span className="text-[11px] font-display font-bold tabular-nums">
+            <span className="text-[11px] font-medium tabular-nums">
               {ex.completedRounds}/{ex.targetRounds}
             </span>
           ) : null}
@@ -114,11 +112,11 @@ export function ChecklistItemCard({
 
         <div className="flex-1 min-w-0">
           <h3
-            className={`font-semibold text-foreground truncate ${allDone ? "opacity-55 line-through" : ""}`}
+            className={`truncate text-[15px] font-normal ${allDone ? "text-muted-foreground line-through" : "text-foreground"}`}
           >
             {ex.name}
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
             <span className="font-medium" style={{ color: accent }}>
               {meta ? meta.label : "Checklist"}
             </span>
@@ -130,7 +128,7 @@ export function ChecklistItemCard({
         </div>
 
         {!timed && target && (
-          <span className="font-display font-semibold text-[15px] text-foreground whitespace-nowrap shrink-0">
+          <span className="shrink-0 whitespace-nowrap text-[15px] text-muted-foreground">
             {target}
           </span>
         )}

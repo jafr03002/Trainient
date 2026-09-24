@@ -147,6 +147,15 @@ The trailing value (sets × reps, a target) is quiet muted text, not a chip.
 **Notice / info card:** `rounded-[22px] bg-card px-4 py-3.5`, a muted 16px
 icon, `text-[12.5px]` muted copy, and links as `text-foreground underline underline-offset-[3px]`.
 
+**Stat-band input row (`SetRow`, log page):** for entering numbers mid-set.
+Each row is `border-t border-border px-5`, with a 52px leading column (big light
+number over a caps label) and then `flex-1` columns split by `border-l border-border`.
+Each column holds a **boxless** input (`bg-transparent text-[26px] font-light`,
+`–` placeholder, `focus:border-b` underline) over a `text-[10px]` caps label.
+The number goes from muted to white once the row is filled in. A caps hint line
+("Target 80 kg × 8" plus a delta pill) sits under the band. A PR row gets a faint
+cyan wash from the left and a cyan trophy.
+
 **Primary button (standalone):** `h-[52px] rounded-full bg-primary px-8 text-sm
 font-semibold uppercase tracking-[0.06em] text-primary-foreground`, which is white
 with black text. Secondary actions are either an outlined pill
@@ -174,8 +183,10 @@ with black text. Secondary actions are either an outlined pill
 
 ## 8. Not yet migrated / open
 
-- Only `/program` (AI + My program pages, including the builder and empty
-  states) uses Sessions so far. The sidebar, mobile tab bar and other pages are still Voltage.
+- `/program` (AI + My program pages, including the builder and empty states)
+  and `/log` (the workout logger, its confirm sheets and empty states) use Sessions.
+  The log page reuses `ProgramPageShell`. The sidebar, mobile tab bar and other pages are still Voltage.
+  Log page screenshots: [mobile](docs/design/references/log-page-mobile.png) · [desktop](docs/design/references/log-page-desktop.png)
 - The program page's **week strip** (`ScheduleStrip`) is parked. It's still in the
   code but nothing renders it, until a reworked week view is designed.
 - Per-day colours (Settings → calendar colours) still paint the calendar and the
