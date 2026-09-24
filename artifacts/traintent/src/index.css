@@ -254,6 +254,16 @@
   user-select: none;
 }
 
+/* The soft grey-to-teal light behind the top of the dashboard (the date arc
+   and greeting) - the hero glass's colours, fading down into the black. */
+.sessions-wash {
+  background:
+    radial-gradient(60% 55% at 50% 30%, hsl(var(--sessions-cyan) / 0.3), transparent 70%),
+    radial-gradient(75% 60% at 50% 18%, rgb(214 222 222 / 0.22), transparent 72%),
+    linear-gradient(180deg, #2f3538 0%, #1b2224 38%, hsl(var(--background)) 100%);
+  pointer-events: none;
+}
+
 @layer base {
   * {
     @apply border-border;

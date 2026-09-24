@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useState, type ReactNode, type RefObject } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Check, ChevronRight } from "lucide-react";
@@ -25,6 +25,8 @@ type WeekStripProps = {
   // The "Full month" link, which the calendar leg of the first-run tour points
   // at when the nav no longer carries a Calendar tab.
   calendarLinkRef?: RefObject<HTMLAnchorElement | null>;
+  // Shown on the left of the strip's top row, opposite "Full month".
+  header?: ReactNode;
 };
 
 // A session name has about 45px at 390px wide, so a long label is shortened
@@ -50,10 +52,10 @@ function addDays(from: string, days: number): string {
 }
 
 /**
- * The tappable week under the dashboard's greeting card: seven days,
- * Monday-first, each carrying the session it belongs to. Completed sessions
- * read in `chart-2` green, the ones still ahead sit dimmed, and today is ringed
- * in `primary`. Tapping any day opens its detail - the numbers the old "This
+ * The tappable week at the top of the dashboard: seven days, Monday-first, on a
+ * shallow arc over the Sessions wash, each carrying the session it belongs to.
+ * A logged session fills its circle, a planned one is outlined, a rest day is
+ * dashed, and today wears a white ring. Tapping any day opens its detail - the numbers the old "This
  * week" table used to spread across four columns.
  *
  * `programs.schedule` may be `rotating`, which the backend doesn't fully
@@ -71,6 +73,7 @@ export function WeekStrip({
   isIndependent,
   isLoading,
   calendarLinkRef,
+  header,
 }: WeekStripProps) {
   const [openDate, setOpenDate] = useState<string | null>(null);
   const colorsQuery = useGetCalendarColors();
@@ -119,99 +122,93 @@ export function WeekStrip({
   const openDay = openDate ? week.find((d) => d.date === openDate) : undefined;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 }}
-      className="p-4 rounded-xl bg-card border border-border"
+      transition={{ duration: 0.2 }}
+      className="relative"
       data-testid="card-week-strip"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">This week</h2>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">{header}</div>
         <Link
           href="/calendar"
           ref={calendarLinkRef}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+          className="flex shrink-0 items-center gap-1 rounded-full bg-black/30 px-3 py-1.5 text-[12px] text-white/85 backdrop-blur-sm transition-colors hover:text-white"
           data-testid="link-week-strip-calendar"
         >
-          Full month <ChevronRight className="w-3.5 h-3.5" />
+          Full month <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.6} />
         </Link>
       </div>
 
       {isLoading ? (
-        <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+        <div className="h-[128px]" aria-hidden />
       ) : (
         <>
-          <div className="grid grid-cols-7 gap-1">
-            {week.map((day) => (
-              <button
-                key={day.date}
-                onClick={() => setOpenDate(day.date)}
-                // Pressable, and said out loud for a screen reader: the visual
-                // cues (the press-down, the chevron hint below) can't be heard.
-                aria-label={`${day.weekday} ${day.dayOfMonth}${day.label ? ` - ${day.label}` : " - rest day"}, open details`}
-                title={day.label ?? undefined}
-                className={`flex flex-col items-center gap-1 px-0.5 pt-1.5 pb-2 rounded-lg border transition-all active:scale-[0.96] ${
-                  day.done
-                    ? "border-chart-2/40 bg-chart-2/10 hover:bg-chart-2/15"
-                    : day.label
-                    ? "border-border bg-secondary/20 hover:bg-secondary/40"
-                    : "border-border/50 bg-transparent hover:bg-secondary/20"
-                } ${day.isToday ? "ring-1 ring-primary" : ""}`}
-                data-testid={`week-strip-day-${day.date}`}
-              >
-                <span
-                  className={`text-[10px] font-medium uppercase tracking-wide ${
-                    day.isToday ? "text-primary" : "text-muted-foreground"
-                  }`}
+          {/* The week on a shallow arc, as in the reference: today is the
+              ringed circle, a logged session fills its day, a planned one is
+              outlined and a rest day is dashed. The edges sink and fade a
+              little so the middle of the week reads as the front. */}
+          <div className="relative mx-auto mt-4 h-[128px] max-w-[440px]" role="group" aria-label="This week">
+            {week.map((day, i) => {
+              const offset = i - 3;
+              return (
+                <button
+                  key={day.date}
+                  onClick={() => setOpenDate(day.date)}
+                  // Said out loud for a screen reader: the fills and rings can't be heard.
+                  aria-label={`${day.weekday} ${day.dayOfMonth}${day.label ? ` - ${day.label}${day.done ? ", done" : ""}` : " - rest day"}, open details`}
+                  title={day.label ?? undefined}
+                  className="absolute flex w-[52px] -translate-x-1/2 flex-col items-center gap-1.5"
+                  style={{
+                    left: `${((i + 0.5) / 7) * 100}%`,
+                    top: 6 + 1.5 * offset * offset + (day.isToday ? 0 : 4),
+                    opacity: 1 - 0.07 * Math.abs(offset),
+                  }}
+                  data-testid={`week-strip-day-${day.date}`}
                 >
-                  {day.weekday}
-                </span>
-                <span
-                  className={`text-xs font-display font-semibold tabular-nums ${
-                    day.isToday ? "text-primary" : "text-foreground"
-                  }`}
-                >
-                  {day.dayOfMonth}
-                </span>
-                {day.label ? (
                   <span
-                    className={`flex items-center gap-0.5 text-[9px] leading-tight font-medium text-center break-words ${
-                      day.done
-                        ? "text-chart-2"
-                        : // Still ahead: present but recessed, so the week reads
-                          // as what has been done versus what is coming.
-                          "text-muted-foreground/70"
+                    className={`grid place-items-center rounded-full tabular-nums backdrop-blur-sm transition-colors ${
+                      day.isToday
+                        ? "h-12 w-12 bg-black/30 text-[15px] font-medium text-white outline outline-[1.5px] outline-offset-[3px] outline-white"
+                        : "h-10 w-10 text-[13px]"
+                    } ${
+                      day.isToday
+                        ? ""
+                        : day.done
+                        ? "border border-white/35 bg-white/[0.16] text-white"
+                        : day.label
+                        ? "border border-white/25 bg-white/[0.06] text-white/85"
+                        : "border border-dashed border-white/20 text-white/50"
                     }`}
                   >
-                    {day.done && <Check className="w-2.5 h-2.5 shrink-0" />}
-                    {abbreviateLabel(day.label)}
+                    {day.dayOfMonth}
                   </span>
-                ) : (
-                  <span className="text-[9px] leading-tight text-muted-foreground/40">Rest</span>
-                )}
-                {/* The day's own colour, the one it wears on /program and
-                    /calendar, kept as a hairline so the tile can still be read
-                    as done / to come at a glance. */}
-                <span
-                  className="w-4 h-0.5 rounded-full"
-                  style={{ background: day.label ? colorFor(day.label) : "transparent", opacity: day.done ? 1 : 0.45 }}
-                />
-              </button>
-            ))}
+                  <span className={`text-[12.5px] ${day.isToday ? "font-semibold text-white" : "text-white/60"}`}>
+                    {day.weekday}
+                  </span>
+                  <span
+                    className={`flex max-w-full items-center gap-0.5 truncate text-[10px] leading-none ${
+                      day.done ? "text-white/80" : day.label ? "text-white/45" : "text-white/30"
+                    }`}
+                  >
+                    {day.done && <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={2} />}
+                    {day.label ? abbreviateLabel(day.label) : "Rest"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* A rotating cycle isn't pinned to weekdays, and the backend doesn't
               carry it forward yet, so name the sequence instead of guessing
               dates for it. */}
           {!isFixed && days.length > 0 && (
-            <p className="text-[11px] text-muted-foreground mt-2.5" data-testid="week-strip-rotation">
-              <span className="text-muted-foreground/60">In order: </span>
+            <p className="mt-1 truncate text-center text-[11px] text-white/55" data-testid="week-strip-rotation">
+              <span className="text-white/40">In order: </span>
               {days.map((d) => d.label).join(" → ")}
             </p>
           )}
-
-          <p className="text-[10px] text-muted-foreground/60 mt-2.5 text-center">Tap a day for its details</p>
         </>
       )}
 
@@ -227,6 +224,6 @@ export function WeekStrip({
           onClose={() => setOpenDate(null)}
         />
       )}
-    </motion.div>
+    </motion.section>
   );
 }

@@ -172,10 +172,24 @@ with black text. Secondary actions are either an outlined pill
 5. Remove glows, gradient borders and coloured edge bars.
 6. Render at 390px and desktop: no horizontal overflow, nothing clipped, and the icon-only buttons labelled.
 
+**Date arc + wash (dashboard):** the top of the dashboard (`WeekStrip` in
+`components/dashboard/`) is the week on a shallow arc, taken from the calendar row
+of [calendar_dashboard_example.jpg](docs/design/references/calendar_dashboard_example.jpg)
+but recoloured to Sessions. Seven circles, Monday-first. A logged session fills its
+circle (`bg-white/[0.16]`), a planned session is outlined, a rest day is dashed,
+and today is larger with a thin white ring. The ring shows no progress; it only
+marks the day. The outer days sink (`1.5px × offset²`) and fade slightly. Above the arc,
+the white Intent sun (`src/assets/intent-sun.png`, from [intent-logo.png](docs/design/references/intent-logo.png))
+and the word "Intent" sit on the left, with a "Full month" chip on the right. Behind it,
+`.sessions-wash` is a grey-to-teal light that fades into black, and the greeting
+sits straight on it with no card. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
+[desktop](docs/design/references/dashboard-desktop.png).
+
 ## 8. Not yet migrated / open
 
-- Only `/program` (AI + My program pages, including the builder and empty
-  states) uses Sessions so far. The sidebar, mobile tab bar and other pages are still Voltage.
+- `/program` (AI + My program pages, including the builder and empty states)
+  and the dashboard (`/`, including the day sheet and Independent targets card)
+  use Sessions. The sidebar, mobile tab bar and other pages are still Voltage.
 - The program page's **week strip** (`ScheduleStrip`) is parked. It's still in the
   code but nothing renders it, until a reworked week view is designed.
 - Per-day colours (Settings → calendar colours) still paint the calendar and the

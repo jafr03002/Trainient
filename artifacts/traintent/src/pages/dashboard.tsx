@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useUser } from "@clerk/react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { CalendarCheck, Trophy, ArrowRight, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronRight, Loader2, Play } from "lucide-react";
+import intentSun from "@/assets/intent-sun.png";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetWorkoutStats,
@@ -23,7 +24,7 @@ import {
   getGetProfileQueryKey,
   getGetCurrentProgramQueryKey,
 } from "@workspace/api-client-react";
-import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
+import { phaseSolid } from "@/lib/phaseColors";
 import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
 import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
@@ -266,34 +267,34 @@ export default function Dashboard() {
   // today >= startDate, so the two can never both fire on the same render.
   if (!program.isLoading && isPreCalibrationLocked(program.data, new Date())) {
     return (
-      <div className="p-6 max-w-5xl mx-auto space-y-8">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <h1 className="text-2xl font-bold text-foreground">
-            {greet()}, {profile?.name || user?.firstName || "Coach"}.
-          </h1>
+      <DashboardShell>
+        <BrandMark />
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">{greet()}</p>
+          <h1 className={`${DASHBOARD_TITLE_CLASS} mt-1`}>{profile?.name || user?.firstName || "Coach"}</h1>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.06 }}
-          className="p-5 rounded-xl bg-card border border-border space-y-4"
+          className="rounded-[26px] bg-card p-5 space-y-4"
           data-testid="card-pre-calibration-lock"
         >
-          <p className="text-foreground">
+          <p className="text-sm leading-relaxed text-foreground">
             You chose to start on {format(parseLocalDateString(program.data!.startDate!), "EEE, MMM d")} but you can start today.
           </p>
           <button
             onClick={handleStartToday}
             disabled={setProgramStartDate.isPending}
-            className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            className="h-[52px] px-8 rounded-full bg-primary text-primary-foreground font-semibold text-sm uppercase tracking-[0.06em] hover:bg-primary/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
             data-testid="button-start-today"
           >
             {setProgramStartDate.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             Start today
           </button>
         </motion.div>
-      </div>
+      </DashboardShell>
     );
   }
 
@@ -376,97 +377,17 @@ export default function Dashboard() {
   const goal = goalProgress.data;
   const kgToGo = goal?.goalWeight != null ? Math.abs(goal.currentTrendWeight - goal.goalWeight) : null;
 
+  const displayName = profile?.name || user?.firstName || "Coach";
+  // Phases (calibration, bulk, ...) only exist in the AI lineage - never label
+  // an independent-mode dashboard with one, even if a stale AI program is still
+  // resolvable for this user.
+  const heroPhase = !isIndependent ? program.data?.shortTermPhase ?? null : null;
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="p-6 rounded-xl border border-primary/25 glow-primary"
-        style={{ background: "radial-gradient(120% 140% at 0% 0%, hsl(var(--primary) / 0.18), transparent 55%), hsl(var(--card))" }}
-        data-testid="card-todays-session"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">{greet()}</p>
-            <h1 className="text-2xl font-bold text-foreground mt-1 font-display" data-testid="text-greeting">
-              {profile?.name || user?.firstName || "Coach"}
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1" data-testid="text-greeting-line">
-              {program.data && nextDay
-                ? greetingLine(nextDay.label)
-                : stats.data
-                ? `Week ${stats.data.currentWeek} of your program.`
-                : "Start logging your workouts here and get to work."}
-            </p>
-          </div>
-          {/* Phases (calibration, bulk, ...) only exist in the AI lineage - never
-              label an independent-mode dashboard with one, even if a stale AI
-              program is still resolvable for this user. */}
-          {!isIndependent && program.data?.shortTermPhase && (
-            <span
-              className="text-[10px] px-2.5 py-1 rounded-full whitespace-nowrap capitalize shrink-0 font-medium"
-              style={{ background: phaseSoft(program.data.shortTermPhase), color: phaseSolid(program.data.shortTermPhase) }}
-            >
-              {program.data.shortTermPhase.replace(/_/g, " ")}
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mt-6">
-          {program.isLoading ? (
-            <div className="h-11 flex items-center text-muted-foreground text-sm">Loading...</div>
-          ) : !program.data ? (
-            <Link
-              href="/program"
-              ref={tourBuildProgramRef}
-              className="h-11 px-5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
-              data-testid="link-build-program"
-            >
-              {isIndependent ? "Build your program" : "Generate a program"}
-              <ChevronRight className="w-4 h-4" />
-            </Link>
-          ) : nextDay ? (
-            // To the program page, not straight to /log: a session only starts
-            // from the day's Start workout button there, so linking into the
-            // logger would land on its "nothing in progress" idle screen.
-            <Link href="/program">
-              <button
-                ref={tourStartWorkoutRef}
-                className="h-11 px-5 max-w-full rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-2 glow-primary"
-                data-testid="button-start-workout"
-              >
-                {/* Named, so the button says which session it opens. A long
-                    day label is clipped rather than allowed to push the chevron
-                    off the card on a phone. */}
-                <span className="truncate">Start {nextDay.label}</span>
-                <ChevronRight className="w-4 h-4 shrink-0" />
-              </button>
-            </Link>
-          ) : null}
-
-          <div className="flex items-center gap-6">
-            <div data-testid="stat-current-week">
-              <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
-                <CalendarCheck className="w-4 h-4 text-primary" />
-                {stats.isLoading ? "-" : stats.data?.currentWeek ?? "-"}
-              </div>
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">Current week</div>
-            </div>
-            <div data-testid="card-progression">
-              <div className="flex items-center gap-1.5 text-2xl font-bold text-foreground font-display">
-                <Trophy className="w-4 h-4 text-chart-3" />
-                {personalRecords.isLoading ? "-" : recentPrCount}
-              </div>
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">PRs this week</div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* The week, directly under the greeting: what has been trained, what is
-          still to come, and every daily number behind a tap. */}
+    <DashboardShell>
+      {/* The week on an arc at the very top, with the brand opposite "Full
+          month" - the calendar row from the reference. Tapping a day opens
+          its numbers, as before. */}
       <WeekStrip
         program={program.data}
         weekLogs={weekLogs.data}
@@ -477,65 +398,159 @@ export default function Dashboard() {
         isIndependent={isIndependent}
         isLoading={weekLogs.isLoading || program.isLoading}
         calendarLinkRef={tourCalendarLinkRef}
+        header={<BrandMark />}
       />
+
+      {/* Greeting, straight on the wash - no card of its own */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex items-end justify-between gap-3"
+      >
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-white/65">{greet()}</p>
+          <h1 className={`${DASHBOARD_TITLE_CLASS} mt-1 truncate`} data-testid="text-greeting">
+            {displayName}
+          </h1>
+          <p className="text-[13.5px] text-muted-foreground mt-1.5" data-testid="text-greeting-line">
+            {program.data && nextDay
+              ? greetingLine(nextDay.label)
+              : stats.data
+              ? `Week ${stats.data.currentWeek} of your program.`
+              : "Start logging your workouts here and get to work."}
+          </p>
+        </div>
+        {heroPhase && (
+          <span className="mb-1 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground">
+            {/* The phase colour survives as a small signal only. */}
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: phaseSolid(heroPhase) }} />
+            {heroPhase.replace(/_/g, " ")}
+          </span>
+        )}
+      </motion.div>
+
+      {/* Hero: the week's numbers, then the primary action as a bottom-sheet row */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, delay: 0.04 }}
+        className="rounded-[30px] bg-card overflow-hidden"
+        data-testid="card-todays-session"
+      >
+        <div className="flex py-4">
+          <div className="flex-1 min-w-0 px-2 text-center" data-testid="stat-current-week">
+            <div className="text-2xl font-light tracking-[-0.02em] text-foreground tabular-nums">
+              {stats.isLoading ? "-" : stats.data?.currentWeek ?? "-"}
+            </div>
+            <div className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">Current week</div>
+          </div>
+          <div className="flex-1 min-w-0 px-2 text-center border-l border-border" data-testid="card-progression">
+            <div className="text-2xl font-light tracking-[-0.02em] text-foreground tabular-nums">
+              {personalRecords.isLoading ? "-" : recentPrCount}
+            </div>
+            <div className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">PRs this week</div>
+          </div>
+        </div>
+
+        {program.isLoading ? (
+          <div className="mx-2 mb-2 h-[76px] rounded-3xl bg-secondary" aria-hidden />
+        ) : !program.data ? (
+          <Link
+            href="/program"
+            ref={tourBuildProgramRef}
+            className={HERO_ACTION_CLASS}
+            data-testid="link-build-program"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-foreground">
+                {isIndependent ? "Build your program" : "Generate a program"}
+              </span>
+              <span className="block text-[12.5px] text-muted-foreground mt-0.5 truncate">
+                {isIndependent ? "Set up your training days" : "Your coach writes it from your answers"}
+              </span>
+            </span>
+            <span className={HERO_ACTION_CIRCLE_CLASS}>
+              <ChevronRight className="w-5 h-5" strokeWidth={1.8} />
+            </span>
+          </Link>
+        ) : nextDay ? (
+          // To the program page, not straight to /log: a session only starts
+          // from the day's Start workout button there, so linking into the
+          // logger would land on its "nothing in progress" idle screen.
+          <Link href="/program">
+            <button ref={tourStartWorkoutRef} className={HERO_ACTION_CLASS} data-testid="button-start-workout">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-foreground">
+                  Start workout
+                </span>
+                {/* Named, so the row says which session it opens; a long label
+                    truncates rather than pushing the play button off the card. */}
+                <span className="block text-[12.5px] text-muted-foreground mt-0.5 truncate">{nextDay.label}</span>
+              </span>
+              <span className={HERO_ACTION_CIRCLE_CLASS}>
+                <Play className="w-5 h-5 fill-current" strokeWidth={1.6} />
+              </span>
+            </button>
+          </Link>
+        ) : null}
+      </motion.div>
 
       {/* Check-in banner - AI mode only, after day 6 */}
       {showCheckinBanner && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between p-4 rounded-xl bg-primary/10 border border-primary/20"
+          className="flex items-center gap-3 rounded-[22px] bg-card py-3.5 pl-5 pr-3.5"
           data-testid="checkin-banner"
         >
-          <div>
-            <p className="font-semibold text-foreground text-sm">Time for your weekly check-in</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Your AI coach will adjust next week's program based on your answers</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">Time for your weekly check-in</p>
+            <p className="text-[12.5px] leading-relaxed text-muted-foreground mt-0.5">
+              Your AI coach will adjust next week's program based on your answers
+            </p>
           </div>
           <Link
             href="/checkin"
-            className="flex items-center gap-1.5 text-primary text-sm font-semibold shrink-0 ml-4 hover:text-primary/80 transition-colors"
+            className="h-9 shrink-0 inline-flex items-center rounded-full bg-primary px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:bg-primary/90 transition-colors"
             data-testid="link-checkin"
           >
-            Start <ArrowRight className="w-4 h-4" />
+            Start
           </Link>
         </motion.div>
       )}
 
       {/* This week narrative */}
       {!isIndependent && program.data?.aiGenerated && (program.data?.shortTermPhase || program.data?.dailyCalorieTarget != null || program.data?.dailyStepTarget != null) && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="p-5 rounded-xl bg-card border-l-4 border border-border"
-          style={program.data.shortTermPhase ? { borderLeftColor: phaseSolid(program.data.shortTermPhase) } : undefined}
+          transition={{ delay: 0.08 }}
           data-testid="card-week-narrative"
         >
-          <div className="flex items-center gap-1.5 mb-3">
-            {program.data.shortTermPhase && (
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: phaseSolid(program.data.shortTermPhase) }} />
+          <div className="flex items-baseline justify-between gap-3 mb-3">
+            <h2 className={`${SECTION_TITLE_CLASS} capitalize flex items-center gap-2 min-w-0`}>
+              {program.data.shortTermPhase && (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: phaseSolid(program.data.shortTermPhase) }} />
+              )}
+              <span className="truncate">{program.data.shortTermPhase?.replace(/_/g, " ") ?? "This week"}</span>
+            </h2>
+            {program.data.weekInPhase != null && (
+              <span className="text-[12.5px] text-muted-foreground whitespace-nowrap">
+                Week {program.data.weekInPhase}
+                {program.data.phaseTotalWeeks != null ? ` of ${program.data.phaseTotalWeeks}` : ""}
+              </span>
             )}
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground capitalize">
-              {program.data.shortTermPhase?.replace(/_/g, " ") ?? "This week"}
-              {program.data.weekInPhase != null &&
-                ` - week ${program.data.weekInPhase}${program.data.phaseTotalWeeks != null ? ` of ${program.data.phaseTotalWeeks}` : ""}`}
-            </span>
           </div>
-          <dl className="space-y-2">
+          <dl className="rounded-[26px] bg-card overflow-hidden">
             {program.data.dailyCalorieTarget != null && (
-              <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
-                <dt className="text-muted-foreground">Calorie target</dt>
-                <dd className="font-semibold text-foreground">{program.data.dailyCalorieTarget.toLocaleString()} kcal / day</dd>
-              </div>
+              <GroupedRow label="Calorie target" value={`${program.data.dailyCalorieTarget.toLocaleString()} kcal / day`} />
             )}
             {program.data.dailyStepTarget != null && (
-              <div className="flex items-center justify-between text-sm py-1">
-                <dt className="text-muted-foreground">Step target</dt>
-                <dd className="font-semibold text-foreground">{program.data.dailyStepTarget.toLocaleString()} steps / day</dd>
-              </div>
+              <GroupedRow label="Step target" value={`${program.data.dailyStepTarget.toLocaleString()} steps / day`} />
             )}
           </dl>
-        </motion.div>
+        </motion.section>
       )}
 
       {/* Your targets - Independent mode's editable stand-in for the AI narrative
@@ -545,37 +560,31 @@ export default function Dashboard() {
       {isIndependent && profile && <IndependentTargetsCard profile={profile} />}
 
       {/* Daily check-in */}
-      <motion.div
+      <motion.section
         ref={tourDailyCheckinRef}
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18 }}
-        className="p-5 rounded-xl bg-card border border-border"
+        transition={{ delay: 0.12 }}
         data-testid="card-daily-checkin"
       >
-        <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Today's check-in</h2>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className={SECTION_TITLE_CLASS}>Today's check-in</h2>
           <span
-            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-              loggedCount === 4
-                ? "bg-primary/15 text-primary border border-primary/20"
-                : "bg-secondary text-muted-foreground"
+            className={`rounded-full px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] whitespace-nowrap ${
+              loggedCount === 4 ? "bg-white text-black" : "bg-secondary text-muted-foreground"
             }`}
           >
             {loggedCount}/4 logged
           </span>
         </div>
-        {dailyCheckinLocked && (
-          <p className="text-xs text-muted-foreground mt-1" data-testid="text-checkin-locked">
-            Generate a program to start logging your daily check-in.
-          </p>
-        )}
-        <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 ${dailyCheckinLocked ? "opacity-50" : ""}`}>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Weight</label>
-            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
-              checkinWeightError ? "border-destructive" : "border-border focus-within:border-primary"
-            }`}>
+        <div className="rounded-[26px] bg-card p-3">
+          {dailyCheckinLocked && (
+            <p className="px-2 pt-1 pb-3 text-[12.5px] text-muted-foreground" data-testid="text-checkin-locked">
+              Generate a program to start logging your daily check-in.
+            </p>
+          )}
+          <div className={`grid grid-cols-2 md:grid-cols-4 gap-2 ${dailyCheckinLocked ? "opacity-50" : ""}`}>
+            <CheckinTile label="Weight" done={todayEntry?.weight != null} error={!!checkinWeightError}>
               <input
                 type="number"
                 step="0.1"
@@ -585,17 +594,12 @@ export default function Dashboard() {
                 onChange={(e) => setWeightInput(e.target.value)}
                 placeholder="0.0"
                 disabled={dailyCheckinLocked}
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
+                className={CHECKIN_INPUT_CLASS}
                 data-testid="input-checkin-weight"
               />
               <span className="text-xs text-muted-foreground shrink-0">{weightUnit}</span>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Calories</label>
-            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
-              checkinCaloriesError ? "border-destructive" : "border-border focus-within:border-primary"
-            }`}>
+            </CheckinTile>
+            <CheckinTile label="Calories" done={todayEntry?.calories != null} error={!!checkinCaloriesError}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -603,17 +607,12 @@ export default function Dashboard() {
                 onChange={(e) => setCaloriesInput(e.target.value)}
                 placeholder="0"
                 disabled={dailyCheckinLocked}
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
+                className={CHECKIN_INPUT_CLASS}
                 data-testid="input-checkin-calories"
               />
               <span className="text-xs text-muted-foreground shrink-0">kcal</span>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Steps</label>
-            <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
-              checkinStepsError ? "border-destructive" : "border-border focus-within:border-primary"
-            }`}>
+            </CheckinTile>
+            <CheckinTile label="Steps" done={todayEntry?.steps != null} error={!!checkinStepsError}>
               <input
                 type="number"
                 inputMode="numeric"
@@ -621,21 +620,16 @@ export default function Dashboard() {
                 onChange={(e) => setStepsInput(e.target.value)}
                 placeholder="0"
                 disabled={dailyCheckinLocked}
-                className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none disabled:cursor-not-allowed"
+                className={CHECKIN_INPUT_CLASS}
                 data-testid="input-checkin-steps"
               />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cardio</label>
-            <div className={`mt-1.5 flex items-center gap-1 h-12 rounded-xl border bg-secondary/30 px-2 ${
-              checkinCardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
-            }`}>
+            </CheckinTile>
+            <CheckinTile label="Cardio" done={todayEntry?.cardioType != null} error={!!checkinCardioMinutesError}>
               <select
                 value={cardioTypeInput}
                 onChange={(e) => setCardioTypeInput(e.target.value)}
                 disabled={dailyCheckinLocked}
-                className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none disabled:cursor-not-allowed"
+                className="flex-1 min-w-0 h-8 bg-transparent text-[15px] focus:outline-none disabled:cursor-not-allowed"
                 data-testid="select-checkin-cardio-type"
               >
                 <option value="">None</option>
@@ -650,88 +644,87 @@ export default function Dashboard() {
                 onChange={(e) => setCardioMinutesInput(e.target.value)}
                 placeholder="min"
                 disabled={dailyCheckinLocked}
-                className="w-12 shrink-0 bg-transparent text-sm text-right focus:outline-none disabled:cursor-not-allowed"
+                className="w-11 shrink-0 bg-transparent text-[15px] text-right tabular-nums focus:outline-none disabled:cursor-not-allowed"
                 data-testid="input-checkin-cardio-minutes"
               />
-            </div>
+            </CheckinTile>
           </div>
-        </div>
-        {/* One line for the whole row - only ever one field is wrong at a time in
-            practice, and four columns have no room for their own error text. */}
-        {(checkinWeightError || checkinCaloriesError || checkinStepsError || checkinCardioMinutesError) && (
-          <p className="text-xs font-medium text-destructive mt-2" data-testid="text-checkin-error">
-            {checkinWeightError ?? checkinCaloriesError ?? checkinStepsError ?? checkinCardioMinutesError}
-          </p>
-        )}
-        <div className="flex justify-end mt-4">
+          {/* One line for the whole row - only ever one field is wrong at a time in
+              practice, and four columns have no room for their own error text. */}
+          {(checkinWeightError || checkinCaloriesError || checkinStepsError || checkinCardioMinutesError) && (
+            <p className="px-2 pt-2.5 text-xs font-medium text-destructive" data-testid="text-checkin-error">
+              {checkinWeightError ?? checkinCaloriesError ?? checkinStepsError ?? checkinCardioMinutesError}
+            </p>
+          )}
           <button
             onClick={handleSaveDailyCheckin}
             disabled={submitDailyCheckin.isPending || dailyCheckinLocked || checkinHasError}
-            className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="mt-3 h-[52px] w-full rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
             data-testid="button-save-checkin"
           >
             {submitDailyCheckin.isPending ? "Saving..." : "Save today's check-in"}
           </button>
         </div>
-      </motion.div>
+      </motion.section>
 
       {/* Progress toward goal */}
-      <motion.div
+      <motion.section
         ref={tourProgressRef}
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.22 }}
-        className="p-5 rounded-xl bg-card border border-border"
+        transition={{ delay: 0.16 }}
         data-testid="card-progress"
       >
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Progress toward goal</h2>
-        {goalProgress.isLoading ? (
-          <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
-        ) : !goal ? (
-          <div className="text-center py-6 text-muted-foreground text-sm">Log your bodyweight to start tracking progress</div>
-        ) : (
-          <>
-            <div className="flex items-end justify-between mb-3">
-              <div>
-                <div className="text-3xl font-bold text-foreground font-display tabular-nums">
-                  {goal.currentTrendWeight.toFixed(1)}
-                  <span className="text-base font-medium text-muted-foreground"> {weightUnit}</span>
-                </div>
-                <div className="text-[11px] text-muted-foreground/70 mt-0.5">
-                  trend weight (smoothed average)
-                </div>
-              </div>
-              {goal.goalWeight != null && kgToGo != null && (
-                <div className="text-right">
-                  <div className="text-lg font-bold text-chart-2 font-display tabular-nums">
-                    {kgToGo.toFixed(1)} {weightUnit} to go
+        <h2 className={`${SECTION_TITLE_CLASS} mb-3`}>Progress toward goal</h2>
+        <div className="rounded-[26px] bg-card p-5">
+          {goalProgress.isLoading ? (
+            <div className="h-20 flex items-center justify-center text-muted-foreground text-sm">Loading...</div>
+          ) : !goal ? (
+            <div className="text-center py-6 text-muted-foreground text-[12.5px]">Log your bodyweight to start tracking progress</div>
+          ) : (
+            <>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[40px] font-light leading-none tracking-[-0.03em] text-foreground tabular-nums">
+                    {goal.currentTrendWeight.toFixed(1)}
+                    <span className="ml-1 text-[15px] tracking-normal text-muted-foreground">{weightUnit}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">goal {goal.goalWeight} {weightUnit}</div>
+                  <div className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-2">
+                    Trend weight
+                  </div>
                 </div>
-              )}
-            </div>
+                {goal.goalWeight != null && kgToGo != null && (
+                  <div className="text-right shrink-0">
+                    <div className="text-xl font-light tracking-[-0.01em] text-foreground tabular-nums">
+                      {kgToGo.toFixed(1)} {weightUnit}
+                    </div>
+                    <div className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-1">to go</div>
+                  </div>
+                )}
+              </div>
 
-            {goal.goalWeight != null && goal.percentToGoal != null && (
-              <>
-                <div className="h-2.5 rounded-full bg-muted overflow-hidden mb-1">
-                  <div className="h-full rounded-full bg-chart-2" style={{ width: `${goal.percentToGoal}%` }} />
-                </div>
-                <div className="flex items-start justify-between text-[10px] text-muted-foreground">
-                  <span className="flex flex-col">
-                    <span className="font-medium text-foreground">{goal.startWeight} {weightUnit}</span>
-                    <span>started {format(parseLocalDateString(goal.startDate), "MMM d")}</span>
-                  </span>
-                  <span className="self-center">{Math.round(goal.percentToGoal)}% there</span>
-                  <span className="flex flex-col items-end">
-                    <span className="font-medium text-foreground">{goal.goalWeight} {weightUnit}</span>
-                    <span>{goal.targetDate ? `~${format(parseLocalDateString(goal.targetDate), "MMM d")} at this rate` : "still calibrating"}</span>
-                  </span>
-                </div>
-              </>
-            )}
-          </>
-        )}
-      </motion.div>
+              {goal.goalWeight != null && goal.percentToGoal != null && (
+                <>
+                  <div className="h-1.5 rounded-full bg-secondary overflow-hidden mt-5 mb-2.5">
+                    <div className="h-full rounded-full bg-white" style={{ width: `${goal.percentToGoal}%` }} />
+                  </div>
+                  <div className="flex items-start justify-between gap-2 text-[11.5px] text-muted-foreground">
+                    <span className="flex flex-col">
+                      <span className="text-[13px] font-medium text-foreground">{goal.startWeight} {weightUnit}</span>
+                      <span>started {format(parseLocalDateString(goal.startDate), "MMM d")}</span>
+                    </span>
+                    <span className="self-center">{Math.round(goal.percentToGoal)}% there</span>
+                    <span className="flex flex-col items-end text-right">
+                      <span className="text-[13px] font-medium text-foreground">{goal.goalWeight} {weightUnit}</span>
+                      <span>{goal.targetDate ? `~${format(parseLocalDateString(goal.targetDate), "MMM d")} at this rate` : "still calibrating"}</span>
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </motion.section>
 
       {/* Steps whose target isn't on the page (a nav tab that no longer exists)
           are dropped rather than left pointing at nothing - see useTourSteps. */}
@@ -747,6 +740,76 @@ export default function Dashboard() {
       {resolvedCalendarSteps.length > 0 && (
         <CoachmarkTour steps={resolvedCalendarSteps} onDone={skipCalendarLeg} testIdPrefix="calendar-prompt" />
       )}
+    </DashboardShell>
+  );
+}
+
+// ---- Sessions pieces (see TrainientAppDesign.md) ----
+
+const DASHBOARD_TITLE_CLASS = "text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground";
+const SECTION_TITLE_CLASS = "text-[21px] font-light tracking-[-0.01em] text-foreground";
+const HERO_ACTION_CLASS =
+  "mx-2 mb-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-3xl bg-secondary py-3 pl-5 pr-3 text-left transition-colors hover:bg-accent";
+const HERO_ACTION_CIRCLE_CLASS =
+  "grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full bg-white text-black";
+const CHECKIN_INPUT_CLASS =
+  "flex-1 min-w-0 w-full bg-transparent text-2xl font-light tracking-[-0.02em] tabular-nums placeholder:text-muted-foreground/50 focus:outline-none disabled:cursor-not-allowed";
+
+// Every state of the route sits in here so the dashboard never flashes the
+// old navy theme. The wash is the grey-to-teal light behind the date arc and
+// greeting; it reaches up under the phone's status bar and fades into black.
+function DashboardShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="theme-sessions relative min-h-screen overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
+      <div className="sessions-wash absolute inset-x-0 top-0 h-[420px]" aria-hidden />
+      <div className="relative mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <span className="flex items-center gap-[7px]">
+      <img src={intentSun} alt="" className="h-5 w-5" />
+      <span className="text-base font-normal tracking-[-0.005em] text-white">Intent</span>
+    </span>
+  );
+}
+
+// An inset-grouped row: the hairline starts at the text inset, the last row has none.
+function GroupedRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="group flex items-center pl-5">
+      <div className="flex min-w-0 flex-1 items-center gap-3 border-b border-border py-[15px] pr-5 group-last:border-b-0">
+        <dt className="min-w-0 flex-1 truncate text-[15px] text-foreground">{label}</dt>
+        <dd className="whitespace-nowrap text-[15px] text-muted-foreground">{value}</dd>
+      </div>
+    </div>
+  );
+}
+
+function CheckinTile({
+  label,
+  done,
+  error,
+  children,
+}: {
+  label: string;
+  done: boolean;
+  error: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label
+      className={`block min-w-0 rounded-[22px] bg-secondary px-3.5 py-3 ${
+        error ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-white/40"
+      }`}
+    >
+      <span className="flex items-center gap-1 text-[10.5px] uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+        {done && <Check className="h-3 w-3 text-chart-2" strokeWidth={2} />}
+      </span>
+      <span className="mt-1.5 flex items-center gap-1.5">{children}</span>
+    </label>
   );
 }
