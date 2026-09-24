@@ -28,12 +28,12 @@ export function GeneratingScreen() {
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
-        className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-8"
+        className="w-[72px] h-[72px] rounded-full bg-secondary flex items-center justify-center mb-8"
       >
-        <Dumbbell className="w-7 h-7 text-primary" />
+        <Dumbbell className="w-7 h-7 text-foreground" strokeWidth={1.6} />
       </motion.div>
 
-      <h2 className="text-xl font-bold text-foreground mb-3">Building your program</h2>
+      <h2 className="text-[28px] font-light tracking-[-0.02em] text-foreground mb-3">Building your program</h2>
 
       <div className="h-6 relative w-full max-w-xs">
         <AnimatePresence mode="wait">
