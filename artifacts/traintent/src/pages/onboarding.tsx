@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Loader2, Brain, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight, Loader2, Brain, User, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
@@ -480,16 +480,16 @@ export default function Onboarding() {
   const isLastStep = step === totalSteps - 1;
 
   const variants = {
-    enter: { opacity: 0, x: 40 },
+    enter: { opacity: 0, x: 12 },
     center: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -40 },
+    exit: { opacity: 0, x: -12 },
   };
 
   const selectedMuscleCount = form.priorityMuscles.filter((m) => m !== "No preference").length;
 
   if (phase === "generating") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-lg">
           <GeneratingScreen />
         </div>
@@ -497,10 +497,12 @@ export default function Onboarding() {
     );
   }
 
+  // The presentation deck and commitment screen sit inside the same Sessions
+  // scope so the flow never flashes back to the navy theme after the form.
   if (phase === "presentation" && program) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex-1 flex flex-col items-center px-4 py-12">
+      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
+        <div className="flex-1 flex flex-col items-center p-6 py-12">
           <PresentationDeck
             program={program}
             goal={form.goal}
@@ -518,8 +520,8 @@ export default function Onboarding() {
 
   if (phase === "commitment" && program) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex-1 flex flex-col items-center px-4 py-12">
+      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
+        <div className="flex-1 flex flex-col items-center p-6 py-12">
           <CommitmentScreen program={program} onConfirm={handleCommit} />
         </div>
       </div>
@@ -527,22 +529,23 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
       {showGoalWeight && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60"
           onClick={() => setShowGoalWeight(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-primary/40 bg-card p-5 shadow-xl"
+            className="w-full max-w-md rounded-t-[30px] sm:rounded-[30px] bg-card px-6 pt-3 pb-[max(2rem,env(safe-area-inset-bottom))] sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-foreground mb-1">What weight do you want to reach?</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <div className="mx-auto mb-5 h-[5px] w-[38px] rounded-full bg-accent sm:hidden" aria-hidden="true" />
+            <h3 className="text-[22px] font-normal leading-tight tracking-[-0.01em] text-foreground">What weight do you want to reach?</h3>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted-foreground">
               Saved as your long-term goal weight
               {form.weight ? ` (now: ${form.weight} ${form.weightUnit})` : ""}. You can skip this.
             </p>
-            <div className="flex gap-2">
+            <div className="mt-5 flex gap-2">
               <input
                 type="number"
                 autoFocus
@@ -550,66 +553,53 @@ export default function Onboarding() {
                 onChange={(e) => { setGoalWeightDraft(e.target.value); setGoalWeightSaveError(null); }}
                 onKeyDown={(e) => { if (e.key === "Enter") saveGoalWeight(); }}
                 placeholder={`Target ${form.weightUnit}`}
-                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
-                  goalWeightSaveError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
-                }`}
+                className={inputClass(!!goalWeightSaveError, "flex-1 bg-secondary")}
                 data-testid="input-goal-weight"
               />
-              <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
-                {["kg", "lbs"].map((u) => (
-                  <button
-                    key={u}
-                    data-testid={`goal-weight-unit-${u}`}
-                    onClick={() => { setForm((f) => ({ ...f, weightUnit: u })); setGoalWeightSaveError(null); }}
-                    className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                      form.weightUnit === u
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {u}
-                  </button>
-                ))}
-              </div>
+              <UnitToggle
+                value={form.weightUnit}
+                onChange={(u) => { setForm((f) => ({ ...f, weightUnit: u })); setGoalWeightSaveError(null); }}
+                testIdPrefix="goal-weight-unit"
+                className="bg-secondary"
+              />
             </div>
             {goalWeightSaveError && (
-              <p className="mt-3 text-sm font-medium text-destructive" data-testid="text-goal-weight-error">
+              <p className="mt-3 text-[13px] font-medium text-destructive" data-testid="text-goal-weight-error">
                 {goalWeightSaveError}
               </p>
             )}
-            <div className="flex gap-2 mt-5">
-              <Button
-                variant="outline"
-                className="flex-1 h-11"
+            <div className="mt-6 flex gap-2.5">
+              <button
+                className={cn(OUTLINE_BUTTON_CLASS, "flex-1")}
                 onClick={() => { setForm((f) => ({ ...f, goalWeight: "" })); setShowGoalWeight(false); }}
                 data-testid="button-skip-goal-weight"
               >
                 Skip
-              </Button>
-              <Button
-                className="flex-1 h-11"
+              </button>
+              <button
+                className={cn(PRIMARY_BUTTON_CLASS, "flex-[1.4]")}
                 onClick={saveGoalWeight}
                 data-testid="button-save-goal-weight"
               >
                 Save target
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
-      <div className="w-full h-1 bg-secondary/40">
+      <div className="mx-6 mt-4 h-[3px] overflow-hidden rounded-full bg-secondary">
         <motion.div
-          className="h-full bg-primary"
+          className="h-full rounded-full bg-white"
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.3 }}
         />
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 py-12">
         <div className="w-full max-w-lg">
           {/* Hidden (but space reserved to avoid a layout jump) until a mode is
               chosen - "Step 1 of 4" before any interaction is misleading. */}
-          <div className={`text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase ${hasStarted ? "" : "invisible"}`}>
+          <div className={cn(CAPS_CLASS, "mb-3", !hasStarted && "invisible")}>
             Step {step + 1} of {totalSteps}
           </div>
 
@@ -620,53 +610,38 @@ export default function Onboarding() {
               initial="enter"
               animate="center"
               exit="exit"
-              transition={{ duration: 0.22 }}
+              transition={{ duration: 0.2 }}
             >
               {/* Mode selection */}
               {currentStep === "mode" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">How do you want to train?</h2>
-                  <p className="text-muted-foreground mb-8">Choose your mode - you can switch later in Settings.</p>
-                  <div className="grid grid-cols-1 gap-4">
-                    <button
-                      data-testid="mode-ai"
-                      onClick={() => setForm((f) => ({ ...f, mode: "ai" }))}
-                      className={`p-5 rounded-xl border text-left transition-all ${
-                        form.mode === "ai"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                          <Brain className="w-5 h-5" />
-                        </div>
-                        <span className="font-semibold text-foreground text-lg">AI Coach</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        AI builds your program, monitors progress, and adjusts weekly based on your check-ins
-                      </p>
-                    </button>
-
-                    <button
-                      data-testid="mode-independent"
-                      onClick={() => setForm((f) => ({ ...f, mode: "independent" }))}
-                      className={`p-5 rounded-xl border text-left transition-all ${
-                        form.mode === "independent"
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                          <User className="w-5 h-5" />
-                        </div>
-                        <span className="font-semibold text-foreground text-lg">Independent</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved
-                      </p>
-                    </button>
+                  <h2 className={TITLE_CLASS}>How do you want to train?</h2>
+                  <p className={LEDE_CLASS}>Choose your mode - you can switch later in Settings.</p>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {[
+                      { value: "ai", label: "AI Coach", Icon: Brain, sub: "AI builds your program, monitors progress, and adjusts weekly based on your check-ins" },
+                      { value: "independent", label: "Independent", Icon: User, sub: "You're in control. Build your own program, log your sessions, and track progression yourself - no AI involved" },
+                    ].map(({ value, label, Icon, sub }) => {
+                      const selected = form.mode === value;
+                      return (
+                        <button
+                          key={value}
+                          data-testid={`mode-${value}`}
+                          onClick={() => setForm((f) => ({ ...f, mode: value }))}
+                          aria-pressed={selected}
+                          className={optionCardClass(selected)}
+                        >
+                          <div className={cn(
+                            "mb-3.5 grid h-11 w-11 place-items-center rounded-full",
+                            selected ? "bg-black/[0.07]" : "bg-secondary",
+                          )}>
+                            <Icon className="h-5 w-5" strokeWidth={1.6} />
+                          </div>
+                          <div className="text-base font-medium">{label}</div>
+                          <p className={optionSubClass(selected)}>{sub}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -674,15 +649,15 @@ export default function Onboarding() {
               {/* Name */}
               {currentStep === "name" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">What should we call you?</h2>
-                  <p className="text-muted-foreground mb-8">Optional - you can change this later in Settings.</p>
+                  <h2 className={TITLE_CLASS}>What should we call you?</h2>
+                  <p className={LEDE_CLASS}>Optional - you can change this later in Settings.</p>
                   <input
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                     maxLength={MAX_PROFILE_NAME}
                     placeholder="Your name"
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                    className={inputClass(false)}
                     data-testid="input-name"
                   />
                 </div>
@@ -691,59 +666,44 @@ export default function Onboarding() {
               {/* Body stats - age + weight, same as what's editable in Settings */}
               {currentStep === "bodyStats" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Body stats</h2>
-                  <p className="text-muted-foreground mb-8">Optional - you can change this later in Settings.</p>
+                  <h2 className={TITLE_CLASS}>Body stats</h2>
+                  <p className={LEDE_CLASS}>Optional - you can change this later in Settings.</p>
                   <div className="space-y-5">
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Age</label>
+                      <label className={LABEL_CLASS}>Age</label>
                       <input
                         type="number"
                         value={form.age}
                         onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))}
                         placeholder="e.g. 28"
-                        className={`w-full px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
-                          ageError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
-                        }`}
+                        className={inputClass(!!ageError)}
                         data-testid="input-age"
                       />
                       {ageError && (
-                        <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-age-error">
+                        <p className={ERROR_TEXT_CLASS} data-testid="text-age-error">
                           {ageError}
                         </p>
                       )}
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Weight</label>
+                      <label className={LABEL_CLASS}>Weight</label>
                       <div className="flex gap-2">
                         <input
                           type="number"
                           value={form.weight}
                           onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))}
                           placeholder="e.g. 80"
-                          className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none ${
-                            weightError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
-                          }`}
+                          className={inputClass(!!weightError, "flex-1")}
                           data-testid="input-weight"
                         />
-                        <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
-                          {["kg", "lbs"].map((u) => (
-                            <button
-                              key={u}
-                              data-testid={`unit-${u}`}
-                              onClick={() => setForm((f) => ({ ...f, weightUnit: u }))}
-                              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                                form.weightUnit === u
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-card text-muted-foreground hover:text-foreground"
-                              }`}
-                            >
-                              {u}
-                            </button>
-                          ))}
-                        </div>
+                        <UnitToggle
+                          value={form.weightUnit}
+                          onChange={(u) => setForm((f) => ({ ...f, weightUnit: u }))}
+                          testIdPrefix="unit"
+                        />
                       </div>
                       {weightError && (
-                        <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-weight-error">
+                        <p className={ERROR_TEXT_CLASS} data-testid="text-weight-error">
                           {weightError}
                         </p>
                       )}
@@ -755,51 +715,51 @@ export default function Onboarding() {
               {/* Goal - both modes */}
               {currentStep === "goal" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">What's your main goal?</h2>
-                  <p className="text-muted-foreground mb-8">
+                  <h2 className={TITLE_CLASS}>What's your main goal?</h2>
+                  <p className={LEDE_CLASS}>
                     {form.mode === "ai"
                       ? "Shapes your program and targets. Every option is built around building or keeping muscle."
                       : "Sets the target your dashboard tracks against. Every option is built around building or keeping muscle."}
                   </p>
-                  <div className="grid grid-cols-1 gap-3">
-                    {GOALS.map((g) => (
-                      <button
-                        key={g.value}
-                        data-testid={`goal-${g.value}`}
-                        onClick={() => selectGoal(g.value)}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          form.goal === g.value
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border bg-card text-foreground hover:border-border/80 hover:bg-secondary/30"
-                        }`}
-                      >
-                        <div className="font-semibold">{g.label}</div>
-                        <div className="text-sm text-muted-foreground mt-0.5">{g.sub}</div>
-                        {form.goal === g.value && WEIGHT_GOALS.has(g.value) && (
-                          <div className="mt-2 flex items-center gap-2 text-sm">
-                            <span className="text-muted-foreground">Goal weight:</span>
-                            <span className={`font-medium ${goalWeightError ? "text-destructive" : "text-foreground"}`}>
-                              {form.goalWeight ? `${form.goalWeight} ${form.weightUnit}` : "Not set"}
-                            </span>
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              className="text-primary underline underline-offset-2"
-                              data-testid="link-edit-goal-weight"
-                              onClick={(e) => { e.stopPropagation(); setShowGoalWeight(true); }}
-                            >
-                              Edit
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {GOALS.map((g) => {
+                      const selected = form.goal === g.value;
+                      return (
+                        <button
+                          key={g.value}
+                          data-testid={`goal-${g.value}`}
+                          onClick={() => selectGoal(g.value)}
+                          aria-pressed={selected}
+                          className={optionCardClass(selected)}
+                        >
+                          <div className="text-base font-medium">{g.label}</div>
+                          <div className={optionSubClass(selected)}>{g.sub}</div>
+                          {selected && WEIGHT_GOALS.has(g.value) && (
+                            <div className="mt-2.5 flex items-center gap-2 text-[13px]">
+                              <span className="text-black/60">Goal weight:</span>
+                              <span className={cn("font-medium", goalWeightError ? "text-destructive" : "text-black")}>
+                                {form.goalWeight ? `${form.goalWeight} ${form.weightUnit}` : "Not set"}
+                              </span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                className="text-black underline underline-offset-[3px]"
+                                data-testid="link-edit-goal-weight"
+                                onClick={(e) => { e.stopPropagation(); setShowGoalWeight(true); }}
+                              >
+                                Edit
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                   {/* Reachable by dismissing the popup with a bad target still in
                       it, or by going back and changing the body weight - Continue
                       stays blocked until it's resolved. */}
                   {goalWeightError && (
-                    <p className="mt-4 text-sm font-medium text-destructive" data-testid="text-goal-weight-error-step">
+                    <p className="mt-4 text-[13px] font-medium text-destructive" data-testid="text-goal-weight-error-step">
                       {goalWeightError}
                     </p>
                   )}
@@ -809,55 +769,54 @@ export default function Onboarding() {
               {/* Activity level - AI mode only */}
               {currentStep === "activity" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">How active are your days?</h2>
-                  <p className="text-muted-foreground mb-8">
+                  <h2 className={TITLE_CLASS}>How active are your days?</h2>
+                  <p className={LEDE_CLASS}>
                     Outside of training - this tells your coach how much you recover and burn.
                   </p>
-                  <div className="grid grid-cols-1 gap-3">
-                    {ACTIVITY.map((a) => (
-                      <button
-                        key={a.value}
-                        data-testid={`activity-${a.value}`}
-                        onClick={() => setForm((f) => ({ ...f, activityLevel: f.activityLevel === a.value ? "" : a.value }))}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          form.activityLevel === a.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                        }`}
-                      >
-                        <div className="font-semibold text-foreground">{a.label}</div>
-                        <div className="text-sm text-muted-foreground mt-0.5">{a.sub}</div>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {ACTIVITY.map((a) => {
+                      const selected = form.activityLevel === a.value;
+                      return (
+                        <button
+                          key={a.value}
+                          data-testid={`activity-${a.value}`}
+                          onClick={() => setForm((f) => ({ ...f, activityLevel: f.activityLevel === a.value ? "" : a.value }))}
+                          aria-pressed={selected}
+                          className={optionCardClass(selected)}
+                        >
+                          <div className="text-base font-medium">{a.label}</div>
+                          <div className={optionSubClass(selected)}>{a.sub}</div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="mt-4 p-3 rounded-xl bg-secondary/30 border border-border text-xs text-muted-foreground flex gap-2">
-                    <span>💡</span>
-                    <span>Not sure? Your phone's built-in step tracker (Apple Health, Google Fit, Samsung Health) shows your daily average.</span>
-                  </div>
+                  <Notice className="mt-4">
+                    Not sure? Your phone's built-in step tracker (Apple Health, Google Fit, Samsung Health) shows your daily average.
+                  </Notice>
                 </div>
               )}
 
               {/* Experience - AI mode only */}
               {currentStep === "experience" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Your experience level</h2>
-                  <p className="text-muted-foreground mb-8">Honest answers lead to better programs.</p>
-                  <div className="grid grid-cols-1 gap-3">
-                    {EXPERIENCE.map((e) => (
-                      <button
-                        key={e.value}
-                        data-testid={`experience-${e.value}`}
-                        onClick={() => setForm((f) => ({ ...f, experience: e.value }))}
-                        className={`p-4 rounded-xl border text-left transition-all ${
-                          form.experience === e.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                        }`}
-                      >
-                        <div className="font-semibold text-foreground">{e.label}</div>
-                        <div className="text-sm text-muted-foreground mt-0.5">{e.sub}</div>
-                      </button>
-                    ))}
+                  <h2 className={TITLE_CLASS}>Your experience level</h2>
+                  <p className={LEDE_CLASS}>Honest answers lead to better programs.</p>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {EXPERIENCE.map((e) => {
+                      const selected = form.experience === e.value;
+                      return (
+                        <button
+                          key={e.value}
+                          data-testid={`experience-${e.value}`}
+                          onClick={() => setForm((f) => ({ ...f, experience: e.value }))}
+                          aria-pressed={selected}
+                          className={optionCardClass(selected)}
+                        >
+                          <div className="text-base font-medium">{e.label}</div>
+                          <div className={optionSubClass(selected)}>{e.sub}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -865,11 +824,11 @@ export default function Onboarding() {
               {/* Training days - AI mode only */}
               {currentStep === "trainingDays" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Training days per week</h2>
-                  <p className="text-muted-foreground mb-8">How many days can you commit to?</p>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-5xl font-bold text-primary">{form.trainingDays}</span>
-                    <span className="text-muted-foreground">days / week</span>
+                  <h2 className={TITLE_CLASS}>Training days per week</h2>
+                  <p className={LEDE_CLASS}>How many days can you commit to?</p>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[88px] font-light leading-none tracking-[-0.04em] text-foreground">{form.trainingDays}</span>
+                    <span className={CAPS_CLASS}>days / week</span>
                   </div>
                   <input
                     type="range"
@@ -877,10 +836,11 @@ export default function Onboarding() {
                     max={6}
                     value={form.trainingDays}
                     onChange={(e) => setForm((f) => ({ ...f, trainingDays: parseInt(e.target.value) }))}
-                    className="w-full accent-primary mb-4"
+                    className="sessions-range mt-6 mb-3"
+                    aria-label="Training days per week"
                     data-testid="training-days-slider"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground mb-6">
+                  <div className="flex justify-between px-1.5 text-xs text-muted-foreground">
                     {[2, 3, 4, 5, 6].map((n) => <span key={n}>{n}</span>)}
                   </div>
                 </div>
@@ -889,8 +849,8 @@ export default function Onboarding() {
               {/* Preferred rest days - AI mode only */}
               {currentStep === "preferredRestDays" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Any preferred rest days?</h2>
-                  <p className="text-muted-foreground mb-8">
+                  <h2 className={TITLE_CLASS}>Any preferred rest days?</h2>
+                  <p className={LEDE_CLASS}>
                     You picked {form.trainingDays} training days - choose the days you'd like to keep free. Optional.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -901,13 +861,8 @@ export default function Onboarding() {
                           key={d.value}
                           data-testid={`rest-${d.value}`}
                           onClick={() => togglePreferredRestDay(d.value)}
-                          className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                            selected
-                              ? tooManyPreferredRestDays
-                                ? "border-destructive bg-destructive/10 text-destructive"
-                                : "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                          }`}
+                          aria-pressed={selected}
+                          className={chipClass(selected, selected && tooManyPreferredRestDays)}
                         >
                           {d.label}
                         </button>
@@ -915,15 +870,15 @@ export default function Onboarding() {
                     })}
                   </div>
                   {tooManyPreferredRestDays ? (
-                    <p className="text-xs font-medium text-destructive" data-testid="text-rest-warning">
+                    <p className="text-[12.5px] font-medium text-destructive" data-testid="text-rest-warning">
                       Too many rest days to program around your {form.trainingDays} training days - remove one to continue.
                     </p>
                   ) : form.preferredRestDays.length === maxPreferredRestDays ? (
-                    <p className="text-xs font-medium text-amber-500" data-testid="text-rest-warning">
+                    <p className="text-[12.5px] font-medium text-foreground" data-testid="text-rest-warning">
                       You've picked the most rest days we can plan around your {form.trainingDays} training days.
                     </p>
                   ) : form.preferredRestDays.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[12.5px] text-muted-foreground">
                       No preference - your coach schedules your days.
                     </p>
                   ) : null}
@@ -933,28 +888,28 @@ export default function Onboarding() {
               {/* Equipment - AI mode only */}
               {currentStep === "equipment" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Available equipment</h2>
-                  <p className="text-muted-foreground mb-8">
+                  <h2 className={TITLE_CLASS}>Available equipment</h2>
+                  <p className={LEDE_CLASS}>
                     Select everything you have access to, or just "Full gym" if that covers it - it's a single
                     choice that can't be combined with the others.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {EQUIPMENT.map((item) => (
-                      <button
-                        key={item}
-                        data-testid={`equipment-${item.toLowerCase().replace(/\s+/g, "-")}`}
-                        onClick={() => toggleEquipment(item)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                          form.equipment.includes(item)
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    ))}
+                    {EQUIPMENT.map((item) => {
+                      const selected = form.equipment.includes(item);
+                      return (
+                        <button
+                          key={item}
+                          data-testid={`equipment-${item.toLowerCase().replace(/\s+/g, "-")}`}
+                          onClick={() => toggleEquipment(item)}
+                          aria-pressed={selected}
+                          className={chipClass(selected)}
+                        >
+                          {item}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[12.5px] text-muted-foreground">
                     {form.equipment.includes("Full gym")
                       ? "Full gym selected - covers everything"
                       : form.equipment.length > 0
@@ -967,33 +922,33 @@ export default function Onboarding() {
               {/* Sex + injuries - AI mode only, only meaningful for the AI prompt */}
               {currentStep === "details" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">A bit more for your AI coach</h2>
-                  <p className="text-muted-foreground mb-8">Optional - helps tailor your program.</p>
+                  <h2 className={TITLE_CLASS}>A bit more for your AI coach</h2>
+                  <p className={LEDE_CLASS}>Optional - helps tailor your program.</p>
                   <div className="space-y-5">
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Sex <span className="text-muted-foreground font-normal">(optional)</span></label>
+                      <label className={LABEL_CLASS}>Sex <span className="text-muted-foreground">(optional)</span></label>
                       <div className="flex gap-2">
-                        {["Male", "Female"].map((s) => (
-                          <button
-                            key={s}
-                            data-testid={`sex-${s.toLowerCase()}`}
-                            onClick={() => setForm((f) => ({
-                              ...f,
-                              sex: f.sex === s.toLowerCase() ? "" : s.toLowerCase(),
-                            }))}
-                            className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                              form.sex === s.toLowerCase()
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-card text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {s}
-                          </button>
-                        ))}
+                        {["Male", "Female"].map((s) => {
+                          const selected = form.sex === s.toLowerCase();
+                          return (
+                            <button
+                              key={s}
+                              data-testid={`sex-${s.toLowerCase()}`}
+                              onClick={() => setForm((f) => ({
+                                ...f,
+                                sex: f.sex === s.toLowerCase() ? "" : s.toLowerCase(),
+                              }))}
+                              aria-pressed={selected}
+                              className={cn(chipClass(selected), "h-[52px] flex-1")}
+                            >
+                              {s}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Injuries or limitations</label>
+                      <label className={LABEL_CLASS}>Injuries or limitations</label>
                       <textarea
                         value={form.injuries}
                         onChange={(e) => setForm((f) => ({
@@ -1003,34 +958,34 @@ export default function Onboarding() {
                         }))}
                         placeholder="e.g. bad lower back, knee pain"
                         rows={3}
-                        className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+                        className="w-full rounded-3xl bg-card px-5 py-4 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-foreground/40 resize-none"
                         data-testid="input-injuries"
                       />
                     </div>
                     {form.injuries && (
                       <div>
-                        <label className="text-sm font-medium text-foreground mb-1.5 block">
-                          How bad is it? <span className="text-muted-foreground font-normal">(optional)</span>
+                        <label className={LABEL_CLASS}>
+                          How bad is it? <span className="text-muted-foreground">(optional)</span>
                         </label>
-                        <div className="grid grid-cols-1 gap-3">
-                          {INJURY_SEVERITY.map((s) => (
-                            <button
-                              key={s.value}
-                              data-testid={`injury-severity-${s.value}`}
-                              onClick={() => setForm((f) => ({
-                                ...f,
-                                injurySeverity: f.injurySeverity === s.value ? "" : s.value,
-                              }))}
-                              className={`p-4 rounded-xl border text-left transition-all ${
-                                form.injurySeverity === s.value
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border bg-card hover:border-border/80 hover:bg-secondary/30"
-                              }`}
-                            >
-                              <div className="font-semibold text-foreground">{s.label}</div>
-                              <div className="text-sm text-muted-foreground mt-0.5">{s.sub}</div>
-                            </button>
-                          ))}
+                        <div className="grid grid-cols-1 gap-2.5">
+                          {INJURY_SEVERITY.map((s) => {
+                            const selected = form.injurySeverity === s.value;
+                            return (
+                              <button
+                                key={s.value}
+                                data-testid={`injury-severity-${s.value}`}
+                                onClick={() => setForm((f) => ({
+                                  ...f,
+                                  injurySeverity: f.injurySeverity === s.value ? "" : s.value,
+                                }))}
+                                aria-pressed={selected}
+                                className={optionCardClass(selected)}
+                              >
+                                <div className="text-base font-medium">{s.label}</div>
+                                <div className={optionSubClass(selected)}>{s.sub}</div>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1041,25 +996,25 @@ export default function Onboarding() {
               {/* Priority muscles - AI mode only */}
               {currentStep === "priorityMuscles" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Priority muscle groups</h2>
-                  <p className="text-muted-foreground mb-8">Pick up to 3. Extra volume goes here.</p>
+                  <h2 className={TITLE_CLASS}>Priority muscle groups</h2>
+                  <p className={LEDE_CLASS}>Pick up to 3. Extra volume goes here.</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {MUSCLES.map((m) => (
-                      <button
-                        key={m}
-                        data-testid={`muscle-${m.toLowerCase()}`}
-                        onClick={() => toggleMuscle(m)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                          form.priorityMuscles.includes(m)
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                    {MUSCLES.map((m) => {
+                      const selected = form.priorityMuscles.includes(m);
+                      return (
+                        <button
+                          key={m}
+                          data-testid={`muscle-${m.toLowerCase()}`}
+                          onClick={() => toggleMuscle(m)}
+                          aria-pressed={selected}
+                          className={chipClass(selected)}
+                        >
+                          {m}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[12.5px] text-muted-foreground">
                     {form.priorityMuscles.includes("No preference")
                       ? "No preference selected"
                       : `${selectedMuscleCount} / 3 selected`}
@@ -1072,51 +1027,47 @@ export default function Onboarding() {
                   editable later from the dashboard's targets box. */}
               {currentStep === "targets" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">Set your targets</h2>
-                  <p className="text-muted-foreground mb-8">
+                  <h2 className={TITLE_CLASS}>Set your targets</h2>
+                  <p className={LEDE_CLASS}>
                     What you're aiming for day to day. We've suggested a starting point - adjust anything, or skip and set it later.
                   </p>
 
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-sm font-medium text-foreground mb-1.5 block">Calorie target</label>
-                        <div className={`flex items-center gap-2 px-4 rounded-xl border bg-card ${
-                          calorieTargetError ? "border-destructive" : "border-border focus-within:border-primary"
-                        }`}>
+                        <label className={LABEL_CLASS}>Calorie target</label>
+                        <div className={suffixFieldClass(!!calorieTargetError)}>
                           <input
                             type="number"
                             value={form.dailyCalorieTarget}
                             onChange={(e) => setForm((f) => ({ ...f, dailyCalorieTarget: e.target.value }))}
                             placeholder="e.g. 2200"
-                            className="flex-1 min-w-0 py-2.5 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                            className="flex-1 min-w-0 bg-transparent text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
                             data-testid="input-target-calories"
                           />
-                          <span className="text-sm text-muted-foreground shrink-0">kcal / day</span>
+                          <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">kcal / day</span>
                         </div>
                         {calorieTargetError && (
-                          <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-calories-error">
+                          <p className={ERROR_TEXT_CLASS} data-testid="text-target-calories-error">
                             {calorieTargetError}
                           </p>
                         )}
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-foreground mb-1.5 block">Step target</label>
-                        <div className={`flex items-center gap-2 px-4 rounded-xl border bg-card ${
-                          stepTargetError ? "border-destructive" : "border-border focus-within:border-primary"
-                        }`}>
+                        <label className={LABEL_CLASS}>Step target</label>
+                        <div className={suffixFieldClass(!!stepTargetError)}>
                           <input
                             type="number"
                             value={form.dailyStepTarget}
                             onChange={(e) => setForm((f) => ({ ...f, dailyStepTarget: e.target.value }))}
                             placeholder="e.g. 8000"
-                            className="flex-1 min-w-0 py-2.5 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                            className="flex-1 min-w-0 bg-transparent text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
                             data-testid="input-target-steps"
                           />
-                          <span className="text-sm text-muted-foreground shrink-0">steps / day</span>
+                          <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">steps / day</span>
                         </div>
                         {stepTargetError && (
-                          <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-steps-error">
+                          <p className={ERROR_TEXT_CLASS} data-testid="text-target-steps-error">
                             {stepTargetError}
                           </p>
                         )}
@@ -1124,7 +1075,7 @@ export default function Onboarding() {
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-foreground mb-1.5 block">Cardio <span className="text-muted-foreground font-normal">(optional)</span></label>
+                      <label className={LABEL_CLASS}>Cardio <span className="text-muted-foreground">(optional)</span></label>
                       <div className="flex flex-wrap gap-2">
                         {CARDIO_DAYS.map((d) => {
                           const selected = form.cardioDays.includes(d);
@@ -1133,11 +1084,8 @@ export default function Onboarding() {
                               key={d}
                               data-testid={`target-cardio-${d.toLowerCase()}`}
                               onClick={() => toggleCardioDay(d)}
-                              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                                selected
-                                  ? "border-primary bg-primary/10 text-primary"
-                                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-                              }`}
+                              aria-pressed={selected}
+                              className={chipClass(selected)}
                             >
                               {d}
                             </button>
@@ -1147,26 +1095,24 @@ export default function Onboarding() {
                       {(() => {
                         const hasDays = form.cardioDays.length > 0;
                         return (
-                          <div className={`mt-3 transition-opacity ${hasDays ? "opacity-100" : "opacity-40"}`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Minutes each day:</span>
-                              <div className={`flex items-center gap-2 px-3 rounded-xl border bg-card w-28 ${
-                                cardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
-                              }`}>
+                          <div className={cn("mt-3 transition-opacity", hasDays ? "opacity-100" : "opacity-40")}>
+                            <div className="flex items-center gap-3">
+                              <span className="text-[13px] text-muted-foreground">Minutes each day:</span>
+                              <div className={cn(suffixFieldClass(!!cardioMinutesError), "h-11 w-32 px-4")}>
                                 <input
                                   type="number"
                                   value={form.cardioMinutes}
                                   onChange={(e) => setForm((f) => ({ ...f, cardioMinutes: e.target.value }))}
                                   placeholder="e.g. 25"
                                   disabled={!hasDays}
-                                  className="flex-1 min-w-0 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed"
+                                  className="flex-1 min-w-0 bg-transparent text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed"
                                   data-testid="input-target-cardio-minutes"
                                 />
-                                <span className="text-sm text-muted-foreground shrink-0">min</span>
+                                <span className="shrink-0 text-sm text-muted-foreground">min</span>
                               </div>
                             </div>
                             {cardioMinutesError && (
-                              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-target-cardio-minutes-error">
+                              <p className={ERROR_TEXT_CLASS} data-testid="text-target-cardio-minutes-error">
                                 {cardioMinutesError}
                               </p>
                             )}
@@ -1176,25 +1122,22 @@ export default function Onboarding() {
                     </div>
                   </div>
 
-                  <div className="mt-6 p-3 rounded-xl bg-secondary/30 border border-border text-xs text-muted-foreground flex gap-2">
-                    <span>💡</span>
-                    <span>You can change these anytime from your dashboard.</span>
-                  </div>
+                  <Notice className="mt-6">You can change these anytime from your dashboard.</Notice>
                 </div>
               )}
 
               {/* Review & finish */}
               {currentStep === "review" && (
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                  <h2 className={TITLE_CLASS}>
                     {form.mode === "ai" ? "Ready to build your program" : "You're all set"}
                   </h2>
-                  <p className="text-muted-foreground mb-8">
+                  <p className={LEDE_CLASS}>
                     {form.mode === "ai"
                       ? "Here's what your AI coach will use."
                       : "Your profile is ready. Head to My Program to build your first program."}
                   </p>
-                  <div className="space-y-3 mb-8">
+                  <div className="mb-6 overflow-hidden rounded-[26px] bg-card">
                     {[
                       { label: "Mode", value: form.mode === "ai" ? "AI Coach" : "Independent" },
                       form.name && { label: "Name", value: form.name },
@@ -1220,72 +1163,75 @@ export default function Onboarding() {
                     ]
                       .filter(Boolean)
                       .map((item: any) => (
-                        <div key={item.label} className="flex items-start gap-4 py-3 border-b border-border/50 last:border-0">
-                          <span className="text-sm text-muted-foreground w-36 shrink-0">{item.label}</span>
-                          <span className="text-sm text-foreground font-medium">{item.value}</span>
+                        // Inset grouped row: the hairline sits on the inner block so it
+                        // starts at the text inset, and the last row has none.
+                        <div key={item.label} className="group flex pl-5">
+                          <div className="flex min-w-0 flex-1 items-start justify-between gap-4 border-b border-border py-[14px] pr-5 group-last:border-b-0">
+                            <span className="shrink-0 text-sm text-muted-foreground">{item.label}</span>
+                            <span className="min-w-0 break-words text-right text-sm text-foreground">{item.value}</span>
+                          </div>
                         </div>
                       ))}
                   </div>
 
                   {(createProfile.isError || generateProgram.isError) && (
-                    <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm mb-4">
+                    <div className="mb-4 rounded-[22px] bg-destructive/10 px-4 py-3.5 text-[12.5px] text-destructive">
                       Something went wrong. Please try again.
                     </div>
                   )}
 
                   {form.mode === "ai" ? (
-                    <div className="space-y-3">
-                      <Button
-                        className="w-full h-12 text-base font-semibold"
+                    <div className="space-y-2.5">
+                      <button
+                        className={cn(PRIMARY_BUTTON_CLASS, "w-full")}
                         onClick={() => { setFinishAction("generate"); handleFinish(true); }}
                         disabled={isPending}
                         data-testid="button-generate-program"
                       >
                         {isPending && finishAction === "generate" ? (
                           <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                             {createProfile.isPending ? "Saving profile..." : "Building your program..."}
                           </>
                         ) : (
                           "Generate program"
                         )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="w-full h-11 text-sm font-semibold"
+                      </button>
+                      <button
+                        className={cn(OUTLINE_BUTTON_CLASS, "w-full")}
                         onClick={() => { setFinishAction("later"); handleFinish(false); }}
                         disabled={isPending}
                         data-testid="button-generate-later"
                       >
                         {isPending && finishAction === "later" ? (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                             Saving profile...
                           </>
                         ) : (
                           "Generate program later"
                         )}
-                      </Button>
-                      <p className="text-xs text-muted-foreground text-center">
+                      </button>
+                      <p className="pt-1 text-center text-[12.5px] text-muted-foreground">
                         You can generate your program any time from My Program.
                       </p>
                     </div>
                   ) : (
-                    <Button
-                      className="w-full h-12 text-base font-semibold"
+                    <button
+                      className={cn(PRIMARY_BUTTON_CLASS, "w-full")}
                       onClick={() => { setFinishAction("later"); handleFinish(false); }}
                       disabled={isPending}
                       data-testid="button-generate-program"
                     >
                       {isPending ? (
                         <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                           Saving profile...
                         </>
                       ) : (
                         "Get started"
                       )}
-                    </Button>
+                    </button>
                   )}
                 </div>
               )}
@@ -1293,43 +1239,135 @@ export default function Onboarding() {
           </AnimatePresence>
 
           {!isLastStep && (
-            <div className="flex items-center gap-3 mt-10">
+            <div className="flex items-center gap-2.5 mt-10">
               {step > 0 && (
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setStep((s) => s - 1)}
-                  className="h-11"
+                  className={OUTLINE_BUTTON_CLASS}
                   data-testid="button-back"
                 >
-                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  <ChevronLeft className="h-4 w-4" strokeWidth={1.8} />
                   Back
-                </Button>
+                </button>
               )}
-              <Button
-                className="flex-1 h-11"
+              <button
+                className={cn(PRIMARY_BUTTON_CLASS, "flex-1")}
                 onClick={() => setStep((s) => s + 1)}
                 disabled={!canAdvance()}
                 data-testid="button-continue"
               >
                 Continue
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
+                <ChevronRight className="h-4 w-4" strokeWidth={1.8} />
+              </button>
             </div>
           )}
 
           {isLastStep && step > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => setStep((s) => s - 1)}
-              className="h-11 mt-4 w-full"
-              data-testid="button-back"
-            >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => setStep((s) => s - 1)}
+                className={cn(CAPS_CLASS, "inline-flex items-center gap-1 px-3 py-2 transition-colors hover:text-foreground")}
+                data-testid="button-back"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+                Back
+              </button>
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Sessions styling (see TrainientAppDesign.md) ---------- */
+
+const TITLE_CLASS = "text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground";
+const LEDE_CLASS = "mt-2.5 mb-8 text-[13.5px] leading-relaxed text-muted-foreground";
+const CAPS_CLASS = "text-[11px] uppercase tracking-[0.14em] text-muted-foreground";
+const LABEL_CLASS = "mb-2 ml-1 block text-[13px] text-foreground";
+const ERROR_TEXT_CLASS = "mt-2 ml-1 text-[13px] font-medium text-destructive";
+const PRIMARY_BUTTON_CLASS =
+  "inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground";
+const OUTLINE_BUTTON_CLASS =
+  "inline-flex h-[52px] items-center justify-center gap-1.5 rounded-full border border-foreground/90 bg-transparent px-6 text-sm font-medium uppercase tracking-[0.06em] text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50";
+
+// A full-width choice card: grey at rest, white with black text once picked.
+function optionCardClass(selected: boolean) {
+  return cn(
+    "w-full rounded-3xl px-5 py-[18px] text-left transition-colors",
+    selected ? "bg-white text-black" : "bg-card text-foreground hover:bg-secondary",
+  );
+}
+
+function optionSubClass(selected: boolean) {
+  return cn("mt-0.5 text-[13px] leading-snug", selected ? "text-black/60" : "text-muted-foreground");
+}
+
+// A multi-select pill. `invalid` marks a picked pill that breaks a rule (too many rest days).
+function chipClass(selected: boolean, invalid = false) {
+  return cn(
+    "rounded-full px-[17px] py-2.5 text-sm whitespace-nowrap transition-colors",
+    invalid
+      ? "bg-destructive/15 text-destructive font-medium"
+      : selected
+        ? "bg-white text-black font-medium"
+        : "bg-card text-muted-foreground hover:text-foreground",
+  );
+}
+
+function inputClass(invalid: boolean, extra?: string) {
+  return cn(
+    "h-[52px] w-full min-w-0 rounded-full bg-card px-5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1",
+    invalid ? "ring-1 ring-destructive focus:ring-destructive" : "focus:ring-foreground/40",
+    extra,
+  );
+}
+
+// A pill field holding an input plus a trailing unit ("kcal / day").
+function suffixFieldClass(invalid: boolean) {
+  return cn(
+    "flex h-[52px] items-center gap-2 rounded-full bg-card px-5",
+    invalid ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-foreground/40",
+  );
+}
+
+function UnitToggle({
+  value,
+  onChange,
+  testIdPrefix,
+  className,
+}: {
+  value: string;
+  onChange: (unit: string) => void;
+  testIdPrefix: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex shrink-0 items-center gap-0.5 rounded-full bg-card p-1", className)} role="group" aria-label="Weight unit">
+      {["kg", "lbs"].map((u) => (
+        <button
+          key={u}
+          data-testid={`${testIdPrefix}-${u}`}
+          onClick={() => onChange(u)}
+          aria-pressed={value === u}
+          className={cn(
+            "h-full rounded-full px-4 text-[13px] transition-colors",
+            value === u ? "bg-white text-black font-medium" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {u}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Notice({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex gap-3 rounded-[22px] bg-card px-4 py-3.5 text-[12.5px] leading-relaxed text-muted-foreground", className)}>
+      <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.6} />
+      <span>{children}</span>
     </div>
   );
 }

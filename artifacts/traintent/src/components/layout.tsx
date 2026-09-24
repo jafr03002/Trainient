@@ -140,7 +140,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   if (location === "/onboarding") {
     return (
-      <main className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      // Onboarding is fully Sessions-styled, so its safe-area strips are black too.
+      <main className="theme-sessions min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {children}
       </main>
     );
