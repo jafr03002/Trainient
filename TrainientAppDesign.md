@@ -175,7 +175,11 @@ with black text. Secondary actions are either an outlined pill
 ## 8. Not yet migrated / open
 
 - Only `/program` (AI + My program pages, including the builder and empty
-  states) uses Sessions so far. The sidebar, mobile tab bar and other pages are still Voltage.
+  states) and `/progress` use Sessions so far. The sidebar, mobile tab bar and other pages are still Voltage.
+- `/progress` shows the metric-card pattern: a caps label, a big light number
+  and a muted delta, above a minimal axis-less chart. Its volume card is
+  monochrome (top three bars white, the rest grey, cyan only for increases)
+  instead of the multi-colour muscle palette.
 - The program page's **week strip** (`ScheduleStrip`) is parked. It's still in the
   code but nothing renders it, until a reworked week view is designed.
 - Per-day colours (Settings → calendar colours) still paint the calendar and the
