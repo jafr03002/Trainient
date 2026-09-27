@@ -138,10 +138,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [profileSettled, profileQuery.isFetching, needsOnboarding, location, setLocation]);
 
-  if (location === "/onboarding") {
+  // Onboarding and the weekly check-in are focused, one-question-per-screen
+  // flows: full screen, no sidebar or tab bar. The check-in carries its own
+  // close button.
+  if (location === "/onboarding" || location === "/checkin") {
     return (
-      // Onboarding is fully Sessions-styled, so its safe-area strips are black too.
-      <main className="theme-sessions min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <main className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {children}
       </main>
     );
@@ -155,9 +157,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Sessions: selected is white, the rest muted - no colour for "active".
   const tabClass = (active: boolean) =>
-    `flex flex-col items-center justify-center gap-1 rounded-lg text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
-      active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+    `flex flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
+      active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
     }`;
 
   const renderTab = (tab: MobileTab) => {
@@ -172,7 +175,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         aria-current={active ? "page" : undefined}
         className={tabClass(active)}
       >
-        <Icon className="h-6 w-6" strokeWidth={active ? 2.25 : 2} />
+        <Icon className="h-6 w-6" strokeWidth={active ? 2 : 1.6} />
         {tab.name}
       </Link>
     );
@@ -183,16 +186,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh bg-background text-foreground">
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar hidden md:flex flex-col">
-        <div className="p-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-display font-bold text-xl tracking-tight text-foreground">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              T
-            </div>
-            Trainient
-          </Link>
-        </div>
-
-        <nav className="flex-1 px-4 space-y-2">
+        {/* No brand mark here: the dashboard's date arc carries the logo. */}
+        <nav aria-label="Main" className="flex-1 px-4 pt-6 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = isAt(location, item.href);
@@ -203,13 +198,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 ref={(el) => navTourCtx.registerEl(item.href, "desktop", el)}
                 onClick={() => clickHandlersRef.current[item.href]?.()}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors ${
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-full text-[15px] transition-colors ${
                   isActive
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    ? "bg-white text-black font-medium"
+                    : "text-muted-foreground hover:bg-card hover:text-foreground"
                 }`}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5" strokeWidth={1.6} />
                 {item.name}
               </Link>
             );
@@ -219,10 +215,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-sidebar-border">
           <Button
             variant="ghost"
-            className="w-full justify-start text-muted-foreground hover:text-foreground"
+            className="w-full justify-start rounded-full text-muted-foreground hover:bg-card hover:text-foreground"
             onClick={() => signOut({ redirectUrl: "/" })}
           >
-            <LogOut className="w-5 h-5 mr-3" />
+            <LogOut className="w-5 h-5 mr-3" strokeWidth={1.6} />
             Log out
           </Button>
         </div>
@@ -237,7 +233,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Nav. The bar's own padding keeps the tabs above the
           home indicator / gesture bar while its background runs under it. */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar/80 backdrop-blur-xl pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <nav aria-label="Main" className="mx-auto grid h-16 max-w-md grid-cols-5 px-1">
           {mobileTabsLeft.map(renderTab)}
 
@@ -250,9 +246,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             href="/program"
             aria-label="Start a workout"
             onClick={() => clickHandlersRef.current["/program"]?.()}
-            className="group flex flex-col items-center justify-center gap-1 text-xs font-semibold text-foreground focus-visible:outline-none"
+            className="group flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-foreground focus-visible:outline-none"
           >
-            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground glow-primary transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
+            {/* The dashboard's play circle, raised: white with a black play, no glow. */}
+            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-white text-black ring-4 ring-black transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
               <Play className="h-6 w-6 translate-x-px fill-current" />
             </span>
             Start

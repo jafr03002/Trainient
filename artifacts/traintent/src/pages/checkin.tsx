@@ -9,6 +9,16 @@ import {
   type SessionAdherence,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+import {
+  TITLE_CLASS,
+  LEDE_CLASS,
+  CAPS_CLASS,
+  ERROR_TEXT_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  OUTLINE_BUTTON_CLASS,
+  optionCardClass,
+} from "@/lib/sessionsForm";
 
 // One question per screen, mirroring the onboarding flow - the old
 // single-screen form asked for a dozen answers at once, which nobody enjoys
@@ -30,8 +40,7 @@ type StepKey =
 
 // The missed-session step only exists when the client came up short, so the
 // flow is 12 steps on a full week and 13 on a short one. Deriving the list (as
-// onboarding's stepsFor(mode) does) keeps the progress bar and "Step N of M"
-// correct for free.
+// onboarding's stepsFor(mode) does) keeps the "N of M" count correct for free.
 function stepsFor(adherence: SessionAdherence | undefined): StepKey[] {
   const cameUpShort = !!adherence && adherence.loggedSessions < adherence.plannedSessions;
   return [
@@ -93,7 +102,6 @@ export default function Checkin() {
   const currentStep = steps[safeStep]!;
   const totalSteps = steps.length;
   const isLastStep = safeStep === totalSteps - 1;
-  const progress = ((safeStep + 1) / totalSteps) * 100;
 
   function canAdvance(): boolean {
     switch (currentStep) {
@@ -129,27 +137,40 @@ export default function Checkin() {
     setResult({ aiMessage: res.aiMessage });
   }
 
+  // The check-in runs full screen (layout.tsx hides the tab bar here), so it
+  // carries its own way out.
+  const closeButton = (
+    <button
+      onClick={() => setLocation("/dashboard")}
+      aria-label="Close check-in"
+      className="grid h-10 w-10 place-items-center rounded-full bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      data-testid="button-close-checkin"
+    >
+      <X className="h-5 w-5" strokeWidth={1.6} />
+    </button>
+  );
+
   if (result) {
     return (
-      <div className="p-6 max-w-xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <div className="mx-auto max-w-lg p-6">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="space-y-6 pt-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Check-in submitted</h1>
-            <p className="text-muted-foreground mt-1">Your AI coach has reviewed your week.</p>
+            <h1 className={TITLE_CLASS}>Check-in submitted</h1>
+            <p className={cn(LEDE_CLASS, "mb-0")}>Your AI coach has reviewed your week.</p>
           </div>
 
-          <div className="p-5 rounded-xl bg-primary/5 border border-primary/20">
-            <p className="text-sm font-semibold text-primary mb-2 uppercase tracking-wider">Coach message</p>
-            <p className="text-foreground leading-relaxed">{result.aiMessage}</p>
+          <div className="rounded-[26px] bg-card p-5">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-[hsl(var(--sessions-cyan))]">Coach message</div>
+            <p className="mt-2 text-[15px] leading-relaxed text-foreground">{result.aiMessage}</p>
           </div>
 
           <button
             onClick={() => setLocation("/program")}
-            className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+            className={cn(PRIMARY_BUTTON_CLASS, "w-full")}
             data-testid="button-see-updated-program"
           >
             See updated program
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="h-4 w-4" strokeWidth={1.8} />
           </button>
         </motion.div>
       </div>
@@ -157,28 +178,24 @@ export default function Checkin() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="w-full h-1 bg-secondary/40">
-        <motion.div
-          className="h-full bg-primary"
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.3 }}
-        />
+    <div className="flex min-h-dvh flex-col">
+      <div className="flex items-center justify-between px-6 pt-4">
+        {closeButton}
+        {/* Progress is the caps count only - no bar (see TrainientAppDesign.md). */}
+        <div className={CAPS_CLASS}>
+          {safeStep + 1} of {totalSteps}
+        </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+      <div className="flex flex-1 flex-col items-center justify-center p-6 py-10">
         <div className="w-full max-w-lg">
-          <div className="text-xs text-muted-foreground mb-8 font-medium tracking-wider uppercase">
-            Step {safeStep + 1} of {totalSteps}
-          </div>
-
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
-              initial={{ opacity: 0, x: 24 }}
+              initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.22 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
             >
               {currentStep === "energy" && (
                 <Question title="How was your energy this week?" testId="question-energy">
@@ -235,26 +252,21 @@ export default function Checkin() {
                   hint="If you trained it and just didn't log it, say so - your coach won't cut your training for a logging gap."
                   testId="question-missed-reason"
                 >
-                  <div className="space-y-2">
-                    {MISSED_REASONS.map((r) => (
-                      <button
-                        key={r.value}
-                        onClick={() => setMissedReason(r.value)}
-                        data-testid={`radio-missed-${r.value}`}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm text-left transition-all ${
-                          missedReason === r.value
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        <span
-                          className={`w-4 h-4 rounded-full border-2 shrink-0 ${
-                            missedReason === r.value ? "border-primary bg-primary" : "border-muted-foreground/60"
-                          }`}
-                        />
-                        {r.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {MISSED_REASONS.map((r) => {
+                      const selected = missedReason === r.value;
+                      return (
+                        <button
+                          key={r.value}
+                          onClick={() => setMissedReason(r.value)}
+                          aria-pressed={selected}
+                          data-testid={`radio-missed-${r.value}`}
+                          className={cn(optionCardClass(selected), "text-[15px]")}
+                        >
+                          {r.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </Question>
               )}
@@ -288,24 +300,24 @@ export default function Checkin() {
                   hint="Be honest - if the data isn't reliable, your coach won't change your calories off it."
                   testId="question-offday"
                 >
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2.5">
                     {[
                       { label: "No", val: false },
                       { label: "Yes", val: true },
-                    ].map((o) => (
-                      <button
-                        key={o.label}
-                        onClick={() => setOffDayDeviation(o.val)}
-                        data-testid={`chip-offday-${o.label.toLowerCase()}`}
-                        className={`flex-1 py-3.5 rounded-xl border text-sm font-medium transition-all ${
-                          offDayDeviation === o.val
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
+                    ].map((o) => {
+                      const selected = offDayDeviation === o.val;
+                      return (
+                        <button
+                          key={o.label}
+                          onClick={() => setOffDayDeviation(o.val)}
+                          aria-pressed={selected}
+                          data-testid={`chip-offday-${o.label.toLowerCase()}`}
+                          className={cn(optionCardClass(selected), "text-center text-base font-medium")}
+                        >
+                          {o.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </Question>
               )}
@@ -365,19 +377,17 @@ export default function Checkin() {
           </AnimatePresence>
 
           {submitCheckin.isError && (
-            <div className="mt-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-              Something went wrong. Please try again.
-            </div>
+            <p className={cn(ERROR_TEXT_CLASS, "mt-6")}>Something went wrong. Please try again.</p>
           )}
 
-          <div className="flex items-center gap-3 mt-10">
+          <div className="mt-10 flex items-center gap-3">
             {safeStep > 0 && (
               <button
                 onClick={() => setStep(safeStep - 1)}
-                className="h-12 px-5 rounded-xl border border-border text-muted-foreground font-semibold hover:text-foreground transition-colors flex items-center"
+                className={OUTLINE_BUTTON_CLASS}
                 data-testid="button-back"
               >
-                <ChevronLeft className="w-4 h-4 mr-1" />
+                <ChevronLeft className="h-4 w-4" strokeWidth={1.8} />
                 Back
               </button>
             )}
@@ -385,13 +395,13 @@ export default function Checkin() {
               <button
                 onClick={handleSubmit}
                 disabled={submitCheckin.isPending}
-                className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className={cn(PRIMARY_BUTTON_CLASS, "min-w-0 flex-1 px-5")}
                 data-testid="button-submit-checkin"
               >
                 {submitCheckin.isPending ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Your AI coach is reviewing your week...
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    <span className="truncate">Reviewing your week...</span>
                   </>
                 ) : (
                   "Submit check-in"
@@ -401,11 +411,10 @@ export default function Checkin() {
               <button
                 onClick={() => setStep(safeStep + 1)}
                 disabled={!canAdvance()}
-                className="flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center disabled:opacity-50"
+                className={cn(PRIMARY_BUTTON_CLASS, "flex-1")}
                 data-testid="button-continue"
               >
                 Continue
-                <ChevronRight className="w-4 h-4 ml-1" />
               </button>
             )}
           </div>
@@ -416,7 +425,7 @@ export default function Checkin() {
 }
 
 const textareaClass =
-  "w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none";
+  "w-full resize-none rounded-3xl bg-card px-5 py-4 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-foreground/40";
 
 function Question({
   title,
@@ -431,16 +440,16 @@ function Question({
 }) {
   return (
     <div data-testid={testId}>
-      <h2 className="text-2xl font-bold text-foreground mb-2">{title}</h2>
-      {hint && <p className="text-muted-foreground mb-8">{hint}</p>}
-      <div className={hint ? "" : "mt-8"}>{children}</div>
+      <h2 className={TITLE_CLASS}>{title}</h2>
+      {hint ? <p className={LEDE_CLASS}>{hint}</p> : <div className="mb-8" />}
+      {children}
     </div>
   );
 }
 
-// Five buttons, each carrying its own meaning. Replaces the old 1-10 slider,
-// where the two end captions sat under the track and nothing told you what a 7
-// was supposed to mean.
+// Five circles, each carrying its own meaning - filled white once picked.
+// Replaces the old 1-10 slider, where the two end captions sat under the track
+// and nothing told you what a 7 was supposed to mean.
 function Scale5({
   value,
   onChange,
@@ -453,7 +462,7 @@ function Scale5({
   testIdPrefix: string;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-1.5">
+    <div className="grid grid-cols-5 gap-2">
       {labels.map((label, i) => {
         const n = i + 1;
         const selected = value === n;
@@ -461,21 +470,22 @@ function Scale5({
           <button
             key={n}
             onClick={() => onChange(n)}
+            aria-pressed={selected}
+            aria-label={`${n} - ${label}`}
             data-testid={`${testIdPrefix}-${n}`}
-            className="text-center min-w-0"
+            className="group flex min-w-0 flex-col items-center"
           >
-            <div
-              className={`rounded-xl border-2 py-3.5 text-xl font-bold transition-all ${
-                selected
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              }`}
+            <span
+              className={cn(
+                "grid aspect-square w-full max-w-[60px] place-items-center rounded-full text-2xl font-light tabular-nums transition-colors",
+                selected ? "bg-white text-black" : "bg-card text-muted-foreground group-hover:bg-secondary group-hover:text-foreground",
+              )}
             >
               {n}
-            </div>
-            <div className={`text-[0.7rem] mt-2 leading-tight break-words ${selected ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+            </span>
+            <span className={cn("mt-2 break-words text-center text-[11px] leading-tight", selected ? "text-foreground" : "text-muted-foreground")}>
               {label}
-            </div>
+            </span>
           </button>
         );
       })}
@@ -495,21 +505,21 @@ function ChipRow({
   testIdPrefix: string;
 }) {
   return (
-    <div className="flex gap-2">
-      {options.map((o) => (
-        <button
-          key={o}
-          onClick={() => onSelect(o.toLowerCase())}
-          data-testid={`${testIdPrefix}-${o.toLowerCase()}`}
-          className={`flex-1 py-3.5 rounded-xl border text-sm font-medium transition-all ${
-            value === o.toLowerCase()
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border bg-card text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {o}
-        </button>
-      ))}
+    <div className="grid grid-cols-3 gap-2.5">
+      {options.map((o) => {
+        const selected = value === o.toLowerCase();
+        return (
+          <button
+            key={o}
+            onClick={() => onSelect(o.toLowerCase())}
+            aria-pressed={selected}
+            data-testid={`${testIdPrefix}-${o.toLowerCase()}`}
+            className={cn(optionCardClass(selected), "px-2 text-center text-[15px] font-medium")}
+          >
+            {o}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -519,8 +529,8 @@ function ChipRow({
 function SessionsSummary({ query }: { query: { isLoading: boolean; data: SessionAdherence | undefined } }) {
   if (query.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-muted-foreground text-sm" data-testid="sessions-loading">
-        <Loader2 className="w-4 h-4 animate-spin" />
+      <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="sessions-loading">
+        <Loader2 className="h-4 w-4 animate-spin" />
         Checking what you logged...
       </div>
     );
@@ -528,37 +538,46 @@ function SessionsSummary({ query }: { query: { isLoading: boolean; data: Session
   const a = query.data;
   if (!a) {
     return (
-      <p className="text-muted-foreground text-sm" data-testid="sessions-unavailable">
+      <p className="text-sm text-muted-foreground" data-testid="sessions-unavailable">
         We couldn't read your training week - your coach will work from your answers alone.
       </p>
     );
   }
   return (
-    <div className="p-5 rounded-xl bg-primary/5 border border-primary/20" data-testid="sessions-summary">
-      <p className="text-xl font-bold text-foreground">
-        You logged <span className="text-primary">{a.loggedSessions} of {a.plannedSessions}</span> sessions
-      </p>
-      <div className="mt-4 space-y-2">
+    <div data-testid="sessions-summary">
+      <div className="mb-3 flex items-baseline gap-2">
+        <span className="text-[34px] font-light tracking-[-0.02em] tabular-nums">
+          {a.loggedSessions}
+          <span className="text-muted-foreground"> / {a.plannedSessions}</span>
+        </span>
+        <span className={CAPS_CLASS}>sessions logged</span>
+      </div>
+      {/* Inset grouped list, as on the program page. */}
+      <div className="overflow-hidden rounded-[26px] bg-card">
         {a.loggedDays.map((d) => (
-          <div key={`logged-${d.dayNumber}`} className="flex items-center gap-2.5 text-sm">
-            <Check className="w-4 h-4 text-primary shrink-0" />
-            <span className="min-w-0 break-words">{d.label}</span>
-            <span className="ml-auto text-xs text-muted-foreground shrink-0">{d.date}</span>
-          </div>
+          <SummaryRow key={`logged-${d.dayNumber}`} icon={<Check className="h-4 w-4 text-[hsl(var(--sessions-cyan))]" strokeWidth={1.8} />} label={d.label} trailing={d.date ?? ""} />
         ))}
         {a.missingDays.map((d) => (
-          <div key={`missing-${d.dayNumber}`} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-            <X className="w-4 h-4 text-destructive shrink-0" />
-            <span className="min-w-0 break-words">{d.label}</span>
-            <span className="ml-auto text-xs shrink-0">not logged</span>
-          </div>
+          <SummaryRow key={`missing-${d.dayNumber}`} icon={<X className="h-4 w-4 text-muted-foreground" strokeWidth={1.8} />} label={d.label} trailing="not logged" muted />
         ))}
       </div>
       {a.extraSessions > 0 && (
-        <p className="text-xs text-muted-foreground mt-4">
+        <p className="mt-3 ml-1 text-[12.5px] text-muted-foreground">
           Plus {a.extraSessions} extra session{a.extraSessions === 1 ? "" : "s"} beyond your program days.
         </p>
       )}
+    </div>
+  );
+}
+
+function SummaryRow({ icon, label, trailing, muted }: { icon: ReactNode; label: string; trailing: string; muted?: boolean }) {
+  return (
+    <div className="group flex items-center pl-5">
+      <div className="flex min-w-0 flex-1 items-center gap-3 border-b border-border py-[15px] pr-5 group-last:border-b-0">
+        <span className="shrink-0">{icon}</span>
+        <span className={cn("min-w-0 flex-1 truncate text-[15px]", muted && "text-muted-foreground")}>{label}</span>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">{trailing}</span>
+      </div>
     </div>
   );
 }

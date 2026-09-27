@@ -2,8 +2,8 @@
 // genie-style wisp tail that gently bobs, sways, and blinks. Inline SVG, crisp
 // at any size. The float/sway/blink keyframes (and prefers-reduced-motion
 // opt-out) live once in index.css under `.coach-robot` rather than in a per-
-// instance <style> tag - see that file. Rendered as the mascot above every
-// CoachmarkTour bubble (see CoachmarkTour) and on the auth panel (AuthShell).
+// instance <style> tag - see that file. Rendered as the mascot on the
+// auth panel (AuthShell). Tours use the white Intent sun instead (CoachmarkTour).
 export function CoachRobot({ size = 30, className }: { size?: number; className?: string }) {
   return (
     <span className={className} style={{ display: "inline-block", lineHeight: 0 }} aria-hidden={false}>

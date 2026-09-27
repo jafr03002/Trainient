@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useUser, useClerk } from "@clerk/react";
 import { motion } from "framer-motion";
-import { Loader2, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, ExternalLink, ChevronRight } from "lucide-react";
 import {
   useGetProfile,
   useUpdateProfile,
@@ -25,6 +25,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
 import { buildDayColorOrder, dayColorHex } from "@/lib/dayColors";
 import { toast } from "@/hooks/use-toast";
+import { PROGRAM_TITLE_CLASS, ProgramBadge } from "@/pages/program/shared";
 
 
 export default function Settings() {
@@ -194,344 +195,343 @@ export default function Settings() {
   const colorOrder = buildDayColorOrder(programLabels, storedLabels);
   const knownLabels = Object.keys(colorOrder);
 
+  const isPro = subscription.data?.plan === "pro";
+
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-8">
+    <div className="mx-auto max-w-2xl space-y-7 p-6">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        {/* "You", matching the tab it lives under. */}
+        <h1 className={PROGRAM_TITLE_CLASS}>You</h1>
         {/* An email address has no spaces to wrap at, so a long one runs off the
             side of a phone screen without break-words. */}
-        <p className="text-muted-foreground mt-1 break-words">{user?.primaryEmailAddress?.emailAddress}</p>
+        <p className="mt-2 break-words text-[15px] text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
       </motion.div>
 
       {/* Profile */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.06 }}
-        className="p-5 rounded-xl bg-card border border-border space-y-5"
-      >
-        <h2 className="font-semibold text-foreground">Profile</h2>
-
-        <div>
-          <label className="text-sm font-medium text-muted-foreground block mb-1.5">Display name</label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={MAX_PROFILE_NAME}
-            placeholder="Your name"
-            className="w-full px-4 py-2.5 rounded-xl border border-border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-            data-testid="input-name"
-          />
-        </div>
-
-        {/* Side by side only from sm up. Two columns on a phone left the weight
-            field ~40px wide and clipped the kg/lbs toggle against the card edge,
-            because the toggle's buttons take ~84px of the ~135px column. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-muted-foreground block mb-1.5">Age</label>
+      <SettingsSection title="Profile" delay={0.06}>
+        <GroupedList>
+          <FieldRow label="Name">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={MAX_PROFILE_NAME}
+              placeholder="Your name"
+              aria-label="Display name"
+              className={ROW_INPUT_CLASS}
+              data-testid="input-name"
+            />
+          </FieldRow>
+          <FieldRow label="Age" error={ageError} errorTestId="text-settings-age-error">
             <input
               type="number"
+              inputMode="numeric"
               value={age}
               onChange={(e) => setAge(e.target.value)}
-              placeholder="e.g. 28"
-              className={`w-full px-4 py-2.5 rounded-xl border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none ${
-                ageError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
-              }`}
+              placeholder="-"
+              aria-label="Age"
+              aria-invalid={!!ageError}
+              className={ROW_INPUT_CLASS}
               data-testid="input-settings-age"
             />
-            {ageError && (
-              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-settings-age-error">{ageError}</p>
-            )}
-          </div>
-          <div className="min-w-0">
-            <label className="text-sm font-medium text-muted-foreground block mb-1.5">Weight</label>
-            <div className="flex gap-2 min-w-0">
-              <input
-                type="number"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="e.g. 80"
-                className={`flex-1 min-w-0 px-4 py-2.5 rounded-xl border bg-secondary/20 text-foreground placeholder:text-muted-foreground focus:outline-none ${
-                  weightError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"
-                }`}
-                data-testid="input-settings-weight"
-              />
-              {/* shrink-0: overflow-hidden zeroes this box's automatic minimum
-                  size, so without it the toggle shrinks and clips "lbs" in half
-                  rather than letting the input next to it give up the space. */}
-              <div className="flex shrink-0 rounded-xl border border-border overflow-hidden">
-                {["kg", "lbs"].map((u) => (
-                  <button
-                    key={u}
-                    onClick={() => setWeightUnit(u)}
-                    data-testid={`settings-unit-${u}`}
-                    className={`px-3 py-2.5 text-sm font-medium transition-colors ${
-                      weightUnit === u
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {u}
-                  </button>
-                ))}
-              </div>
+          </FieldRow>
+          <FieldRow label="Weight" error={weightError} errorTestId="text-settings-weight-error">
+            <input
+              type="number"
+              inputMode="decimal"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              placeholder="-"
+              aria-label="Weight"
+              aria-invalid={!!weightError}
+              className={ROW_INPUT_CLASS}
+              data-testid="input-settings-weight"
+            />
+            {/* shrink-0 so the input gives up the space, not the toggle. */}
+            <div className="flex shrink-0 rounded-full bg-secondary p-0.5" role="group" aria-label="Weight unit">
+              {["kg", "lbs"].map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  onClick={() => setWeightUnit(u)}
+                  aria-pressed={weightUnit === u}
+                  data-testid={`settings-unit-${u}`}
+                  className={`rounded-full px-3 py-1 text-[13px] transition-colors ${
+                    weightUnit === u ? "bg-white font-medium text-black" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
             </div>
-            {weightError && (
-              <p className="mt-1.5 text-sm font-medium text-destructive" data-testid="text-settings-weight-error">{weightError}</p>
-            )}
-          </div>
-        </div>
+          </FieldRow>
+        </GroupedList>
 
         <button
           onClick={handleSave}
           disabled={updateProfile.isPending || !!ageError || !!weightError}
-          className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+          className="mt-3 flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-[13px] font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
           data-testid="button-save-profile"
         >
-          {updateProfile.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          {saved ? "Saved!" : "Save changes"}
+          {updateProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {saved ? "Saved" : "Save changes"}
         </button>
-      </motion.section>
+      </SettingsSection>
 
       {/* Training mode */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
-        className="p-5 rounded-xl bg-card border border-border space-y-4"
-      >
-        <h2 className="font-semibold text-foreground">Training mode</h2>
-        <div className="flex items-center gap-3">
-          <div className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-            currentMode === "ai"
-              ? "bg-primary/10 text-primary border-primary/20"
-              : "bg-secondary/50 text-muted-foreground border-border"
-          }`}>
-            {currentMode === "ai" ? "AI Coach" : "Independent"}
-          </div>
-        </div>
-
-        {currentMode === "ai" ? (
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Switch to Independent mode to build and manage your own program without AI.
-            </p>
-            <button
-              onClick={() => { setPendingMode("independent"); setShowModeConfirm(true); }}
-              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-            >
-              Switch to Independent
-            </button>
-          </div>
-        ) : (
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Switch to AI Coach mode to get AI-generated programs and weekly adjustments.
-            </p>
-            <button
-              onClick={() => { setPendingMode("ai"); setShowModeConfirm(true); }}
-              className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-            >
-              Switch to AI Coach
-            </button>
-          </div>
-        )}
-
-        {showModeConfirm && (
-          <div className="p-4 rounded-xl bg-secondary/20 border border-border">
-            <p className="text-sm text-foreground font-medium mb-2">
-              Switch to {pendingMode === "ai" ? "AI Coach" : "Independent"} mode?
-            </p>
-            <p className="text-xs text-muted-foreground mb-4">
-              {pendingMode === "ai"
-                ? "Your own program stays intact. We'll take you to AI Coach to set up and generate your program - it may ask a few quick questions first."
-                : "Your existing program will remain, but AI check-ins and adjustments will be disabled."}
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setShowModeConfirm(false); setPendingMode(null); }}
-                className="flex-1 h-9 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleModeSwitch}
-                disabled={updateProfile.isPending}
-                className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        )}
-      </motion.section>
+      <SettingsSection title="Training" delay={0.08}>
+        <GroupedList>
+          <RowShell>
+            <div className="min-w-0 flex-1 truncate text-[15px]">Mode</div>
+            {currentMode === "ai" ? <ProgramBadge kind="ai" /> : (
+              <span className="rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground">
+                Independent
+              </span>
+            )}
+          </RowShell>
+          <ActionRow
+            title={currentMode === "ai" ? "Switch to Independent" : "Switch to AI Coach"}
+            subtitle={
+              currentMode === "ai"
+                ? "Build and manage your own program without AI."
+                : "Get AI-generated programs and weekly adjustments."
+            }
+            onClick={() => { setPendingMode(currentMode === "ai" ? "independent" : "ai"); setShowModeConfirm(true); }}
+          />
+          {showModeConfirm && (
+            <ConfirmSheet
+              title={`Switch to ${pendingMode === "ai" ? "AI Coach" : "Independent"} mode?`}
+              body={
+                pendingMode === "ai"
+                  ? "Your own program stays intact. We'll take you to AI Coach to set up and generate your program - it may ask a few quick questions first."
+                  : "Your existing program will remain, but AI check-ins and adjustments will be disabled."
+              }
+              onCancel={() => { setShowModeConfirm(false); setPendingMode(null); }}
+              confirm={
+                <button
+                  onClick={handleModeSwitch}
+                  disabled={updateProfile.isPending}
+                  className="h-10 flex-1 rounded-full bg-primary text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                >
+                  Confirm
+                </button>
+              }
+            />
+          )}
+        </GroupedList>
+      </SettingsSection>
 
       {/* Calendar colours */}
       {knownLabels.length > 0 && (
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
-          className="p-5 rounded-xl bg-card border border-border space-y-4"
+        <SettingsSection
+          title="Calendar colours"
+          caption="Each training day's colour, used on your calendar, your program page and in the editor."
+          delay={0.1}
         >
-          <div>
-            <h2 className="font-semibold text-foreground">Calendar colours</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Each training day's colour, used on your calendar, your program page and in the editor.
-            </p>
-          </div>
-
-          <div className="space-y-3">
+          <GroupedList>
             {knownLabels.map((label) => {
               const currentColor = dayColorHex(label, colorOrder, colorMap);
               return (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{label}</span>
-                  <label className="relative cursor-pointer">
-                    <div
-                      className="w-8 h-8 rounded-lg border-2 border-border overflow-hidden cursor-pointer hover:border-primary transition-colors"
-                      style={{ background: currentColor }}
-                    />
+                <RowShell key={label}>
+                  <div className="min-w-0 flex-1 truncate text-[15px]">{label}</div>
+                  <label className="relative shrink-0 cursor-pointer">
+                    <span className="sr-only">Colour for {label}</span>
+                    <span className="block h-7 w-7 rounded-full" style={{ background: currentColor }} />
                     <input
                       type="color"
                       value={currentColor}
                       onChange={(e) => handleColorChange(label, e.target.value)}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                     />
                   </label>
-                </div>
+                </RowShell>
               );
             })}
-          </div>
-        </motion.section>
+          </GroupedList>
+        </SettingsSection>
       )}
 
       {/* Subscription */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.12 }}
-        className="p-5 rounded-xl bg-card border border-border space-y-4"
-      >
-        <h2 className="font-semibold text-foreground">Subscription</h2>
-
-        {subscription.isLoading ? (
-          <div className="text-muted-foreground text-sm">Loading...</div>
-        ) : (
-          <>
-            <div className="flex items-center gap-3">
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                subscription.data?.plan === "pro"
-                  ? "bg-primary/10 text-primary border border-primary/20"
-                  : "bg-secondary/50 text-muted-foreground border border-border"
-              }`}>
-                {subscription.data?.plan === "pro" ? "Pro" : "Free"}
-              </span>
-              {subscription.data?.currentPeriodEnd && (
-                <span className="text-xs text-muted-foreground">
-                  Renews {new Date(subscription.data.currentPeriodEnd).toLocaleDateString("en-GB")}
+      <SettingsSection title="Subscription" delay={0.12}>
+        <GroupedList>
+          {subscription.isLoading ? (
+            <RowShell>
+              <div className="flex-1 text-[15px] text-muted-foreground">Loading...</div>
+            </RowShell>
+          ) : (
+            <>
+              <RowShell>
+                <div className="min-w-0 flex-1 truncate text-[15px]">Plan</div>
+                {subscription.data?.currentPeriodEnd && (
+                  <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+                    Renews {new Date(subscription.data.currentPeriodEnd).toLocaleDateString("en-GB")}
+                  </span>
+                )}
+                <span className="rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground">
+                  {isPro ? "Pro" : "Free"}
                 </span>
-              )}
-            </div>
-
-            {subscription.data?.plan !== "pro" ? (
-              <div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upgrade to Pro for unlimited programs, weekly AI adjustments, and full progress tracking.
-                </p>
-                <button
+              </RowShell>
+              {!isPro ? (
+                <ActionRow
+                  title="Upgrade to Pro"
+                  subtitle="Unlimited programs, weekly AI adjustments and full progress tracking."
+                  trailing="£9.99/mo"
+                  pending={createCheckout.isPending}
                   onClick={handleUpgrade}
-                  disabled={createCheckout.isPending}
-                  className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2 disabled:opacity-60"
-                  data-testid="button-upgrade-pro"
-                >
-                  {createCheckout.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Upgrade to Pro - £9.99/month
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleManageBilling}
-                disabled={createPortal.isPending}
-                className="h-11 px-6 rounded-xl border border-border text-foreground font-semibold text-sm hover:bg-secondary/30 transition-colors flex items-center gap-2 disabled:opacity-60"
-                data-testid="button-manage-billing"
-              >
-                {createPortal.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                Manage billing
-              </button>
-            )}
-          </>
-        )}
-      </motion.section>
+                  testId="button-upgrade-pro"
+                />
+              ) : (
+                <ActionRow
+                  title="Manage billing"
+                  icon={<ExternalLink className="h-4 w-4" strokeWidth={1.6} />}
+                  pending={createPortal.isPending}
+                  onClick={handleManageBilling}
+                  testId="button-manage-billing"
+                />
+              )}
+            </>
+          )}
+        </GroupedList>
+      </SettingsSection>
 
-      {/* Danger zone */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.16 }}
-        className="p-5 rounded-xl bg-card border border-destructive/20 space-y-4"
-        data-testid="danger-zone"
-      >
-        <h2 className="font-semibold text-destructive flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" />
-          Danger zone
-        </h2>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Sign out</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Sign out of your account</p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="h-9 px-4 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
-            data-testid="button-sign-out"
-          >
-            Sign out
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all data</p>
-          </div>
-          <button
+      {/* Account. Destructive actions are red text, not a red box. */}
+      <SettingsSection title="Account" delay={0.16}>
+        <GroupedList testId="danger-zone">
+          <ActionRow title="Sign out" onClick={() => signOut()} testId="button-sign-out" />
+          <ActionRow
+            title="Delete account"
+            subtitle="Permanently delete your account and all data."
+            tone="destructive"
             onClick={() => setShowDeleteConfirm(true)}
-            className="h-9 px-4 rounded-lg border border-destructive/40 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-            data-testid="button-delete-account"
-          >
-            Delete
-          </button>
-        </div>
+            testId="button-delete-account"
+          />
+          {showDeleteConfirm && (
+            <ConfirmSheet
+              title="Delete everything?"
+              body="This will permanently delete your account and all training data. This cannot be undone."
+              onCancel={() => setShowDeleteConfirm(false)}
+              confirm={
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteAccount.isPending}
+                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-full bg-destructive text-[13px] font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteAccount.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Yes, delete everything
+                </button>
+              }
+            />
+          )}
+        </GroupedList>
+      </SettingsSection>
+    </div>
+  );
+}
 
-        {showDeleteConfirm && (
-          <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20">
-            <p className="text-sm text-destructive font-medium mb-3">
-              This will permanently delete your account and all training data. This cannot be undone.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 h-9 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteAccount.isPending}
-                className="flex-1 h-9 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-                data-testid="button-confirm-delete"
-              >
-                {deleteAccount.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Yes, delete everything
-              </button>
-            </div>
-          </div>
+// Boxless, right-aligned value input: the row is the field, like iOS Settings.
+const ROW_INPUT_CLASS =
+  "min-w-0 flex-1 bg-transparent text-right text-[15px] text-muted-foreground placeholder:text-muted-foreground/50 focus:text-foreground focus:outline-none";
+
+function SettingsSection({ title, caption, delay, children }: { title: string; caption?: string; delay: number; children: ReactNode }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut", delay }}
+    >
+      <h2 className="mb-3 text-[21px] font-light tracking-[-0.01em]">{title}</h2>
+      {caption && <p className="-mt-1.5 mb-3 text-[12.5px] leading-relaxed text-muted-foreground">{caption}</p>}
+      {children}
+    </motion.section>
+  );
+}
+
+function GroupedList({ children, testId }: { children: ReactNode; testId?: string }) {
+  return (
+    <div className="overflow-hidden rounded-[26px] bg-card" data-testid={testId}>
+      {children}
+    </div>
+  );
+}
+
+// The inset grouped row: the hairline sits on the inner block so it starts at
+// the text inset, and the last row has none (see RosterRow on /program).
+function RowShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="group flex items-center pl-5">
+      <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 border-b border-border py-3 pr-5 group-last:border-b-0">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FieldRow({ label, error, errorTestId, children }: { label: string; error?: string | null; errorTestId?: string; children: ReactNode }) {
+  return (
+    <div className="group pl-5">
+      <div className="border-b border-border pr-5 group-last:border-b-0">
+        <label className="flex min-h-[52px] min-w-0 items-center gap-3 py-2">
+          <span className="w-20 shrink-0 text-[15px]">{label}</span>
+          {children}
+        </label>
+        {error && (
+          <p className="-mt-1 pb-3 text-right text-[12.5px] text-destructive" data-testid={errorTestId}>{error}</p>
         )}
-      </motion.section>
+      </div>
+    </div>
+  );
+}
+
+function ActionRow({
+  title, subtitle, trailing, icon, tone, pending, onClick, testId,
+}: {
+  title: string;
+  subtitle?: string;
+  trailing?: string;
+  icon?: ReactNode;
+  tone?: "destructive";
+  pending?: boolean;
+  onClick: () => void;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      className="group flex w-full items-center pl-5 text-left transition-colors hover:bg-accent disabled:opacity-60"
+      data-testid={testId}
+    >
+      <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 border-b border-border py-3 pr-4 group-last:border-b-0">
+        <div className="min-w-0 flex-1">
+          <div className={`truncate text-[15px] ${tone === "destructive" ? "text-destructive" : "text-foreground"}`}>{title}</div>
+          {subtitle && <div className="mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{subtitle}</div>}
+        </div>
+        {trailing && <span className="whitespace-nowrap text-[15px] text-muted-foreground">{trailing}</span>}
+        <span className="shrink-0 text-muted-foreground">
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : icon ?? <ChevronRight className="h-4 w-4" strokeWidth={1.6} />}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// A confirm step that opens inside the group as a bottom-sheet row.
+function ConfirmSheet({ title, body, onCancel, confirm }: { title: string; body: string; onCancel: () => void; confirm: ReactNode }) {
+  return (
+    <div className="mx-2 mb-2 rounded-3xl bg-secondary p-4">
+      <p className="text-[15px] font-medium">{title}</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{body}</p>
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={onCancel}
+          className="h-10 flex-1 rounded-full border border-foreground/90 bg-transparent text-[13px] font-semibold text-foreground transition-colors hover:bg-accent"
+        >
+          Cancel
+        </button>
+        {confirm}
+      </div>
     </div>
   );
 }
