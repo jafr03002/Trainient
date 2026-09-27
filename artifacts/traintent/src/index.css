@@ -264,6 +264,35 @@
   pointer-events: none;
 }
 
+/* A thin grey track with a white thumb (onboarding's training-days slider). */
+.sessions-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: hsl(var(--accent));
+  outline: none;
+  cursor: pointer;
+}
+.sessions-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: #fff;
+}
+.sessions-range::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
+}
+.sessions-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 0 5px hsl(var(--foreground) / 0.6);
+}
+
 @layer base {
   * {
     @apply border-border;
