@@ -190,7 +190,12 @@ marks the day. The outer days sink (`1.5px × offset²`) and fade slightly. Abov
 the white Intent sun (`src/assets/intent-sun.png`, from [intent-logo.png](docs/design/references/intent-logo.png))
 and the word "Intent" sit on the left, with a "Full month" chip on the right. Behind it,
 `.sessions-wash` is a grey-to-teal light that fades into black, and the greeting
-sits straight on it with no card. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
+sits straight on it with no card. The wash is live (`components/dashboard/DashboardWash.tsx`):
+a WebGL shader draws slow light shafts, a drifting teal pool and thin caustics
+over today's column. It follows a finger, ripples on tap and tilts on Android.
+`.sessions-wash` stays underneath as the fallback, and reduced motion gets one
+still frame. This is the one sanctioned exception to "no glows": keep it on the
+dashboard top and nowhere else. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
 [desktop](docs/design/references/dashboard-desktop.png).
 
 ## 8. Status and open work
