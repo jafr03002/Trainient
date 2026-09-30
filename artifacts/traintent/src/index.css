@@ -264,6 +264,15 @@
 }
 
 @layer utilities {
+  /* A page's full height inside the app shell. Not min-h-screen: the shell's
+     <main> already pads for the tab bar and safe areas, so a 100vh page on top
+     of that scrolled by ~88px even when empty - and on iOS 100vh is taller
+     than the visible screen besides. The shell sets --page-inset to whatever
+     chrome it wraps the page in (src/components/layout.tsx). */
+  .min-h-page {
+    min-height: calc(100dvh - var(--page-inset, 0px));
+  }
+
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
   }

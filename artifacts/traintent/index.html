@@ -7,6 +7,20 @@
          pinch-zoom must keep working. The theme-color meta and manifest link
          are injected at build from src/theme/tokens.ts (vite.config.ts). -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- iOS only: Safari zooms the page in whenever an input under 16px gets
+         focus (every Clerk field, most set-logging inputs) and leaves it zoomed.
+         maximum-scale=1 stops that, and since iOS 10 Safari ignores it for
+         pinch-zoom, so pinching still works. Android honours maximum-scale for
+         pinch too, and never auto-zooms, so it keeps the plain viewport. -->
+    <script>
+      (function () {
+        var ua = navigator.userAgent;
+        var iOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        if (!iOS) return;
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) viewport.setAttribute("content", viewport.getAttribute("content") + ", maximum-scale=1");
+      })();
+    </script>
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Trainient" />

@@ -143,7 +143,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // close button.
   if (location === "/onboarding" || location === "/checkin") {
     return (
-      <main className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <main className="min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] [--page-inset:calc(env(safe-area-inset-top)+env(safe-area-inset-bottom))]">
         {children}
       </main>
     );
@@ -212,7 +212,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-border">
           <Button
             variant="ghost"
             className="w-full justify-start rounded-full text-muted-foreground hover:bg-card hover:text-foreground"
@@ -226,8 +226,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content. On a phone the bottom padding clears the tab bar, the
           Start button's overhang above it, and the home indicator / gesture bar
-          under it; the side and top insets matter in landscape and standalone. */}
-      <main className="flex-1 md:ml-64 relative min-h-dvh overflow-x-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
+          under it; the side and top insets matter in landscape and standalone.
+          --page-inset repeats that vertical padding for pages sized with
+          min-h-page (src/index.css). */}
+      <main className="flex-1 md:ml-64 relative min-h-dvh overflow-x-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0 [--page-inset:calc(env(safe-area-inset-top)+5.5rem+env(safe-area-inset-bottom))] md:[--page-inset:env(safe-area-inset-top)]">
         {children}
       </main>
 

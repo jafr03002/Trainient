@@ -760,7 +760,7 @@ const CHECKIN_INPUT_CLASS =
 // and fades into black.
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
+    <div className="relative min-h-page overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
       <div className="sessions-wash absolute inset-x-0 top-0 h-[420px]" aria-hidden />
       <div className="relative mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>
