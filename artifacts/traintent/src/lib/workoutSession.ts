@@ -128,12 +128,26 @@ export function loadActiveSession(userId: string): ActiveSessionPointer | null {
   }
 }
 
+// Fired on `window` whenever the pointer is written or cleared. The browser's own
+// `storage` event only reaches OTHER tabs, so without this the tab bar (which
+// lives outside the log page) would not hear a session start or end in this one.
+export const ACTIVE_SESSION_EVENT = "traintent:active-session-changed";
+
+function announceActiveSessionChange() {
+  try {
+    window.dispatchEvent(new Event(ACTIVE_SESSION_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
 export function saveActiveSession(userId: string, pointer: ActiveSessionPointer) {
   try {
     window.localStorage.setItem(activeSessionKey(userId), JSON.stringify(pointer));
   } catch {
     // ignore
   }
+  announceActiveSessionChange();
 }
 
 export function clearActiveSession(userId: string) {
@@ -142,6 +156,7 @@ export function clearActiveSession(userId: string) {
   } catch {
     // ignore
   }
+  announceActiveSessionChange();
 }
 
 /**
