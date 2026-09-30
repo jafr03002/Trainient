@@ -1,6 +1,6 @@
 # Trainient App Design — "Sessions"
 
-The visual language for Trainient's screens going forward. **Pure black canvas,
+Trainient's visual language, app-wide. **Pure black canvas,
 soft rounded grey cards, thin light Inter headings, pill-shaped controls, and
 white-on-black for whatever is selected or primary.** It reads as a calm,
 premium iOS app: almost monochrome, with one cool teal accent.
@@ -10,36 +10,35 @@ the code disagree, the reference screen's code wins:
 
 - **Reference screen:** the program page — `artifacts/traintent/src/pages/program/shared.tsx`
   (`ProgramWeekView`, `RosterRow`, `ProgramPageShell`, `ProgramBadge`, `InactiveLineageNotice`)
-- **Tokens and helpers:** `artifacts/traintent/src/index.css` (`.theme-sessions`, `.sessions-glass`, `.sessions-watermark`)
+- **Tokens:** `artifacts/traintent/src/theme/tokens.ts` (the one source - written into `index.css` at build time, and read by Clerk's appearance and the web app manifest)
+- **Helpers:** `artifacts/traintent/src/index.css` (`.sessions-glass`, `.sessions-watermark`, `.sessions-wash`, `.sessions-range`)
+- **Form kit** for stepped flows (onboarding, the weekly check-in): `artifacts/traintent/src/lib/sessionsForm.ts`
 - **Screenshots:** [mobile](docs/design/references/program-page-mobile.png) · [desktop](docs/design/references/program-page-desktop.png)
 - **Approved mockup** (the design review this came from, open in a browser): [program-page-mockup.html](docs/design/references/program-page-mockup.html)
 
 ![Program page, mobile](docs/design/references/program-page-mobile.png)
 
 > Relationship to Voltage: `docs/design/voltage-style.md` describes the older
-> navy/electric-blue theme, which is still the app-wide default. Sessions replaces it
-> screen by screen. New or reworked screens use Sessions, and Voltage stays in place
-> for untouched screens until they're migrated.
+> navy/electric-blue theme. It is **retired**: Sessions became the app-wide default
+> in `src/theme/tokens.ts`, so every screen, dialog, popover and toast gets it
+> without opting in.
 
 ---
 
 ## 1. How to apply it to a screen
 
-Sessions is a **scoped token override**, not a new component library. Wrap the
-screen in the `theme-sessions` class and every semantic Tailwind token inside
-(`bg-card`, `bg-secondary`, `text-muted-foreground`, `border-border`,
-`bg-primary`, …) re-skins itself. shadcn components come along for free.
+Sessions is the app's **token set**, not a component library. Every semantic
+Tailwind token (`bg-card`, `bg-secondary`, `text-muted-foreground`,
+`border-border`, `bg-primary`, …) already resolves to it, and shadcn components
+come along for free. There is no wrapper class to add: restyling a screen means
+using the tokens, type scale and shapes below.
 
 ```tsx
-// the program page's wrapper - copy the pattern for other screens
-<div className="theme-sessions min-h-screen bg-background text-foreground">
+// the page frame the program and log pages share (ProgramPageShell)
+<div className="min-h-screen bg-background text-foreground">
   <div className="mx-auto max-w-3xl space-y-6 p-6">{children}</div>
 </div>
 ```
-
-For the program routes this wrapper is `ProgramPageShell`. Put **every state**
-of a route inside it (loading, empty, editing, the main view) so the screen
-never flashes the old navy theme between states.
 
 Rules:
 
@@ -51,7 +50,7 @@ Rules:
 - Keep the app's existing structure and behaviour. Sessions changes how a screen
   looks, not what it does.
 
-## 2. Tokens (`.dark .theme-sessions` in `index.css`)
+## 2. Tokens (`src/theme/tokens.ts`)
 
 | Token | HSL | Hex ≈ | Use |
 |---|---|---|---|
@@ -76,8 +75,8 @@ but never as fills for large areas.
 
 ## 3. Type
 
-**Inter only.** `.theme-sessions` switches headings and `font-display` from Space
-Grotesk to Inter. The contrast comes from weight and size, not from a second face.
+**Inter only.** Headings and `font-display` both resolve to Inter (`appFonts` in
+`tokens.ts`); Space Grotesk is gone. The contrast comes from weight and size, not from a second face.
 
 | Role | Classes |
 |---|---|
@@ -174,7 +173,7 @@ with black text. Secondary actions are either an outlined pill
 
 ## 7. Checklist for restyling a screen
 
-1. Wrap every state of the route in `theme-sessions` (or reuse `ProgramPageShell`).
+1. Use the page frame (`ProgramPageShell`'s gutter and width, or the same classes).
 2. Swap heading classes to the type scale above, and drop `font-bold` / `font-display` on titles.
 3. Turn bordered cards into borderless `bg-card` cards with large radii. Keep hairlines only between rows.
 4. Replace coloured selected states and CTAs with the white-on-black pattern.
@@ -194,14 +193,30 @@ and the word "Intent" sit on the left, with a "Full month" chip on the right. Be
 sits straight on it with no card. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
 [desktop](docs/design/references/dashboard-desktop.png).
 
-## 8. Not yet migrated / open
+## 8. Status and open work
 
-- `/program` (AI + My program pages, including the builder and empty states),
-  `/progress`, `/log` (the workout logger, its confirm sheets and empty states)
-  and the dashboard (`/`, including the day sheet and Independent targets card)
-  use Sessions so far. The log page reuses `ProgramPageShell`, and the dashboard
-  has its own `DashboardShell` (it adds the wash). The sidebar, mobile tab bar
-  and other pages are still Voltage.
+Trainient is a **mobile app**: design for the 390px phone first. The desktop
+sidebar only gets the tokens, with no design work of its own.
+
+- Designed in Sessions: `/program` (AI + My, builder, empty states), `/progress`,
+  `/log`, the dashboard (with its own `DashboardShell` for the wash), onboarding,
+  the weekly check-in, Settings (the "You" tab), the mobile tab bar and the tours.
+- **The mobile tab bar** is a black blurred bar: the active tab is white, the
+  rest muted, and Start is a raised white disc with a black play icon.
+- **Settings** is iOS inset grouped lists (Profile, Training, Calendar colours,
+  Subscription, Account) with boxless right-aligned inputs, and confirms that
+  open inside the group as a `bg-secondary` bottom-sheet row. Destructive
+  actions are red *text*, never a red surface.
+- **The weekly check-in** reuses onboarding's stacked-card kit
+  (`lib/sessionsForm.ts`): full screen with no tab bar, a close button top left,
+  a caps "N of M" count (no progress bar), a 1-5 scale as circles that fill white.
+- **Tours** use the white Intent sun on a black disc as the avatar (the robot
+  mascot now only appears on the sign-in panel).
+- **Still to design, each in its own session:** the calendar (`/calendar`: month
+  grid, phases, calibration nudge, session sheet) and the sign-in / sign-up
+  screen (as a native-app screen, not a web split layout). Both already pick up
+  the tokens, but their layouts are still the old ones. The landing page is out
+  of scope for an app.
 - `/progress` shows the metric-card pattern: a caps label, a big light number
   and a muted delta, above a minimal axis-less chart. Its volume card is
   monochrome (top three bars white, the rest grey, cyan only for increases)

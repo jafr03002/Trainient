@@ -46,11 +46,11 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
             {steps.map((_, i) => (
               <span
                 key={i}
-                className={`h-1.5 rounded-full transition-all ${i === step ? "w-6 bg-primary" : "w-1.5 bg-secondary"}`}
+                className={`h-1.5 rounded-full transition-all ${i === step ? "w-6 bg-white" : "w-1.5 bg-secondary"}`}
               />
             ))}
           </div>
-          <span className="text-xs font-medium text-muted-foreground tracking-wider uppercase">
+          <span className="text-[11px] text-muted-foreground tracking-[0.14em] uppercase">
             {step + 1} / {total}
           </span>
         </div>
@@ -58,10 +58,10 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
         <div className="space-y-5">
           {steps[step] === "intro" && (
             <>
-              <div className="text-xs font-semibold tracking-wider uppercase text-primary">Calibration</div>
+              <div className="text-[11px] tracking-[0.14em] uppercase text-[hsl(var(--sessions-cyan))]">Calibration</div>
               <div>
-                <h2 className="text-2xl font-bold text-foreground mb-1">Welcome to calibration</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <h2 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-2.5">Welcome to calibration</h2>
+                <p className="text-[13.5px] text-muted-foreground leading-relaxed">
                   This is your smooth on-ramp into training. Over this first phase you'll try the
                   program, get to know your gym, and lock in solid form on each exercise.
                 </p>
@@ -69,19 +69,21 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
 
               <div className="space-y-2.5">
                 {INTRO_FOCUS_ITEMS.map((item) => (
-                  <div key={item.title} className="p-4 rounded-xl bg-primary/5 border border-primary/15">
-                    <div className="flex items-start gap-2.5">
-                      <item.icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <div>
-                        <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
-                        <p className="text-sm text-muted-foreground mt-0.5">{item.detail}</p>
+                  <div key={item.title} className="px-5 py-4 rounded-3xl bg-card">
+                    <div className="flex items-start gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary">
+                        <item.icon className="w-4 h-4" strokeWidth={1.6} />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] font-normal text-foreground">{item.title}</h3>
+                        <p className="text-[12.5px] text-muted-foreground mt-0.5 leading-relaxed">{item.detail}</p>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <p className="text-[12.5px] text-muted-foreground leading-relaxed">
                 Everything you notice feeds back to your AI coach, who fine-tunes your program
                 before you move toward your goal.
               </p>
@@ -97,7 +99,7 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
           <button
             onClick={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0}
-            className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+            className="flex-1 h-[52px] rounded-full border border-foreground/90 text-sm font-medium uppercase tracking-[0.06em] text-foreground hover:bg-secondary transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
             data-testid="calibration-walkthrough-back"
           >
             <ChevronLeft className="w-4 h-4" /> Back
@@ -105,7 +107,7 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
           <button
             onClick={() => (isLast ? finish() : setStep((s) => Math.min(total - 1, s + 1)))}
             disabled={updateProfile.isPending}
-            className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+            className="flex-1 h-[52px] rounded-full bg-primary text-primary-foreground text-sm font-semibold uppercase tracking-[0.06em] hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
             data-testid="calibration-walkthrough-next"
           >
             Next <ChevronRight className="w-4 h-4" />

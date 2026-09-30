@@ -8,7 +8,7 @@ import {
   getGetGoalProgressQueryKey,
   type UserProfile,
 } from "@workspace/api-client-react";
-import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
+import { phaseSolid } from "@/lib/phaseColors";
 import {
   PHASE_OPTIONS,
   goalToPhase,
@@ -126,7 +126,6 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
 
   // ---------------- EDIT MODE ----------------
   if (editing) {
-    const draftAccent = phaseSolid(phase);
     const showGoalError = !!goalError && !!goalWeight.trim();
     return (
       <>
@@ -139,7 +138,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Edit your targets</h2>
 
           {/* Phase picker */}
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phase — pick your goal</label>
+          <label className="text-[11px] text-muted-foreground uppercase tracking-[0.12em]">Phase — pick your goal</label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-2">
             {PHASE_OPTIONS.map((o) => {
               const selected = phase === o.phase;
@@ -149,20 +148,19 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                   key={o.phase}
                   type="button"
                   onClick={() => pickPhase(o.phase)}
-                  className="text-left rounded-xl border p-3 transition-all"
-                  style={{
-                    borderColor: selected ? c : "hsl(var(--border))",
-                    background: selected ? phaseSoft(o.phase) : "hsl(var(--secondary) / 0.4)",
-                  }}
+                  aria-pressed={selected}
+                  className={`text-left rounded-3xl p-4 transition-colors ${
+                    selected ? "bg-white text-black" : "bg-secondary text-foreground hover:bg-accent"
+                  }`}
                   data-testid={`targets-phase-${o.phase}`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c }} />
-                    <span className="text-sm font-semibold text-foreground">{o.heading}</span>
-                    {selected && <Check className="w-3.5 h-3.5 ml-auto shrink-0" style={{ color: c }} />}
+                    <span className="text-[15px] font-medium">{o.heading}</span>
+                    {selected && <Check className="w-3.5 h-3.5 ml-auto shrink-0" strokeWidth={2} />}
                   </div>
-                  <div className="text-[11px] font-semibold mt-1.5" style={{ color: c }}>{o.tag}</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{o.sub}</div>
+                  <div className={`text-[11px] uppercase tracking-[0.1em] mt-1.5 ${selected ? "text-black/60" : "text-muted-foreground"}`}>{o.tag}</div>
+                  <div className={`text-[12px] mt-0.5 leading-snug ${selected ? "text-black/60" : "text-muted-foreground"}`}>{o.sub}</div>
                 </button>
               );
             })}
@@ -171,37 +169,31 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
           {/* Goal weight - required for bulk/diet, absent for maintenance */}
           {phase === "maintenance" ? (
             <div
-              className="mt-3 rounded-xl px-3.5 py-3 text-xs text-muted-foreground leading-relaxed"
-              style={{ border: `1px dashed ${phaseSolid("maintenance")}80`, background: phaseSoft("maintenance") }}
+              className="mt-3 rounded-[22px] bg-secondary px-4 py-3.5 text-[12.5px] text-muted-foreground leading-relaxed"
               data-testid="targets-maintenance-note"
             >
-              <span className="text-foreground font-semibold">General fitness has no goal weight.</span> Your progress graph stops tracking toward a target until you pick Bulk or Diet again.
+              <span className="text-foreground">General fitness has no goal weight.</span> Your progress graph stops tracking toward a target until you pick Bulk or Diet again.
             </div>
           ) : (
             <div
-              className="mt-3 rounded-xl px-3.5 py-3"
-              style={{
-                border: `1px solid ${showGoalError ? "hsl(var(--destructive))" : draftAccent}`,
-                background: showGoalError ? "hsl(var(--destructive) / 0.07)" : phaseSoft(phase),
-              }}
+              className={`mt-3 rounded-3xl bg-secondary px-4 py-3.5 ${showGoalError ? "ring-1 ring-destructive" : ""}`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-foreground">Goal weight</span>
+                <span className="text-[13px] text-foreground">Goal weight</span>
                 <span
-                  className="text-[9px] font-bold uppercase tracking-wider"
-                  style={{ color: showGoalError ? "hsl(var(--destructive))" : draftAccent }}
+                  className={`text-[9.5px] uppercase tracking-[0.1em] ${showGoalError ? "text-destructive" : "text-muted-foreground"}`}
                 >
                   Required
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-1.5 h-11 rounded-xl border border-border bg-secondary/40 px-3 focus-within:border-primary">
+              <div className="mt-2 flex items-center gap-1.5 h-12 rounded-full bg-card px-5 focus-within:ring-1 focus-within:ring-foreground/40">
                 <input
                   type="number"
                   step="0.1"
                   value={goalWeight}
                   onChange={(e) => setGoalWeight(e.target.value)}
                   placeholder={`Target ${weightUnit}`}
-                  className="flex-1 min-w-0 bg-transparent text-base font-bold tabular-nums focus:outline-none"
+                  className="flex-1 min-w-0 bg-transparent text-xl font-light tabular-nums focus:outline-none"
                   data-testid="input-targets-goal-weight"
                 />
                 <span className="text-xs text-muted-foreground shrink-0">{weightUnit}</span>
@@ -221,16 +213,16 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
           {/* Calories + steps */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5 mb-5">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Calorie target</label>
-              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
-                caloriesError ? "border-destructive" : "border-border focus-within:border-primary"
+              <label className="text-[11px] text-muted-foreground uppercase tracking-[0.12em]">Calorie target</label>
+              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-full bg-secondary px-5 ${
+                caloriesError ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-foreground/40"
               }`}>
                 <input
                   type="number"
                   value={calories}
                   onChange={(e) => setCalories(e.target.value)}
                   placeholder="0"
-                  className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                  className="flex-1 min-w-0 bg-transparent text-xl font-light tabular-nums focus:outline-none"
                   data-testid="input-targets-calories"
                 />
                 <span className="text-xs text-muted-foreground shrink-0">kcal / day</span>
@@ -240,16 +232,16 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
               )}
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Step target</label>
-              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-xl border bg-secondary/30 px-3 ${
-                stepsError ? "border-destructive" : "border-border focus-within:border-primary"
+              <label className="text-[11px] text-muted-foreground uppercase tracking-[0.12em]">Step target</label>
+              <div className={`mt-1.5 flex items-center gap-1.5 h-12 rounded-full bg-secondary px-5 ${
+                stepsError ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-foreground/40"
               }`}>
                 <input
                   type="number"
                   value={steps}
                   onChange={(e) => setSteps(e.target.value)}
                   placeholder="0"
-                  className="flex-1 min-w-0 bg-transparent text-lg font-bold tabular-nums focus:outline-none"
+                  className="flex-1 min-w-0 bg-transparent text-xl font-light tabular-nums focus:outline-none"
                   data-testid="input-targets-steps"
                 />
                 <span className="text-xs text-muted-foreground shrink-0">steps / day</span>
@@ -261,7 +253,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
           </div>
 
           {/* Cardio */}
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cardio — which days &amp; how long</label>
+          <label className="text-[11px] text-muted-foreground uppercase tracking-[0.12em]">Cardio — which days &amp; how long</label>
           <div className="flex flex-col sm:flex-row sm:items-end gap-3 mt-2">
             <div className="flex flex-wrap gap-1.5">
               {CARDIO_DAYS.map((d) => {
@@ -272,10 +264,10 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                     type="button"
                     onClick={() => toggleDay(d)}
                     aria-pressed={on}
-                    className={`px-3.5 py-2 rounded-full border text-xs font-medium transition-all ${
+                    className={`px-3.5 py-2 rounded-full text-xs transition-colors ${
                       on
-                        ? "border-white bg-white text-black"
-                        : "border-transparent bg-secondary text-muted-foreground hover:text-foreground"
+                        ? "bg-white text-black font-medium"
+                        : "bg-secondary text-muted-foreground hover:text-foreground"
                     }`}
                     data-testid={`targets-cardio-day-${d.toLowerCase()}`}
                   >
@@ -284,15 +276,15 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
                 );
               })}
             </div>
-            <div className={`flex items-center gap-1.5 h-11 w-32 shrink-0 rounded-xl border bg-secondary/30 px-3 ${
-              cardioMinutesError ? "border-destructive" : "border-border focus-within:border-primary"
+            <div className={`flex items-center gap-1.5 h-11 w-32 shrink-0 rounded-full bg-secondary px-4 ${
+              cardioMinutesError ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-foreground/40"
             }`}>
               <input
                 type="number"
                 value={cardioMinutes}
                 onChange={(e) => setCardioMinutes(e.target.value)}
                 placeholder="min"
-                className="flex-1 min-w-0 bg-transparent text-base font-bold tabular-nums focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent text-base font-light tabular-nums focus:outline-none"
                 data-testid="input-targets-cardio-minutes"
               />
               <span className="text-xs text-muted-foreground shrink-0">min</span>
@@ -334,11 +326,10 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
             data-testid="dialog-clear-goal-weight"
           >
             <div
-              className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl"
-              style={{ borderColor: `${phaseSolid("maintenance")}66` }}
+              className="w-full max-w-md rounded-[26px] bg-card p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-bold text-foreground mb-2">Clear your goal weight?</h3>
+              <h3 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-2">Clear your goal weight?</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 General fitness has no target weight, so switching will set your goal weight
                 {profile.goalWeight != null ? ` (${profile.goalWeight} ${weightUnit})` : ""} back to scratch. Your progress

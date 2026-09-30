@@ -1258,12 +1258,11 @@ export function InactiveLineageNotice({ children }: { children: ReactNode }) {
   );
 }
 
-// Every program page state (loading, empty, builder, the program itself) sits
-// in this wrapper, so the whole route wears the Sessions look: black canvas,
-// neutral grey cards, thin Inter. See TrainientAppDesign.md.
+// The page frame every program page state (loading, empty, builder, the
+// program itself) shares - the Sessions gutter and width. See TrainientAppDesign.md.
 export function ProgramPageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="theme-sessions min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>
   );
