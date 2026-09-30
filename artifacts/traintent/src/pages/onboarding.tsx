@@ -3,6 +3,20 @@ import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  TITLE_CLASS,
+  LEDE_CLASS,
+  CAPS_CLASS,
+  LABEL_CLASS,
+  ERROR_TEXT_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  OUTLINE_BUTTON_CLASS,
+  optionCardClass,
+  optionSubClass,
+  chipClass,
+  inputClass,
+  suffixFieldClass,
+} from "@/lib/sessionsForm";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateProfile, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
@@ -490,7 +504,7 @@ export default function Onboarding() {
 
   if (phase === "generating") {
     return (
-      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col items-center justify-center p-6">
+      <div className="min-h-page bg-background text-foreground flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-lg">
           <GeneratingScreen />
         </div>
@@ -498,11 +512,9 @@ export default function Onboarding() {
     );
   }
 
-  // The presentation deck and commitment screen sit inside the same Sessions
-  // scope so the flow never flashes back to the navy theme after the form.
   if (phase === "presentation" && program) {
     return (
-      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
+      <div className="min-h-page bg-background text-foreground flex flex-col">
         <div className="flex-1 flex flex-col items-center p-6 py-12">
           <PresentationDeck
             program={program}
@@ -521,7 +533,7 @@ export default function Onboarding() {
 
   if (phase === "commitment" && program) {
     return (
-      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
+      <div className="min-h-page bg-background text-foreground flex flex-col">
         <div className="flex-1 flex flex-col items-center p-6 py-12">
           <CommitmentScreen program={program} onConfirm={handleCommit} />
         </div>
@@ -530,7 +542,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
+    <div className="min-h-page bg-background text-foreground flex flex-col">
       {showGoalWeight && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60"
@@ -1282,56 +1294,6 @@ export default function Onboarding() {
 }
 
 /* ---------- Sessions styling (see TrainientAppDesign.md) ---------- */
-
-const TITLE_CLASS = "text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground";
-const LEDE_CLASS = "mt-2.5 mb-8 text-[13.5px] leading-relaxed text-muted-foreground";
-const CAPS_CLASS = "text-[11px] uppercase tracking-[0.14em] text-muted-foreground";
-const LABEL_CLASS = "mb-2 ml-1 block text-[13px] text-foreground";
-const ERROR_TEXT_CLASS = "mt-2 ml-1 text-[13px] font-medium text-destructive";
-const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-primary px-8 text-sm font-semibold uppercase tracking-[0.06em] text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-secondary disabled:text-muted-foreground";
-const OUTLINE_BUTTON_CLASS =
-  "inline-flex h-[52px] items-center justify-center gap-1.5 rounded-full border border-foreground/90 bg-transparent px-6 text-sm font-medium uppercase tracking-[0.06em] text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50";
-
-// A full-width choice card: grey at rest, white with black text once picked.
-function optionCardClass(selected: boolean) {
-  return cn(
-    "w-full rounded-3xl px-5 py-[18px] text-left transition-colors",
-    selected ? "bg-white text-black" : "bg-card text-foreground hover:bg-secondary",
-  );
-}
-
-function optionSubClass(selected: boolean) {
-  return cn("mt-0.5 text-[13px] leading-snug", selected ? "text-black/60" : "text-muted-foreground");
-}
-
-// A multi-select pill. `invalid` marks a picked pill that breaks a rule (too many rest days).
-function chipClass(selected: boolean, invalid = false) {
-  return cn(
-    "rounded-full px-[17px] py-2.5 text-sm whitespace-nowrap transition-colors",
-    invalid
-      ? "bg-destructive/15 text-destructive font-medium"
-      : selected
-        ? "bg-white text-black font-medium"
-        : "bg-card text-muted-foreground hover:text-foreground",
-  );
-}
-
-function inputClass(invalid: boolean, extra?: string) {
-  return cn(
-    "h-[52px] w-full min-w-0 rounded-full bg-card px-5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1",
-    invalid ? "ring-1 ring-destructive focus:ring-destructive" : "focus:ring-foreground/40",
-    extra,
-  );
-}
-
-// A pill field holding an input plus a trailing unit ("kcal / day").
-function suffixFieldClass(invalid: boolean) {
-  return cn(
-    "flex h-[52px] items-center gap-2 rounded-full bg-card px-5",
-    invalid ? "ring-1 ring-destructive" : "focus-within:ring-1 focus-within:ring-foreground/40",
-  );
-}
 
 function UnitToggle({
   value,

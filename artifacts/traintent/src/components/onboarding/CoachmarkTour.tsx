@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { CoachRobot } from "@/components/CoachRobot";
+import intentSun from "@/assets/intent-sun.png";
 
 // A single coachmark step.
 // - "info" (the default): an explanatory bubble anchored to a real element via
@@ -74,12 +74,12 @@ function scrimClipPath(hole: Rect): string {
 
 const BUBBLE_WIDTH = 320;
 
-// Coach's rendered box, as laid out by `coachAt` below: 30px square, inset 12px
-// (left-3 / right-3) from a top corner of the bubble and lifted 36px (-top-9)
-// above its top edge.
-const COACH_SIZE = 30;
+// The tour avatar's rendered box, as laid out by `coachAt` below: a 36px
+// circle, inset 12px (left-3 / right-3) from a top corner of the bubble and
+// lifted 18px (-top-[18px]) so it straddles the bubble's top edge.
+const COACH_SIZE = 36;
 const COACH_INSET = 12;
-const COACH_LIFT = 36;
+const COACH_LIFT = 18;
 
 function overlaps(a: Rect, b: Rect): boolean {
   return (
@@ -278,21 +278,23 @@ export function CoachmarkTour({
     </>
   );
 
-  // Coach, the AI coach mascot, perches on a top corner of every tour box. He's
-  // a child of the box element (never the scrim), so he always paints on top of
-  // the dimming backdrop and keeps his bright blue - he never darkens with the
-  // page behind it.
+  // The white Intent sun, on a black disc so it reads against the white
+  // bubble, sits on a top corner of every tour box. It's a child of the box
+  // element (never the scrim), so it always paints on top of the dimming
+  // backdrop and never darkens with the page behind it.
   //
-  // He overhangs the box's top edge, which puts him over whatever sits above the
+  // It overhangs the box's top edge, which puts it over whatever sits above the
   // bubble - and when the bubble is anchored just below a small target, that is
-  // the target itself. On the calendar's last step he sat squarely on the session
-  // sheet's close button, hiding both the X and its highlight ring. The anchored
-  // branch below picks the corner that keeps him off the target.
+  // the target itself. On the calendar's last step the avatar sat squarely on
+  // the session sheet's close button, hiding both the X and its highlight ring.
+  // The anchored branch below picks the corner that keeps it off the target.
   const coachAt = (side: "left" | "right") => (
-    <CoachRobot
-      size={COACH_SIZE}
-      className={`pointer-events-none absolute -top-9 ${side === "left" ? "left-3" : "right-3"} drop-shadow-[0_5px_9px_rgba(23,55,110,0.35)]`}
-    />
+    <span
+      className={`pointer-events-none absolute -top-[18px] ${side === "left" ? "left-3" : "right-3"} grid h-9 w-9 place-items-center rounded-full bg-black ring-2 ring-white`}
+      aria-hidden
+    >
+      <img src={intentSun} alt="" className="h-5 w-5" />
+    </span>
   );
   // Unanchored surfaces (intro card, centered bubble) have no target to dodge.
   const coach = coachAt("left");
@@ -306,11 +308,11 @@ export function CoachmarkTour({
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={end}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm p-5 rounded-xl bg-primary text-primary-foreground shadow-xl"
+            className="relative w-full max-w-sm p-5 rounded-[22px] bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-intro`}
           >
             {coach}
-            <div className="text-xs font-semibold uppercase tracking-wider opacity-80">Quick tour</div>
+            <div className="text-[11px] font-medium uppercase tracking-[0.12em] opacity-60">Quick tour</div>
             <p className="text-sm font-medium mt-1 leading-relaxed">{intro.text}</p>
             <div className="flex items-center gap-2 mt-3">
               <button
@@ -323,7 +325,7 @@ export function CoachmarkTour({
               <div className="flex-1" />
               <button
                 onClick={() => setPhase("steps")}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-foreground text-primary hover:opacity-90 transition-opacity"
+                className="text-xs font-semibold px-4 py-2 rounded-full bg-primary-foreground text-primary hover:opacity-90 transition-opacity"
                 data-testid={`${testIdPrefix}-intro-next`}
               >
                 {intro.cta ?? "Let's go"}
@@ -343,7 +345,7 @@ export function CoachmarkTour({
   // centered and the anchored placements below.
   const bubbleBody = (
     <>
-      <div className="text-xs font-semibold uppercase tracking-wider opacity-80">
+      <div className="text-[11px] font-medium uppercase tracking-[0.12em] opacity-60">
         Step {step + 1} of {total}
       </div>
       <p className="text-sm font-medium mt-1 leading-relaxed">{current.text}</p>
@@ -359,7 +361,7 @@ export function CoachmarkTour({
         {!handsOff && (
           <button
             onClick={() => (isLast ? end() : setStep((s) => s + 1))}
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary-foreground text-primary hover:opacity-90 transition-opacity"
+            className="text-xs font-semibold px-4 py-2 rounded-full bg-primary-foreground text-primary hover:opacity-90 transition-opacity"
             data-testid={`${testIdPrefix}-next`}
           >
             {isLast ? "Done" : "Next"}
@@ -379,7 +381,7 @@ export function CoachmarkTour({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm p-4 rounded-xl bg-primary text-primary-foreground shadow-xl"
+            className="relative w-full max-w-sm p-4 rounded-[22px] bg-primary text-primary-foreground shadow-xl"
             data-testid={`${testIdPrefix}-bubble`}
           >
             {coach}
@@ -393,8 +395,8 @@ export function CoachmarkTour({
   const spaceBelow = window.innerHeight - (rect!.top + rect!.height);
   const placeAbove = spaceBelow < 180;
   // Keep the whole bubble on-screen regardless of where the target sits.
-  // TOP_MARGIN leaves room for the Coach mascot, which overhangs the bubble's
-  // top edge (-top-9). Without this vertical clamp the bubble - and its
+  // TOP_MARGIN leaves room for the avatar, which overhangs the bubble's
+  // top edge. Without this vertical clamp the bubble - and its
   // Skip/Next buttons - can land below the fold on a short viewport.
   const TOP_MARGIN = 44;
   const BOTTOM_MARGIN = 12;
@@ -403,8 +405,8 @@ export function CoachmarkTour({
   const bubbleTop = Math.min(Math.max(desiredTop, TOP_MARGIN), Math.max(TOP_MARGIN, maxTop));
   const bubbleLeft = Math.min(Math.max(rect!.left, 16), window.innerWidth - 16 - BUBBLE_WIDTH);
 
-  // Keep Coach off the highlighted element. He hangs above the bubble's top
-  // edge, so a bubble anchored under a small target puts him right on top of it
+  // Keep the avatar off the highlighted element. It hangs above the bubble's top
+  // edge, so a bubble anchored under a small target puts it right on top of it
   // - the calendar's close-button step is the case that bit. Both corners are
   // measured against the ring (the target plus its 4px halo); the near corner
   // wins unless it collides, and if the target is wide enough to swallow both,
@@ -422,12 +424,12 @@ export function CoachmarkTour({
     <>
       {scrim}
       <div
-        className="fixed z-[60] rounded-lg ring-4 ring-primary/40 pointer-events-none transition-all duration-200"
+        className="fixed z-[60] rounded-lg ring-2 ring-white/80 pointer-events-none transition-all duration-200"
         style={ringBox}
       />
       <div
         ref={bubbleRef}
-        className="fixed z-[60] p-4 rounded-xl bg-primary text-primary-foreground shadow-xl transition-all duration-200"
+        className="fixed z-[60] p-4 rounded-[22px] bg-primary text-primary-foreground shadow-xl transition-all duration-200"
         style={{ top: bubbleTop, left: bubbleLeft, width: BUBBLE_WIDTH }}
         data-testid={`${testIdPrefix}-bubble`}
       >

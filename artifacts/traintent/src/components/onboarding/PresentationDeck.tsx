@@ -106,16 +106,16 @@ function SessionRow({ day, color }: { day: ProgramDay; color: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div
-      className={`rounded-xl border overflow-hidden transition-colors ${open ? "border-primary/40" : "border-border"} bg-secondary/20`}
+      className="rounded-3xl overflow-hidden bg-card"
       data-testid={`session-row-${day.dayNumber}`}
     >
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2.5 px-3 py-3 text-left"
+        className="w-full flex items-center gap-2.5 px-5 py-4 text-left min-w-0"
       >
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-        <span className="text-sm font-semibold text-foreground">{day.label}</span>
-        <span className="text-xs text-muted-foreground truncate">· {day.focus}</span>
+        <span className="text-[15px] font-normal text-foreground shrink-0">{day.label}</span>
+        <span className="min-w-0 text-[12.5px] text-muted-foreground truncate">· {day.focus}</span>
         <span className="ml-auto text-[11px] text-muted-foreground shrink-0">{day.exercises.length} exercises</span>
         <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -123,15 +123,15 @@ function SessionRow({ day, color }: { day: ProgramDay; color: string }) {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="px-3 pb-2.5 pl-[30px]"
+          className="px-5 pb-3 pl-[38px]"
         >
           {day.exercises.map((ex) => (
             <div
               key={ex.name}
-              className="flex items-center justify-between gap-3 text-sm py-1.5 border-b border-border/40 last:border-0"
+              className="flex items-center justify-between gap-3 text-[13.5px] py-2 border-b border-border last:border-0"
             >
-              <span className="text-foreground">{ex.name}</span>
-              <span className="text-muted-foreground shrink-0">{ex.sets} × {ex.reps}</span>
+              <span className="min-w-0 truncate text-foreground">{ex.name}</span>
+              <span className="text-muted-foreground whitespace-nowrap">{ex.sets} × {ex.reps}</span>
             </div>
           ))}
         </motion.div>
@@ -188,11 +188,11 @@ export function PresentationDeck({
               key={i}
               onClick={() => setCard(i)}
               aria-label={`Card ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all ${i === card ? "w-6 bg-primary" : "w-1.5 bg-secondary"}`}
+              className={`h-1.5 rounded-full transition-all ${i === card ? "w-6 bg-white" : "w-1.5 bg-secondary"}`}
             />
           ))}
         </div>
-        <span className="text-xs font-medium text-muted-foreground tracking-wider uppercase">
+        <span className="text-[11px] text-muted-foreground tracking-[0.14em] uppercase">
           {card + 1} / {total}
         </span>
       </div>
@@ -210,9 +210,9 @@ export function PresentationDeck({
             {/* CARD 1 - Program & split */}
             {cards[card] === "program" && (
               <>
-                <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your program</div>
+                <div className="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">Your program</div>
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-3">{program.programName}</h2>
+                  <h2 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-3">{program.programName}</h2>
                   <div className="flex flex-wrap gap-2">
                     {program.splitType
                       .split(/[\/,]/)
@@ -220,7 +220,7 @@ export function PresentationDeck({
                       .filter(Boolean)
                       .map((part) => formatSplitType(part))
                       .map((part, i) => (
-                        <span key={i} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                        <span key={i} className="text-[10.5px] font-medium uppercase tracking-[0.1em] px-2.5 py-1 rounded-full bg-secondary text-foreground">
                           {part}
                         </span>
                       ))}
@@ -233,10 +233,10 @@ export function PresentationDeck({
             {/* CARD 2 - Timeline */}
             {cards[card] === "timeline" && (
               <>
-                <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your journey</div>
+                <div className="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">Your journey</div>
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-1">The road to your goal</h2>
-                  <p className="text-sm text-muted-foreground">
+                  <h2 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-2.5">The road to your goal</h2>
+                  <p className="text-[13.5px] leading-relaxed text-muted-foreground">
                     {program.longTermGoalWeight != null
                       ? `You're building toward ${program.longTermGoalWeight}${weightUnit ?? "kg"} - this is a long game, and week one is just the start. Here's how your training gets you there.`
                       : "This is a long game - week one is just the start. Here's how your training evolves."}
@@ -254,22 +254,22 @@ export function PresentationDeck({
                         style={{ background: p.color, boxShadow: `0 0 0 2px ${p.color}` }}
                       />
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-semibold text-muted-foreground">{p.weeks}</span>
+                        <span className="text-[11px] text-muted-foreground">{p.weeks}</span>
                         {isCurrentPhase(p.phase, program.shortTermPhase, goal) && (
-                          <span className="text-[9px] font-bold uppercase tracking-wide text-primary bg-primary/10 border border-primary/30 rounded-full px-1.5 py-0.5">
+                          <span className="text-[9.5px] font-medium uppercase tracking-[0.1em] text-[hsl(var(--sessions-cyan))] bg-[hsl(var(--sessions-cyan)/0.1)] rounded-full px-2 py-0.5">
                             You are here
                           </span>
                         )}
                       </div>
-                      <h3 className="text-sm font-semibold text-foreground mt-0.5 mb-0.5">{p.title}</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{p.motive}</p>
+                      <h3 className="text-[15px] font-normal text-foreground mt-0.5 mb-0.5">{p.title}</h3>
+                      <p className="text-[12.5px] text-muted-foreground leading-relaxed">{p.motive}</p>
                     </div>
                   ))}
                 </div>
                 {(program.shortTermPhase || program.energyBalance || program.cardioIntensity || program.dailyStepTarget) && (
-                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/15" data-testid="deck-monitoring">
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">Right now</div>
-                    <p className="text-xs text-foreground leading-relaxed">{rightNowSentence(program)}</p>
+                  <div className="px-4 py-3.5 rounded-[22px] bg-card" data-testid="deck-monitoring">
+                    <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Right now</div>
+                    <p className="text-[13px] text-foreground leading-relaxed">{rightNowSentence(program)}</p>
                   </div>
                 )}
               </>
@@ -278,13 +278,13 @@ export function PresentationDeck({
             {/* CARD 3 - Balance & schedule */}
             {cards[card] === "balance" && (
               <>
-                <div className="text-xs font-semibold tracking-wider uppercase text-primary">Balance &amp; schedule</div>
+                <div className="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">Balance &amp; schedule</div>
                 <div>
-                  <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Weekly volume</h3>
+                  <h3 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-3">Weekly volume</h3>
                   <MuscleVolumeChart days={days} />
                 </div>
                 <div>
-                  <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">Your week</h3>
+                  <h3 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-3">Your week</h3>
                   <div className="grid grid-cols-7 gap-1">
                     {WEEKDAY_LABELS.map((wd) => (
                       <div key={wd} className="text-center text-[10px] font-medium text-muted-foreground pb-0.5">{wd}</div>
@@ -294,7 +294,7 @@ export function PresentationDeck({
                       return (
                         <div
                           key={i}
-                          className="min-h-[52px] rounded-lg border border-border/50 bg-card/50 p-1"
+                          className="min-h-[52px] rounded-xl bg-card p-1"
                         >
                           {day && tones && (
                             <div
@@ -323,8 +323,8 @@ export function PresentationDeck({
             {/* CARD 4 - Sessions */}
             {cards[card] === "sessions" && (
               <>
-                <div className="text-xs font-semibold tracking-wider uppercase text-primary">Your week's sessions</div>
-                <p className="text-sm text-muted-foreground">Tap any session to see the full exercise list.</p>
+                <div className="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">Your week's sessions</div>
+                <p className="text-[13.5px] text-muted-foreground">Tap any session to see the full exercise list.</p>
                 <div className="space-y-2">
                   {days.map((day) => (
                     <SessionRow key={day.dayNumber} day={day} color={dayColor(day)} />
@@ -336,9 +336,9 @@ export function PresentationDeck({
             {/* CARD 5 - Gate */}
             {cards[card] === "gate" && (
               <>
-                <div className="text-xs font-semibold tracking-wider uppercase text-primary">Ready?</div>
+                <div className="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">Ready?</div>
                 {error && (
-                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                  <div className="px-4 py-3.5 rounded-[22px] bg-card text-destructive text-[13px]">
                     Something went wrong regenerating your program. Please try again.
                   </div>
                 )}
@@ -359,7 +359,7 @@ export function PresentationDeck({
         <button
           onClick={() => setCard((c) => Math.max(0, c - 1))}
           disabled={card === 0}
-          className="flex-1 h-11 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+          className="flex-1 h-[52px] rounded-full border border-foreground/90 text-sm font-medium uppercase tracking-[0.06em] text-foreground hover:bg-secondary transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
           data-testid="deck-back"
         >
           <ChevronLeft className="w-4 h-4" /> Back
@@ -367,7 +367,7 @@ export function PresentationDeck({
         {!isLast && (
           <button
             onClick={() => setCard((c) => Math.min(total - 1, c + 1))}
-            className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+            className="flex-1 h-[52px] rounded-full bg-primary text-primary-foreground text-sm font-semibold uppercase tracking-[0.06em] hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
             data-testid="deck-next"
           >
             Next <ChevronRight className="w-4 h-4" />

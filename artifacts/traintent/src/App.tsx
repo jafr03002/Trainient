@@ -5,7 +5,7 @@ import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider, removeOldestQuery } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { hsl, voltageFonts, voltageRadius } from "@/theme/tokens";
+import { hsl, appFonts, appRadius } from "@/theme/tokens";
 import { dismissSplash } from "@/lib/splash";
 
 import { Toaster } from "@/components/ui/toaster";
@@ -43,7 +43,7 @@ if (!clerkPubKey) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
 }
 
-// Voltage palette (docs/design/voltage-style.md). Clerk's appearance variables
+// Sessions palette (TrainientAppDesign.md). Clerk's appearance variables
 // can't read CSS custom properties, so they take literal values - from the same
 // token module that writes the CSS variables, so the two can't drift.
 const clerkAppearance = {
@@ -60,8 +60,8 @@ const clerkAppearance = {
     colorInput: hsl("input"),
     colorInputForeground: hsl("foreground"),
     colorNeutral: hsl("muted"),
-    fontFamily: voltageFonts.sans,
-    borderRadius: voltageRadius,
+    fontFamily: appFonts.sans,
+    borderRadius: appRadius,
   },
   // Clerk's own styles win the cascade over these classes, so any override
   // that has to stick - widths above all: `.cl-cardBox` ships a fixed 25rem
@@ -77,19 +77,19 @@ const clerkAppearance = {
     cardBox: "!bg-transparent !shadow-none !border-0 !w-full !min-w-0 !max-w-[400px] overflow-hidden",
     card: "!shadow-none !border-0 !bg-transparent !rounded-none !w-full !min-w-0 !px-0",
     footer: "!shadow-none !border-0 !bg-transparent !bg-none !rounded-none",
-    headerTitle: "text-foreground font-display",
+    headerTitle: "text-foreground font-normal",
     headerSubtitle: "text-muted-foreground",
     socialButtonsBlockButtonText: "!text-foreground",
     formFieldLabel: "text-foreground",
-    footerActionLink: "text-primary hover:text-primary/90",
+    footerActionLink: "text-foreground underline underline-offset-[3px] hover:text-foreground/80",
     footerActionText: "text-muted-foreground",
     dividerText: "text-muted-foreground",
-    identityPreviewEditButton: "text-primary hover:text-primary/90",
+    identityPreviewEditButton: "text-foreground hover:text-foreground/80",
     formFieldSuccessText: "text-chart-2",
     alertText: "text-destructive-foreground",
     socialButtonsBlockButton: "!bg-card !border-border hover:!bg-secondary",
-    formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 glow-primary",
-    formFieldInput: "bg-input border-border text-foreground !text-base focus:border-primary focus:ring-1 focus:ring-primary",
+    formButtonPrimary: "!rounded-full bg-primary text-primary-foreground hover:bg-primary/90",
+    formFieldInput: "bg-secondary border-transparent text-foreground !text-base focus:border-foreground/40 focus:ring-0",
     footerAction: "border-t border-border pt-4 mt-4",
     dividerLine: "bg-border",
     alert: "bg-destructive/20 border-destructive",

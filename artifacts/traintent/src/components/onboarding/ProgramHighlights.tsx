@@ -14,13 +14,13 @@ export function ProgramHighlights({ highlights }: { highlights: ProgramHighlight
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.05 }}
-          className="p-4 rounded-xl bg-primary/5 border border-primary/15"
+          className="px-5 py-4 rounded-3xl bg-card"
         >
           <div className="flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <Sparkles className="w-4 h-4 text-[hsl(var(--sessions-cyan))] shrink-0 mt-0.5" strokeWidth={1.6} />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">{h.title}</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">{h.detail}</p>
+              <h3 className="text-[15px] font-normal text-foreground">{h.title}</h3>
+              <p className="text-[12.5px] leading-relaxed text-muted-foreground mt-0.5">{h.detail}</p>
             </div>
           </div>
         </motion.div>

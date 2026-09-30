@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
 import type { Program } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { phaseSolid, phaseSoft } from "@/lib/phaseColors";
+import { phaseSolid } from "@/lib/phaseColors";
 
 type Cell = { date: Date | null };
 
@@ -64,20 +64,19 @@ export function CommitmentScreen({
     <div className="w-full max-w-lg mx-auto" data-testid="commitment-screen">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <div
-          className="text-xs font-semibold tracking-wider uppercase mb-2"
+          className="text-[11px] tracking-[0.14em] uppercase mb-2"
           style={{ color: phaseSolid("calibration") }}
         >
           Starting phase
         </div>
-        <h1 className="text-2xl font-bold text-foreground mb-6">Time to put in the work</h1>
+        <h1 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-6">Time to put in the work</h1>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="p-4 rounded-xl border mb-3"
-        style={{ backgroundColor: phaseSoft("calibration"), borderColor: phaseSoft("calibration") }}
+        className="px-5 py-4 rounded-3xl bg-card mb-2.5"
       >
         <div className="flex items-start gap-2.5">
           <svg
@@ -94,8 +93,8 @@ export function CommitmentScreen({
             <path d="M12 6v6l4 2" />
           </svg>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Calibration phase</h3>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h3 className="text-[15px] font-normal text-foreground">Calibration phase</h3>
+            <p className="text-[12.5px] leading-relaxed text-muted-foreground mt-0.5">
               First, the calibration phase — taking it slow while we dial in your training and see how you respond. Everything after builds from what we learn here.
             </p>
           </div>
@@ -107,13 +106,13 @@ export function CommitmentScreen({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="p-4 rounded-xl bg-primary/5 border border-primary/15 mb-8"
+          className="px-5 py-4 rounded-3xl bg-card mb-8"
         >
           <div className="flex items-start gap-2.5">
-            <Dumbbell className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <Dumbbell className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" strokeWidth={1.6} />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Your first session</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <h3 className="text-[15px] font-normal text-foreground">Your first session</h3>
+              <p className="text-[12.5px] text-muted-foreground mt-0.5">
                 {firstSession.label}: {firstSession.focus}
               </p>
             </div>
@@ -122,24 +121,24 @@ export function CommitmentScreen({
       )}
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <p className="text-sm font-medium text-foreground mb-1">When do you want to start?</p>
-        <p className="text-xs text-muted-foreground mb-4">Tap a day below to set your start date.</p>
+        <h2 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-1">When do you want to start?</h2>
+        <p className="text-[12.5px] text-muted-foreground mb-4">Tap a day below to set your start date.</p>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="p-4 rounded-xl bg-card border border-border mb-2"
+        className="p-4 rounded-[26px] bg-card mb-2"
       >
         <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-sm font-semibold text-foreground">{format(viewMonth, "MMMM yyyy")}</span>
+          <span className="text-[15px] font-normal text-foreground">{format(viewMonth, "MMMM yyyy")}</span>
           <div className="flex items-center gap-1">
             <button
               type="button"
               disabled={!canGoPrev}
               onClick={() => setViewMonth((m) => addMonths(m, -1))}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
               aria-label="Previous month"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -148,7 +147,7 @@ export function CommitmentScreen({
               type="button"
               disabled={!canGoNext}
               onClick={() => setViewMonth((m) => addMonths(m, 1))}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
               aria-label="Next month"
             >
               <ChevronRight className="w-4 h-4" />
@@ -179,11 +178,11 @@ export function CommitmentScreen({
                 disabled={disabled}
                 onClick={() => setSelectedDate(date)}
                 className={cn(
-                  "min-h-13 rounded-xl border text-sm flex flex-col items-center justify-center gap-0.5 transition-colors",
-                  disabled && "border-transparent text-muted-foreground/30 cursor-not-allowed",
-                  !disabled && selected && "bg-primary border-primary text-primary-foreground font-semibold",
-                  !disabled && !selected && isTodayCell && "border-primary/60 bg-primary/10 text-primary font-medium",
-                  !disabled && !selected && !isTodayCell && "border-border/40 bg-card/50 text-foreground hover:bg-secondary/60",
+                  "min-h-13 rounded-2xl text-sm flex flex-col items-center justify-center gap-0.5 transition-colors",
+                  disabled && "text-muted-foreground/30 cursor-not-allowed",
+                  !disabled && selected && "bg-white text-black font-medium",
+                  !disabled && !selected && isTodayCell && "ring-1 ring-white text-foreground",
+                  !disabled && !selected && !isTodayCell && "bg-secondary text-foreground hover:bg-accent",
                 )}
               >
                 <span className="leading-none">{getDate(date)}</span>
@@ -196,12 +195,12 @@ export function CommitmentScreen({
         </div>
       </motion.div>
 
-      <p className="text-xs text-muted-foreground text-center mb-6">
+      <p className="text-[12.5px] text-muted-foreground text-center mb-6">
         Any highlighted day is fair game — up to 30 days out.
       </p>
 
       <Button
-        className="w-full h-12 text-sm font-semibold"
+        className="w-full h-[52px] text-sm font-semibold uppercase tracking-[0.06em]"
         onClick={() => onConfirm(selectedDate)}
         data-testid="button-commitment-confirm"
       >

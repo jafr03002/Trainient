@@ -755,12 +755,12 @@ const HERO_ACTION_CIRCLE_CLASS =
 const CHECKIN_INPUT_CLASS =
   "flex-1 min-w-0 w-full bg-transparent text-2xl font-light tracking-[-0.02em] tabular-nums placeholder:text-muted-foreground/50 focus:outline-none disabled:cursor-not-allowed";
 
-// Every state of the route sits in here so the dashboard never flashes the
-// old navy theme. The wash is the grey-to-teal light behind the date arc and
-// greeting; it reaches up under the phone's status bar and fades into black.
+// Every state of the route sits in here. The wash is the grey-to-teal light
+// behind the date arc and greeting; it reaches up under the phone's status bar
+// and fades into black.
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div className="theme-sessions relative min-h-page overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
+    <div className="relative min-h-page overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
       <div className="sessions-wash absolute inset-x-0 top-0 h-[420px]" aria-hidden />
       <div className="relative mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>

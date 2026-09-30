@@ -5,25 +5,25 @@ import { VitePWA } from "vite-plugin-pwa";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "path";
-import { hex, voltageCss } from "./src/theme/tokens";
+import { hex, appTokensCss } from "./src/theme/tokens";
 
-// Writes the Voltage tokens (src/theme/tokens.ts) into src/index.css at the
+// Writes the app tokens (src/theme/tokens.ts) into src/index.css at the
 // marker, so the CSS custom properties and every other consumer of the palette
 // read one source. Runs before Tailwind (both are `pre`; array order decides),
 // which then sees ordinary hand-written-looking CSS. Editing tokens.ts restarts
 // the dev server, since it is imported by this config.
-const TOKENS_MARKER = "/* @voltage-tokens */";
-function voltageTokens(): Plugin {
+const TOKENS_MARKER = "/* @app-tokens */";
+function appTokens(): Plugin {
   return {
-    name: "traintent:voltage-tokens",
+    name: "traintent:app-tokens",
     enforce: "pre",
     transform(code, id) {
       if (!id.split("?")[0].endsWith("/src/index.css")) return;
       if (!code.includes(TOKENS_MARKER)) {
         // Fail loudly: without the tokens every colour in the app is unset.
-        this.error(`src/index.css lost its ${TOKENS_MARKER} marker - the Voltage tokens have nowhere to go.`);
+        this.error(`src/index.css lost its ${TOKENS_MARKER} marker - the app tokens have nowhere to go.`);
       }
-      return { code: code.replace(TOKENS_MARKER, voltageCss()), map: null };
+      return { code: code.replace(TOKENS_MARKER, appTokensCss()), map: null };
     },
     transformIndexHtml() {
       return [{ tag: "meta", attrs: { name: "theme-color", content: hex("background") }, injectTo: "head" }];
@@ -116,7 +116,7 @@ export default defineConfig(({ command, mode }) => {
       __QUERY_CACHE_BUSTER__: JSON.stringify(queryCacheBuster),
     },
     plugins: [
-      voltageTokens(),
+      appTokens(),
       react(),
       tailwindcss(),
       VitePWA({
@@ -135,10 +135,7 @@ export default defineConfig(({ command, mode }) => {
           scope: basePath,
           display: "standalone",
           theme_color: hex("background"),
-          // The OS launch screen, shown before index.html paints. It hands over
-          // to the splash in index.html, which is black, so this is too - the
-          // navy Voltage background flashed between the two on Android.
-          background_color: "#000000",
+          background_color: hex("background"),
           icons: [
             { src: "pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
             { src: "pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },

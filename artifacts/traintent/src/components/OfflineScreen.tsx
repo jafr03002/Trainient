@@ -6,7 +6,7 @@ import { WifiOff } from "lucide-react";
 // in a gym basement would be told to sign in again.
 export function OfflineScreen() {
   return (
-    <main className="theme-sessions flex min-h-dvh flex-col items-center justify-center bg-background px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-center text-foreground">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-center text-foreground">
       <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-card">
         <WifiOff className="h-7 w-7 text-muted-foreground" />
       </div>

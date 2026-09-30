@@ -1,5 +1,8 @@
 # Voltage — Trainient visual style
 
+> **Retired.** Voltage is no longer used: Sessions (`TrainientAppDesign.md`) is the
+> app-wide token set in `src/theme/tokens.ts`. Kept for history only.
+
 The app-wide dark theme. **Electric blue on navy-black**, geometric display type,
 soft rounded surfaces, and a subtle glow on primary actions. This file is the
 source of truth: build and review every page against it, not against a mockup.

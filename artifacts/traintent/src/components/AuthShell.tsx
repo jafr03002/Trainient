@@ -29,7 +29,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
       {/* Form column */}
       <div className="flex min-h-[100dvh] flex-col px-6 py-6 lg:px-10 lg:py-8">
         <Link href="/" className="flex items-center gap-2.5 font-display text-base font-bold">
-          <span className="glow-primary flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-display text-base font-bold text-primary-foreground">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-display text-base font-bold text-primary-foreground">
             T
           </span>
           Trainient

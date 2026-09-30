@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { chipClass } from "@/lib/sessionsForm";
 import { motion, AnimatePresence } from "framer-motion";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -54,13 +55,13 @@ export function SatisfactionGate({
   if (!askingWhy) {
     return (
       <div data-testid="satisfaction-gate">
-        <h2 className="text-xl font-bold text-foreground mb-2">Happy with this program?</h2>
-        <p className="text-muted-foreground mb-6">
+        <h2 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-2">Happy with this program?</h2>
+        <p className="text-[13.5px] leading-relaxed text-muted-foreground mb-6">
           You can tweak anything before you get started.
         </p>
         <div className="flex gap-3">
           <Button
-            className="flex-1 h-12"
+            className="flex-1 h-[52px]"
             onClick={onSatisfied}
             data-testid="button-satisfied-yes"
           >
@@ -69,7 +70,7 @@ export function SatisfactionGate({
           </Button>
           <Button
             variant="outline"
-            className="flex-1 h-12"
+            className="flex-1 h-[52px]"
             onClick={() => setAskingWhy(true)}
             data-testid="button-satisfied-no"
           >
@@ -90,8 +91,8 @@ export function SatisfactionGate({
         transition={{ duration: 0.2 }}
         data-testid="feedback-form"
       >
-        <h2 className="text-xl font-bold text-foreground mb-2">What would you change?</h2>
-        <p className="text-muted-foreground mb-6">
+        <h2 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-2">What would you change?</h2>
+        <p className="text-[13.5px] leading-relaxed text-muted-foreground mb-6">
           Pick anything that applies, or just leave a note.
         </p>
 
@@ -101,11 +102,8 @@ export function SatisfactionGate({
               key={category}
               data-testid={`feedback-category-${category}`}
               onClick={() => toggleCategory(category)}
-              className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                categories.includes(category)
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-border/80"
-              }`}
+              aria-pressed={categories.includes(category)}
+              className={chipClass(categories.includes(category))}
             >
               {CATEGORY_LABELS[category]}
             </button>
@@ -117,12 +115,12 @@ export function SatisfactionGate({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Anything specific? (optional)"
           rows={3}
-          className="w-full px-4 py-2.5 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none mb-4"
+          className="w-full px-5 py-4 rounded-3xl bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-foreground/40 resize-none mb-4"
           data-testid="input-feedback-note"
         />
 
         {showRegenerateNudge && (
-          <div className="p-3 rounded-xl bg-secondary/30 border border-border text-sm text-muted-foreground mb-4">
+          <div className="px-4 py-3.5 rounded-[22px] bg-card text-[12.5px] leading-relaxed text-muted-foreground mb-4">
             Programs improve as you train - consider starting and adjusting from real
             sessions instead of regenerating again.
           </div>
@@ -131,7 +129,7 @@ export function SatisfactionGate({
         <div className="flex gap-3">
           <Button
             variant="outline"
-            className="flex-1 h-11"
+            className="flex-1 h-[52px]"
             onClick={() => setAskingWhy(false)}
             disabled={isSubmitting}
             data-testid="button-feedback-back"
@@ -139,7 +137,7 @@ export function SatisfactionGate({
             Back
           </Button>
           <Button
-            className="flex-1 h-11"
+            className="flex-1 h-[52px]"
             onClick={handleSubmit}
             disabled={isSubmitting}
             data-testid="button-feedback-submit"

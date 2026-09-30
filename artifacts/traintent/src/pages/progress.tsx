@@ -172,7 +172,7 @@ export default function Progress() {
     .map((w) => ({ week: w.week, sets: weekTotal(w) }));
 
   return (
-    <div className="theme-sessions min-h-page bg-background text-foreground">
+    <div className="min-h-page bg-background text-foreground">
       <div className="mx-auto max-w-3xl space-y-7 p-6">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
