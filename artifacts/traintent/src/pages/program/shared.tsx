@@ -1587,13 +1587,14 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
         inProgressLabel={conflictLabel}
         targetLabel={day?.label ?? "this day"}
         onDismiss={() => setConflict(null)}
-        // Bare `/log`, not `?day=`: the log page re-resolves the active session
-        // against the mode's current program and lands on the right day with
-        // its resume banner - which stays correct even when the session belongs
-        // to the other lineage's program.
+        // No `?day=`: the log page re-resolves the active session against the
+        // mode's current program and lands on the right day - which stays
+        // correct even when the session belongs to the other lineage's program.
+        // `resumed=1` is what earns the resume banner: this is the one route in
+        // that follows an attempt to start a different session.
         onKeep={() => {
           setConflict(null);
-          setLocation("/log");
+          setLocation("/log?resumed=1");
         }}
         onDiscard={() => {
           if (user?.id && day) {
