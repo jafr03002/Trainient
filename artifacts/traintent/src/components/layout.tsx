@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, useLocation } from "wouter";
-import { useClerk } from "@clerk/react";
+import { useClerk, useUser } from "@clerk/react";
+import { AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
   House,
@@ -11,12 +12,18 @@ import {
   Calendar,
   CircleUser,
   Play,
+  X,
   LogOut,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
-import { useGetProfile } from "@workspace/api-client-react";
+import { useGetProfile, useGetCurrentProgram, getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { StartWorkoutMenu } from "@/components/StartWorkoutMenu";
+import { useActiveSession } from "@/hooks/useActiveSession";
+import { startSession } from "@/lib/workoutSession";
+import { isPreCalibrationLocked } from "@/lib/calibration";
+import { formatClock } from "@/lib/sessionDuration";
 
 // Desktop sidebar: every destination.
 const navItems = [
@@ -30,9 +37,9 @@ const navItems = [
 
 // Mobile tab bar: four tabs either side of a central Start action. All six
 // sidebar entries only fit a phone at 9px labels and ~30px touch targets, so
-// Log and Calendar leave the bar - a session is started from the program page
-// (which is where Start goes), and Calendar is reached from the dashboard. Both
-// routes still exist. `match` is every route that lights the tab, so the
+// Log and Calendar leave the bar - Start stands in for Log (it opens the
+// workout picker, or returns to the session in progress), and Calendar is
+// reached from the dashboard. Both routes still exist. `match` is every route that lights the tab, so the
 // section a page belongs to stays lit on it.
 type MobileTab = { name: string; href: string; icon: LucideIcon; match: string[] };
 const mobileTabsLeft: MobileTab[] = [
@@ -86,10 +93,55 @@ export function useNavTourClick(href: string, handler: (() => void) | null): voi
   }, [ctx, href, handler]);
 }
 
+// Start's icon while a session runs. Filled, not a lucide outline: it replaces
+// the filled play glyph in the same disc, so it carries the same weight.
+function SolidDumbbell({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+      <rect x="1.5" y="8.5" width="3" height="7" rx="1.2" />
+      <rect x="4.5" y="5" width="4.5" height="14" rx="1.8" />
+      <rect x="8.5" y="10" width="7" height="4" rx="1" />
+      <rect x="15" y="5" width="4.5" height="14" rx="1.8" />
+      <rect x="19.5" y="8.5" width="3" height="7" rx="1.2" />
+    </svg>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { signOut } = useClerk();
   const profileQuery = useGetProfile();
+  const { user } = useUser();
+
+  // Start's two jobs. With a session in progress it is the way back into it,
+  // from any page, until the session is finished or cancelled on the log page.
+  // Without one it opens the workout picker over the current page. The program
+  // is the same one the log page logs against (the active mode's lineage).
+  const activeSession = useActiveSession(user?.id, location);
+  const currentProgramQuery = useGetCurrentProgram(undefined, {
+    query: { enabled: !!profileQuery.data, queryKey: getGetCurrentProgramQueryKey() },
+  });
+  const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const closeStartMenu = useCallback(() => setStartMenuOpen(false), []);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Navigating anywhere (a tab tap - the bar stays usable under the picker -
+  // or Back) closes the picker, and so does a session appearing from another tab.
+  useEffect(() => setStartMenuOpen(false), [location]);
+  useEffect(() => {
+    if (activeSession) setStartMenuOpen(false);
+  }, [activeSession]);
+
+  // The live label under Start. Derived from `startedAt` every tick, never
+  // counted up, so it matches the log page's clock after a backgrounded tab.
+  const [now, setNow] = useState(() => Date.now());
+  const sessionStartedAt = activeSession?.startedAt ?? null;
+  useEffect(() => {
+    if (sessionStartedAt == null) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [sessionStartedAt]);
 
   const navElsRef = useRef<Record<string, { desktop?: HTMLAnchorElement | null; mobile?: HTMLAnchorElement | null }>>({});
   const clickHandlersRef = useRef<Record<string, (() => void) | null>>({});
@@ -239,27 +291,96 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <nav aria-label="Main" className="mx-auto grid h-16 max-w-md grid-cols-5 px-1">
           {mobileTabsLeft.map(renderTab)}
 
-          {/* Start goes to the program page, where a session is started
-              deliberately (startSession in src/lib/workoutSession.ts). It must
-              never start or log a session itself. Not registered as the
-              "/program" tour target - the Program tab is - but it is the same
-              destination, so a tour waiting on "/program" hears it too. */}
-          <Link
-            href="/program"
-            aria-label="Start a workout"
-            onClick={() => clickHandlersRef.current["/program"]?.()}
-            className="group flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-foreground focus-visible:outline-none"
-          >
-            {/* The dashboard's play circle, raised: white with a black play, no glow. */}
-            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-white text-black ring-4 ring-black transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
-              <Play className="h-6 w-6 translate-x-px fill-current" />
-            </span>
-            Start
-          </Link>
+          {/* Start. It must never start or log a session by itself: a session
+              begins only when a day is picked from the menu (startSession in
+              src/lib/workoutSession.ts) - the same deliberate press as the
+              program page's Start workout. */}
+          {activeSession ? (
+            <Link
+              href={`/log?day=${activeSession.dayNumber}`}
+              aria-label="Resume your workout"
+              className="group flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-foreground focus-visible:outline-none"
+              data-testid="nav-resume-workout"
+            >
+              {/* The same raised disc, now a solid dumbbell inside a thin teal
+                  arc that turns slowly while the session runs. */}
+              <span className="relative -mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-white text-black ring-4 ring-black transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-[7px] rounded-full border-2 border-[hsl(var(--sessions-cyan))] border-r-transparent motion-safe:animate-spin motion-safe:[animation-duration:3s]"
+                />
+                <SolidDumbbell className="h-6 w-6" />
+              </span>
+              <span className="tabular-nums text-[hsl(var(--sessions-cyan))]">
+                {sessionStartedAt != null ? formatClock((now - sessionStartedAt) / 1000) : "Resume"}
+              </span>
+            </Link>
+          ) : (
+            <button
+              ref={startButtonRef}
+              type="button"
+              aria-label={startMenuOpen ? "Close workout picker" : "Start a workout"}
+              aria-expanded={startMenuOpen}
+              aria-haspopup="dialog"
+              onClick={() => {
+                if (startMenuOpen) {
+                  setStartMenuOpen(false);
+                  return;
+                }
+                const program = currentProgramQuery.data;
+                // Nothing to pick from - no program yet, or one locked until its
+                // start date. The program page explains both and is the only
+                // place to act on them, so Start goes there as it always did
+                // (and a tour waiting on "/program" still hears it).
+                if (!program || !program.days?.length || isPreCalibrationLocked(program, new Date())) {
+                  clickHandlersRef.current["/program"]?.();
+                  setLocation("/program");
+                  return;
+                }
+                setStartMenuOpen(true);
+              }}
+              className="group flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-foreground focus-visible:outline-none"
+              data-testid="nav-start-workout"
+            >
+              {/* The dashboard's play circle, raised: white with a black play, no glow. */}
+              <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-white text-black ring-4 ring-black transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
+                {startMenuOpen ? (
+                  <X className="h-6 w-6" strokeWidth={2.2} />
+                ) : (
+                  <Play className="h-6 w-6 translate-x-px fill-current" />
+                )}
+              </span>
+              {startMenuOpen ? "Close" : "Start"}
+            </button>
+          )}
 
           {mobileTabsRight.map(renderTab)}
         </nav>
       </div>
+
+      <AnimatePresence
+        onExitComplete={() => {
+          // Hand focus back to Start - unless a day was picked, which navigated.
+          if (!activeSession) startButtonRef.current?.focus();
+        }}
+      >
+        {startMenuOpen && currentProgramQuery.data && (
+          <StartWorkoutMenu
+            key="start-menu"
+            days={currentProgramQuery.data.days as any[]}
+            onClose={closeStartMenu}
+            onPick={(dayNumber) => {
+              const program = currentProgramQuery.data!;
+              if (user?.id) startSession(user.id, program.id, dayNumber);
+              setStartMenuOpen(false);
+              // `start=1` carries the press across, exactly as the program
+              // page does, so the logger still begins the day if the write
+              // above didn't land (see useWorkoutSession).
+              setLocation(`/log?day=${dayNumber}&start=1`);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
     </NavTourContext.Provider>
   );
