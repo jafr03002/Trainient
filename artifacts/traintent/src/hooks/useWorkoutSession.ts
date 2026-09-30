@@ -61,13 +61,16 @@ export function useWorkoutSession({
   // opposed to opening the logger from the nav. The two say different things:
   // `day` is which day is wanted, `start` is that a session was actually asked
   // for, and only the second one licenses beginning one (see the effect below).
-  const { targetDayNumber, startRequested } = (() => {
+  // `resumed=1` is the program page's discard dialog answering "Keep": the
+  // client tried to start another day and chose this session instead.
+  const { targetDayNumber, startRequested, resumeRequested } = (() => {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("day");
     const n = raw ? parseInt(raw) : NaN;
     return {
       targetDayNumber: Number.isFinite(n) ? n : null,
       startRequested: params.get("start") === "1",
+      resumeRequested: params.get("resumed") === "1",
     };
   })();
 
@@ -151,16 +154,23 @@ export function useWorkoutSession({
     setActiveDay(day);
 
     // `?day=` only says which day the client asked for; the open session decides
-    // which one they get. Landing on a different one (or on a bare /log) means
-    // they were sent back to the session already running, which the banner says.
+    // which one they get. A bare or mismatched URL is just normalised - opening
+    // the logger from the nav, or coming back to it after a while, is not an
+    // attempt to start anything, and telling the client to "finish it before
+    // starting a new one" there reads as if they had. The banner is kept for
+    // the times they really did ask for another session and were sent back to
+    // this one instead.
     const requestedDay = resolveDay(program.days as any[]);
     const wasRedirected = !!requestedDay && requestedDay.dayNumber !== day.dayNumber;
-    setResumedElsewhere(wasRedirected);
-    // Replaces rather than pushes, which also spends the `start=1` request: it
-    // has been served, and leaving it in the history entry would let a refresh -
-    // or a Back out of the session the client just finished - ask for the day to
-    // be started all over again.
-    if (wasRedirected || startRequested) {
+    const blockedStart = startRequested && targetDayNumber != null && targetDayNumber !== day.dayNumber;
+    // Latched on, never off: the URL carrying the request is replaced below, so a
+    // later re-run of this effect (a program refetch) can't see it any more.
+    if (resumeRequested || blockedStart) setResumedElsewhere(true);
+    // Replaces rather than pushes, which also spends the `start=1` / `resumed=1`
+    // request: it has been served, and leaving it in the history entry would let
+    // a refresh - or a Back out of the session the client just finished - ask
+    // for the day to be started all over again.
+    if (wasRedirected || startRequested || resumeRequested) {
       setLocation(`/log?day=${day.dayNumber}`, { replace: true });
     }
 
