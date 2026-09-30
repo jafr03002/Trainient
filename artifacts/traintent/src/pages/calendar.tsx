@@ -150,7 +150,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.22 }}
-          className="relative z-10 w-full max-w-lg max-h-[88vh] flex flex-col bg-card border border-border rounded-t-2xl md:rounded-2xl overflow-hidden"
+          className="relative z-10 w-full max-w-lg max-h-[88dvh] flex flex-col bg-card border border-border rounded-t-2xl md:rounded-2xl overflow-hidden pb-[env(safe-area-inset-bottom)] md:pb-0"
         >
           {/* Grab handle (mobile bottom-sheet affordance) */}
           <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
@@ -315,7 +315,7 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.22 }}
-            className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+            className="relative z-10 w-full max-w-sm bg-card border border-border rounded-t-2xl md:rounded-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5 space-y-4"
           >
             <div>
               <h3 className="font-semibold text-foreground">Delete this session?</h3>
@@ -378,7 +378,7 @@ function DayAgendaSheet({ date, sessions, colorFor, onSelect, onClose }: DayAgen
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.22 }}
-          className="relative z-10 w-full max-w-lg bg-card border border-border rounded-t-2xl overflow-hidden"
+          className="relative z-10 w-full max-w-lg bg-card border border-border rounded-t-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]"
         >
           <div className="pt-2.5 pb-1 flex justify-center shrink-0">
             <div className="w-10 h-1.5 rounded-full bg-border" />

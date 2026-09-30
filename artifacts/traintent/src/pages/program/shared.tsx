@@ -1262,7 +1262,7 @@ export function InactiveLineageNotice({ children }: { children: ReactNode }) {
 // program itself) shares - the Sessions gutter and width. See TrainientAppDesign.md.
 export function ProgramPageShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-page bg-background text-foreground">
       <div className="mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>
   );

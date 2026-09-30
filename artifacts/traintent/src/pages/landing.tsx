@@ -4,7 +4,7 @@ import { Dumbbell, Target, LineChart, Brain, User } from "lucide-react";
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background flex flex-col selection:bg-primary/30">
+    <div className="min-h-dvh bg-background flex flex-col selection:bg-primary/30">
       <header className="px-6 lg:px-12 h-20 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tight text-white">
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">

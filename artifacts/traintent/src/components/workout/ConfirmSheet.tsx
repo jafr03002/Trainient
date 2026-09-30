@@ -44,7 +44,7 @@ export function ConfirmSheet({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 40 }}
             transition={{ duration: 0.22 }}
-            className="relative z-10 w-full max-w-sm space-y-5 rounded-t-[30px] bg-card px-5 pb-8 pt-3 md:rounded-[30px] md:pb-5"
+            className="relative z-10 w-full max-w-sm space-y-5 rounded-t-[30px] bg-card px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3 md:rounded-[30px] md:pb-5"
           >
             <div aria-hidden className="mx-auto h-[5px] w-9 rounded-full bg-accent md:hidden" />
             <div>

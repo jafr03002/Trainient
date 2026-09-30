@@ -39,7 +39,7 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-page flex items-center justify-center p-6">
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-between mb-6">
           <div className="flex gap-1.5">
