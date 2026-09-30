@@ -760,7 +760,7 @@ const CHECKIN_INPUT_CLASS =
 // greeting; it reaches up under the phone's status bar and fades into black.
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div className="theme-sessions relative min-h-screen overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
+    <div className="theme-sessions relative min-h-page overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
       <div className="sessions-wash absolute inset-x-0 top-0 h-[420px]" aria-hidden />
       <div className="relative mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>

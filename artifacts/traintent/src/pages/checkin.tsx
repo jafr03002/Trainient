@@ -1,14 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
 import {
-  useSubmitCheckin,
   useGetCheckinAdherence,
   getGetCurrentProgramQueryKey,
   type SessionAdherence,
+  type CheckinResult,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCheckinJob } from "@/hooks/useAiJob";
 
 // One question per screen, mirroring the onboarding flow - the old
 // single-screen form asked for a dozen answers at once, which nobody enjoys
@@ -65,7 +66,7 @@ const MISSED_REASONS = [
 
 export default function Checkin() {
   const [, setLocation] = useLocation();
-  const submitCheckin = useSubmitCheckin();
+  const submitCheckin = useCheckinJob();
   const queryClient = useQueryClient();
   // 404s until an AI-generated program exists; the sessions step handles that.
   const adherenceQuery = useGetCheckinAdherence();
@@ -107,9 +108,30 @@ export default function Checkin() {
     }
   }
 
+  // A check-in submitted on an earlier visit that was still being reviewed
+  // when the app closed: wait for that one rather than asking the week again.
+  const [resuming, setResuming] = useState(submitCheckin.resumable);
+  useEffect(() => {
+    if (!submitCheckin.resumable) return;
+    void finish(submitCheckin.resume()).finally(() => setResuming(false));
+    // Mount only: `resumable` is read once, when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function finish(job: Promise<CheckinResult>) {
+    try {
+      const res = await job;
+      queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      setResult({ aiMessage: res.aiMessage });
+    } catch {
+      // A failure shows in the error banner (submitCheckin.error). Leaving the
+      // page mid-review isn't one: the job carries on and resumes next visit.
+    }
+  }
+
   async function handleSubmit() {
-    const res = await submitCheckin.mutateAsync({
-      data: {
+    await finish(
+      submitCheckin.run({
         energy,
         sleep,
         hungerAppetite,
@@ -123,10 +145,8 @@ export default function Checkin() {
         sleepDecline: sleepDecline || null,
         digestionIssues: digestionIssues || null,
         notes: notes || null,
-      },
-    });
-    queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
-    setResult({ aiMessage: res.aiMessage });
+      }),
+    );
   }
 
   if (result) {
@@ -156,8 +176,17 @@ export default function Checkin() {
     );
   }
 
+  if (resuming) {
+    return (
+      <div className="min-h-page flex flex-col items-center justify-center gap-3 px-4 text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <p className="text-sm">Your AI coach is reviewing your week...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-page flex flex-col">
       <div className="w-full h-1 bg-secondary/40">
         <motion.div
           className="h-full bg-primary"
@@ -366,7 +395,7 @@ export default function Checkin() {
 
           {submitCheckin.isError && (
             <div className="mt-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-              Something went wrong. Please try again.
+              {submitCheckin.error}
             </div>
           )}
 

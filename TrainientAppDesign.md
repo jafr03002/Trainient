@@ -200,8 +200,10 @@ sits straight on it with no card. Screenshots: [mobile](docs/design/references/d
   `/progress`, `/log` (the workout logger, its confirm sheets and empty states)
   and the dashboard (`/`, including the day sheet and Independent targets card)
   use Sessions so far. The log page reuses `ProgramPageShell`, and the dashboard
-  has its own `DashboardShell` (it adds the wash). The sidebar, mobile tab bar
-  and other pages are still Voltage.
+  has its own `DashboardShell` (it adds the wash). The desktop sidebar and
+  mobile tab bar (`components/layout.tsx`) are Sessions too: black, grey
+  selection, and a white Start circle with no glow. The other pages are still
+  Voltage.
 - `/progress` shows the metric-card pattern: a caps label, a big light number
   and a muted delta, above a minimal axis-less chart. Its volume card is
   monochrome (top three bars white, the rest grey, cyan only for increases)

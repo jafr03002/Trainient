@@ -135,7 +135,10 @@ export default defineConfig(({ command, mode }) => {
           scope: basePath,
           display: "standalone",
           theme_color: hex("background"),
-          background_color: hex("background"),
+          // The OS launch screen, shown before index.html paints. It hands over
+          // to the splash in index.html, which is black, so this is too - the
+          // navy Voltage background flashed between the two on Android.
+          background_color: "#000000",
           icons: [
             { src: "pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
             { src: "pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },

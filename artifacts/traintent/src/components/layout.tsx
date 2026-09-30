@@ -141,7 +141,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   if (location === "/onboarding") {
     return (
       // Onboarding is fully Sessions-styled, so its safe-area strips are black too.
-      <main className="theme-sessions min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <main className="theme-sessions min-h-dvh bg-background pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] [--page-inset:calc(env(safe-area-inset-top)+env(safe-area-inset-bottom))]">
         {children}
       </main>
     );
@@ -181,8 +181,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <NavTourContext.Provider value={navTourCtx}>
     <div className="flex min-h-dvh bg-background text-foreground">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 w-64 border-r border-sidebar-border bg-sidebar hidden md:flex flex-col">
+      {/* Sidebar. Sessions-styled like the pages it sits beside
+          (TrainientAppDesign.md): black, grey selection, no glow. */}
+      <aside className="theme-sessions fixed inset-y-0 left-0 w-64 border-r border-border bg-background text-foreground hidden md:flex flex-col">
         <div className="p-6">
           <Link href="/dashboard" className="flex items-center gap-2 font-display font-bold text-xl tracking-tight text-foreground">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
@@ -205,7 +206,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => clickHandlersRef.current[item.href]?.()}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors ${
                   isActive
-                    ? "bg-primary/10 text-primary font-medium"
+                    ? "bg-secondary text-foreground font-medium"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
@@ -216,7 +217,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-border">
           <Button
             variant="ghost"
             className="w-full justify-start text-muted-foreground hover:text-foreground"
@@ -230,14 +231,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content. On a phone the bottom padding clears the tab bar, the
           Start button's overhang above it, and the home indicator / gesture bar
-          under it; the side and top insets matter in landscape and standalone. */}
-      <main className="flex-1 md:ml-64 relative min-h-dvh overflow-x-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
+          under it; the side and top insets matter in landscape and standalone.
+          --page-inset repeats that vertical padding for pages sized with
+          min-h-page (src/index.css). */}
+      <main className="flex-1 md:ml-64 relative min-h-dvh overflow-x-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0 [--page-inset:calc(env(safe-area-inset-top)+5.5rem+env(safe-area-inset-bottom))] md:[--page-inset:env(safe-area-inset-top)]">
         {children}
       </main>
 
       {/* Mobile Bottom Nav. The bar's own padding keeps the tabs above the
           home indicator / gesture bar while its background runs under it. */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="theme-sessions md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <nav aria-label="Main" className="mx-auto grid h-16 max-w-md grid-cols-5 px-1">
           {mobileTabsLeft.map(renderTab)}
 
@@ -252,7 +255,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             onClick={() => clickHandlersRef.current["/program"]?.()}
             className="group flex flex-col items-center justify-center gap-1 text-xs font-semibold text-foreground focus-visible:outline-none"
           >
-            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground glow-primary transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
+            <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform group-active:scale-95 group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-ring">
               <Play className="h-6 w-6 translate-x-px fill-current" />
             </span>
             Start

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Brain, User, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateProfile, useGenerateProgram, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
+import { useCreateProfile, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { CARDIO_DAYS, orderCardioDays } from "@/lib/independentTargets";
 import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
@@ -13,6 +13,7 @@ import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { CommitmentScreen } from "@/components/onboarding/CommitmentScreen";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 import { toast } from "@/hooks/use-toast";
+import { useProgramGenerationJob } from "@/hooks/useAiJob";
 
 const GOALS = [
   { value: "gain_weight", label: "Gain weight", sub: "Build muscle in a surplus" },
@@ -209,7 +210,7 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createProfile = useCreateProfile();
-  const generateProgram = useGenerateProgram();
+  const generateProgram = useProgramGenerationJob();
   const setProgramStartDate = useSetProgramStartDate();
   const profileQuery = useGetProfile();
 
@@ -428,7 +429,7 @@ export default function Onboarding() {
 
       if (form.mode === "ai" && generateNow) {
         setPhase("generating");
-        const result = await generateProgram.mutateAsync({});
+        const result = await generateProgram.run(undefined);
         setProgram(result);
         setPhase("presentation");
       } else {
@@ -468,7 +469,7 @@ export default function Onboarding() {
     setPhase("generating");
     setRegenerateCount((c) => c + 1);
     try {
-      const result = await generateProgram.mutateAsync({ data: { feedback } });
+      const result = await generateProgram.run({ feedback });
       setProgram(result);
     } catch {
       // keep the previous program on screen; the error banner below reports it
@@ -489,7 +490,7 @@ export default function Onboarding() {
 
   if (phase === "generating") {
     return (
-      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6">
+      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col items-center justify-center p-6">
         <div className="w-full max-w-lg">
           <GeneratingScreen />
         </div>
@@ -501,7 +502,7 @@ export default function Onboarding() {
   // scope so the flow never flashes back to the navy theme after the form.
   if (phase === "presentation" && program) {
     return (
-      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
+      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
         <div className="flex-1 flex flex-col items-center p-6 py-12">
           <PresentationDeck
             program={program}
@@ -520,7 +521,7 @@ export default function Onboarding() {
 
   if (phase === "commitment" && program) {
     return (
-      <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
+      <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
         <div className="flex-1 flex flex-col items-center p-6 py-12">
           <CommitmentScreen program={program} onConfirm={handleCommit} />
         </div>
@@ -529,7 +530,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="theme-sessions min-h-screen bg-background text-foreground flex flex-col">
+    <div className="theme-sessions min-h-page bg-background text-foreground flex flex-col">
       {showGoalWeight && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60"

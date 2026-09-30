@@ -74,7 +74,7 @@ export function DayDetailSheet({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
           transition={{ duration: 0.22 }}
-          className="relative z-10 w-full max-w-lg bg-card rounded-t-[30px] md:rounded-[30px] overflow-hidden"
+          className="relative z-10 w-full max-w-lg bg-card rounded-t-[30px] md:rounded-[30px] overflow-hidden pb-[env(safe-area-inset-bottom)] md:pb-0"
           data-testid="week-day-sheet"
         >
           <div className="pt-2.5 pb-1 flex justify-center shrink-0 md:hidden">

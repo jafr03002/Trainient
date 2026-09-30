@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
@@ -6,11 +6,13 @@ import { PersistQueryClientProvider, removeOldestQuery } from "@tanstack/react-q
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { hsl, voltageFonts, voltageRadius } from "@/theme/tokens";
+import { dismissSplash } from "@/lib/splash";
 
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
 import { AuthShell } from "@/components/AuthShell";
+import { OfflineScreen } from "@/components/OfflineScreen";
 
 import Landing from "@/pages/landing";
 import Onboarding from "@/pages/onboarding";
@@ -63,15 +65,21 @@ const clerkAppearance = {
   },
   // Clerk's own styles win the cascade over these classes, so any override
   // that has to stick - widths above all: `.cl-cardBox` ships a fixed 25rem
-  // that overflows a phone - carries `!`.
+  // that overflows a phone - carries `!`. So does the card's side padding
+  // (Clerk's 40px on top of AuthShell's 24px left a 206px-wide form on a 390px
+  // phone), the Google button's label (Clerk's colour won: navy on navy) and
+  // the inputs' 16px text (anything smaller makes iOS zoom in on focus). So do the card's side padding (Clerk's
+  // 40px, on top of AuthShell's 24px, left a 206px-wide form on a 390px phone),
+  // the Google button's label (Clerk's colour won: navy on navy), and the
+  // inputs' 16px text (anything smaller makes iOS zoom in on focus).
   elements: {
-    rootBox: "w-full min-w-0 flex justify-center",
+    rootBox: "!w-full min-w-0 flex justify-center",
     cardBox: "!bg-transparent !shadow-none !border-0 !w-full !min-w-0 !max-w-[400px] overflow-hidden",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none !w-full !min-w-0",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none !w-full !min-w-0 !px-0",
     footer: "!shadow-none !border-0 !bg-transparent !bg-none !rounded-none",
     headerTitle: "text-foreground font-display",
     headerSubtitle: "text-muted-foreground",
-    socialButtonsBlockButtonText: "text-foreground",
+    socialButtonsBlockButtonText: "!text-foreground",
     formFieldLabel: "text-foreground",
     footerActionLink: "text-primary hover:text-primary/90",
     footerActionText: "text-muted-foreground",
@@ -79,15 +87,14 @@ const clerkAppearance = {
     identityPreviewEditButton: "text-primary hover:text-primary/90",
     formFieldSuccessText: "text-chart-2",
     alertText: "text-destructive-foreground",
-    socialButtonsBlockButton: "bg-card border-border hover:bg-secondary",
+    socialButtonsBlockButton: "!bg-card !border-border hover:!bg-secondary",
     formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90 glow-primary",
-    formFieldInput: "bg-input border-border text-foreground focus:border-primary focus:ring-1 focus:ring-primary",
+    formFieldInput: "bg-input border-border text-foreground !text-base focus:border-primary focus:ring-1 focus:ring-primary",
     footerAction: "border-t border-border pt-4 mt-4",
     dividerLine: "bg-border",
     alert: "bg-destructive/20 border-destructive",
-    otpCodeFieldInput: "bg-input border-border text-foreground",
+    otpCodeFieldInput: "bg-input border-border text-foreground !text-base",
     formFieldRow: "mb-4",
-    main: "p-6",
   },
 };
 
@@ -151,6 +158,22 @@ function ApiAuthWirer() {
   return null;
 }
 
+// Every route renders nothing until Clerk knows who is signed in, so the splash
+// holds until then rather than fading onto a blank screen on a slow network.
+function SplashDismisser() {
+  const { isLoaded } = useAuth();
+  useEffect(() => {
+    if (isLoaded) dismissSplash();
+  }, [isLoaded]);
+  return null;
+}
+
+// Launched from the home screen (an installed app, not a browser tab). iOS
+// Safari reports it through navigator.standalone rather than the media query.
+const isInstalledApp =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
 function HomeRedirect() {
   return (
     <>
@@ -158,10 +181,44 @@ function HomeRedirect() {
         <Redirect to="/dashboard" />
       </Show>
       <Show when="signed-out">
-        <Landing />
+        {/* The landing page is a website's front door. The installed app
+            skips it: whoever opened it from their home screen came to sign in. */}
+        {isInstalledApp ? <Redirect to="/sign-in" /> : <Landing />}
       </Show>
     </>
   );
+}
+
+// With no connection Clerk can't restore a session, and reports the user as
+// signed out (or never finishes loading), so every route would bounce a
+// signed-in user to sign-in. Show an offline screen instead, and reload when
+// the connection returns so Clerk gets a fresh start.
+function OfflineGate({ children }: { children: ReactNode }) {
+  const { isSignedIn } = useAuth();
+  const clerk = useClerk();
+  const [online, setOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const goOnline = () => {
+      setOnline(true);
+      if (!clerk.loaded || !isSignedIn) window.location.reload();
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, [clerk, isSignedIn]);
+
+  const blocked = !isSignedIn && (!online || clerk.status === "error");
+  useEffect(() => {
+    if (blocked) dismissSplash();
+  }, [blocked]);
+
+  // Signed in already (a connection dropped mid-use): keep going on cached data.
+  return blocked ? <OfflineScreen /> : <>{children}</>;
 }
 
 // Last-known server state survives a reload: a cold start - or a gym basement
@@ -250,48 +307,51 @@ function App() {
       >
         <ClerkQueryClientCacheInvalidator />
         <ApiAuthWirer />
+        <SplashDismisser />
         <TooltipProvider>
-          <WouterRouter base={basePath}>
-            <Switch>
-              <Route path="/" component={HomeRedirect} />
-              <Route path="/sign-in/*?" component={SignInPage} />
-              <Route path="/sign-up/*?" component={SignUpPage} />
+          <OfflineGate>
+            <WouterRouter base={basePath}>
+              <Switch>
+                <Route path="/" component={HomeRedirect} />
+                <Route path="/sign-in/*?" component={SignInPage} />
+                <Route path="/sign-up/*?" component={SignUpPage} />
               
-              {/* Authenticated Routes wrapped in Layout.
-                  Must be `/*?`, not `/:rest*`: wouter compiles patterns with
-                  regexparam, where a `:param` segment is always a single
-                  segment (`/([^/]+?)`) and the trailing `*` is just part of
-                  the param name. `/:rest*` therefore never matches nested
-                  paths like /program/ai or /program/my - the Switch falls
-                  through and the whole authenticated app renders nothing. */}
-              <Route path="/*?">
-                {() => (
-                  <>
-                    <Show when="signed-in">
-                      <Layout>
-                        <Switch>
-                          <Route path="/onboarding" component={Onboarding} />
-                          <Route path="/dashboard" component={Dashboard} />
-                          <Route path="/program" component={ProgramRedirect} />
-                          <Route path="/program/ai" component={AiProgram} />
-                          <Route path="/program/my" component={MyProgram} />
-                          <Route path="/log" component={Log} />
-                          <Route path="/checkin" component={Checkin} />
-                          <Route path="/calendar" component={Calendar} />
-                          <Route path="/progress" component={Progress} />
-                          <Route path="/settings" component={Settings} />
-                          <Route component={NotFound} />
-                        </Switch>
-                      </Layout>
-                    </Show>
-                    <Show when="signed-out">
-                      <Redirect to="/sign-in" />
-                    </Show>
-                  </>
-                )}
-              </Route>
-            </Switch>
-          </WouterRouter>
+                {/* Authenticated Routes wrapped in Layout.
+                    Must be `/*?`, not `/:rest*`: wouter compiles patterns with
+                    regexparam, where a `:param` segment is always a single
+                    segment (`/([^/]+?)`) and the trailing `*` is just part of
+                    the param name. `/:rest*` therefore never matches nested
+                    paths like /program/ai or /program/my - the Switch falls
+                    through and the whole authenticated app renders nothing. */}
+                <Route path="/*?">
+                  {() => (
+                    <>
+                      <Show when="signed-in">
+                        <Layout>
+                          <Switch>
+                            <Route path="/onboarding" component={Onboarding} />
+                            <Route path="/dashboard" component={Dashboard} />
+                            <Route path="/program" component={ProgramRedirect} />
+                            <Route path="/program/ai" component={AiProgram} />
+                            <Route path="/program/my" component={MyProgram} />
+                            <Route path="/log" component={Log} />
+                            <Route path="/checkin" component={Checkin} />
+                            <Route path="/calendar" component={Calendar} />
+                            <Route path="/progress" component={Progress} />
+                            <Route path="/settings" component={Settings} />
+                            <Route component={NotFound} />
+                          </Switch>
+                        </Layout>
+                      </Show>
+                      <Show when="signed-out">
+                        <Redirect to="/sign-in" />
+                      </Show>
+                    </>
+                  )}
+                </Route>
+              </Switch>
+            </WouterRouter>
+          </OfflineGate>
           <Toaster />
         </TooltipProvider>
       </PersistQueryClientProvider>

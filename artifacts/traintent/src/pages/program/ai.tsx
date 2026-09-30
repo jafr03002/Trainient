@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Dumbbell } from "lucide-react";
 import {
   useGetCurrentProgram,
   useGetProfile,
-  useGenerateProgram,
   getGetCurrentProgramQueryKey,
   type Program,
 } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { useProgramGenerationJob, isAbandonedJob } from "@/hooks/useAiJob";
 import { GeneratingScreen } from "@/components/onboarding/GeneratingScreen";
 import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
@@ -24,8 +24,12 @@ export default function AiProgram() {
   const { data: program, isLoading } = useGetCurrentProgram({ lineage: "ai" });
   const profileQuery = useGetProfile();
   const queryClient = useQueryClient();
-  const generateProgram = useGenerateProgram();
-  const [phase, setPhase] = useState<"idle" | "generating" | "presentation">("idle");
+  const generateProgram = useProgramGenerationJob();
+  // A generation left running by an earlier visit (the app was closed or the
+  // screen locked mid-way) opens straight back onto the loading screen.
+  const [phase, setPhase] = useState<"idle" | "generating" | "presentation">(
+    generateProgram.resumable ? "generating" : "idle",
+  );
   const [freshProgram, setFreshProgram] = useState<Program | null>(null);
   const [regenerateCount, setRegenerateCount] = useState(0);
   const [, setLocation] = useLocation();
@@ -36,34 +40,46 @@ export default function AiProgram() {
   // profile that exists but isn't ready for the AI to generate from yet.
   const aiProfileReady = !!profileQuery.data?.goal && !!profileQuery.data?.experience;
 
-  async function handleGenerate() {
-    setPhase("generating");
+  async function follow(job: Promise<Program>) {
     try {
-      const result = await generateProgram.mutateAsync({});
+      const result = await job;
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
       setFreshProgram(result);
       setPhase("presentation");
-    } catch {
-      setPhase("idle");
+    } catch (err) {
+      if (!isAbandonedJob(err)) setPhase("idle");
     }
+  }
+
+  useEffect(() => {
+    if (generateProgram.resumable) void follow(generateProgram.resume());
+    // Mount only: `resumable` is read once, when the page opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleGenerate() {
+    setPhase("generating");
+    void follow(generateProgram.run(undefined));
   }
 
   async function handleRegenerateFeedback(feedback: ProgramFeedback) {
     setPhase("generating");
     setRegenerateCount((c) => c + 1);
     try {
-      const result = await generateProgram.mutateAsync({ data: { feedback } });
+      const result = await generateProgram.run({ feedback });
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
       setFreshProgram(result);
-    } catch {
-      // keep the previous program on screen; the error banner in the deck reports it
+    } catch (err) {
+      // Left the page: nothing to show. Otherwise keep the previous program on
+      // screen; the error banner in the deck reports it.
+      if (isAbandonedJob(err)) return;
     }
     setPhase("presentation");
   }
 
   if (phase === "generating") {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+      <div className="min-h-page bg-background flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-lg">
           <GeneratingScreen />
         </div>
@@ -73,7 +89,7 @@ export default function AiProgram() {
 
   if (phase === "presentation" && freshProgram) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-page bg-background flex flex-col">
         <div className="flex-1 flex flex-col items-center px-4 py-12">
           <PresentationDeck
             program={freshProgram}

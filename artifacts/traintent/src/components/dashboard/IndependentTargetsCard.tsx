@@ -329,7 +329,7 @@ export function IndependentTargetsCard({ profile }: { profile: UserProfile }) {
         {/* Confirm clearing the goal weight when switching to maintenance */}
         {confirmClear && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/60"
             onClick={() => setConfirmClear(false)}
             data-testid="dialog-clear-goal-weight"
           >
