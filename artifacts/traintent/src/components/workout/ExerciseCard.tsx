@@ -31,6 +31,7 @@ type ExerciseCardProps = {
   tourRefs?: ExerciseCardTourRefs;
   onHelp: () => void;
   onUpdateSet: (setIdx: number, field: SetField, value: number) => void;
+  onSetFinished: () => void;
   onUpdateNotes: (notes: string) => void;
   onToggleNotes: () => void;
 };
@@ -50,6 +51,7 @@ export function ExerciseCard({
   tourRefs,
   onHelp,
   onUpdateSet,
+  onSetFinished,
   onUpdateNotes,
   onToggleNotes,
 }: ExerciseCardProps) {
@@ -109,6 +111,7 @@ export function ExerciseCard({
                   : null
               }
               onChange={(field, value) => onUpdateSet(setIdx, field, value)}
+              onFinished={onSetFinished}
             />
           ))}
         </div>
