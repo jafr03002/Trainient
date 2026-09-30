@@ -31,6 +31,7 @@ import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalk
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
 import { WeekStrip } from "@/components/dashboard/WeekStrip";
+import { DashboardWash } from "@/components/dashboard/DashboardWash";
 import { greetingLine, nextSessionDay } from "@/lib/greetingLines";
 import { useTourSteps } from "@/hooks/useResolvedTourSteps";
 import { useNavTourTarget, useNavTourClick } from "@/components/layout";
@@ -761,7 +762,7 @@ const CHECKIN_INPUT_CLASS =
 function DashboardShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground -mt-[env(safe-area-inset-top)] pt-[env(safe-area-inset-top)]">
-      <div className="sessions-wash absolute inset-x-0 top-0 h-[420px]" aria-hidden />
+      <DashboardWash className="absolute inset-x-0 top-0 h-[420px]" />
       <div className="relative mx-auto max-w-3xl space-y-6 p-6">{children}</div>
     </div>
   );
