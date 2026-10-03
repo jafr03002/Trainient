@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,7 @@ import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import { formatClock } from "@/lib/sessionDuration";
 import type { LoggedExercise } from "@/lib/workoutSession";
 import { buildLastSessionLookup } from "@/lib/sessionLogs";
+import { findNextUnloggedSet, hasAnyLoggedSet, scrollToSet } from "@/lib/nextSet";
 import { useWorkoutSession } from "@/hooks/useWorkoutSession";
 import { usePrDetection } from "@/hooks/usePrDetection";
 import { useSessionTimers } from "@/hooks/useSessionTimers";
@@ -66,6 +67,36 @@ export default function Log() {
   }
 
   const { lastSetsByExercise, lastNoteByExercise } = buildLastSessionLookup(history as any[] | undefined);
+
+  // Auto-scroll to where the user logs next. The blur that triggers it fires
+  // before React has necessarily flushed the last keystroke, so the lookup reads
+  // the latest logs through a ref instead of this render's closure.
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
+  function scrollToNextSet() {
+    // Let the keyboard finish closing first - on a phone the viewport grows
+    // back as it goes, and "centre of the screen" moves with it.
+    setTimeout(() => {
+      const next = findNextUnloggedSet(logsRef.current);
+      if (next) scrollToSet(next);
+    }, 150);
+  }
+
+  // Reopening a session part-way through lands on the first unlogged set, so
+  // "everything but the last set" opens at the bottom rather than the top. A
+  // session with nothing logged yet stays put - its first set is already on
+  // screen, under the title. Once per visit: after that only finishing a set
+  // moves the page. Skipped while the first-run tour runs, which scrolls itself.
+  const openScrollDone = useRef(false);
+  const tourPending = !!profile && !profile.weightLoggingTourSeenAt;
+  useEffect(() => {
+    if (openScrollDone.current || !hasSession || !program || !activeDay || logs.length === 0) return;
+    openScrollDone.current = true;
+    if (tourPending || !hasAnyLoggedSet(logs)) return;
+    const next = findNextUnloggedSet(logs);
+    // Wait out the cards' staggered entrance so the row is where it will stay.
+    if (next) setTimeout(() => scrollToSet(next), 350);
+  }, [hasSession, program, activeDay, logs, tourPending]);
 
   // Sets are saved implicitly by typing - no separate "confirm" step. Weight
   // and reps together mark a set as logged, and PR detection runs inline.
@@ -455,6 +486,7 @@ export default function Log() {
               }
               onHelp={() => setLocation(`/exercises/how-to?name=${encodeURIComponent(ex.name)}`)}
               onUpdateSet={(setIdx, field, value) => updateSet(exIdx, setIdx, field, value)}
+              onSetFinished={scrollToNextSet}
               onUpdateNotes={(notes) => updateNotes(exIdx, notes)}
               onToggleNotes={() => toggleNotes(exIdx)}
             />

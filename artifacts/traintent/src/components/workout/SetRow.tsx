@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { LOGGED_SET_BOUNDS } from "@/lib/fieldLimits";
@@ -21,6 +21,9 @@ type SetRowProps = {
   // still one tap (or hover) away on the line's title.
   target: SetTarget | null;
   onChange: (field: SetField, value: number) => void;
+  // Focus left this row and the set went from unlogged to logged while it was
+  // there - the cue for the page to move on to the next set.
+  onFinished: () => void;
 };
 
 // The number inputs are deliberately boxless - big light digits, like the stats
@@ -42,17 +45,47 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
 
 // One set's inputs. Sets are saved implicitly by typing - there is no confirm
 // step - so this is only inputs and the PR trophy; the parent owns the maths.
-export function SetRow({ set, exIdx, setIdx, isUnilateral, weightUnit, prevStr, target, onChange }: SetRowProps) {
+export function SetRow({ set, exIdx, setIdx, isUnilateral, weightUnit, prevStr, target, onChange, onFinished }: SetRowProps) {
+  // Whether the set was already logged when focus entered the row. Only a set
+  // finished during this visit moves the page on - going back to correct an
+  // earlier set must not yank the user down to the next empty one.
+  const wasCompletedOnFocus = useRef(set.completed);
+
   return (
     <div
-      className={`border-t border-border px-5 pb-3 pt-2.5 ${
-        set.isNewPr ? "bg-[linear-gradient(90deg,hsl(var(--sessions-cyan)/0.06),transparent_70%)]" : ""
+      data-set-row={`${exIdx}-${setIdx}`}
+      onFocus={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) wasCompletedOnFocus.current = set.completed;
+      }}
+      onBlur={(e) => {
+        // Hopping between this row's own inputs isn't leaving it, and tapping
+        // straight into another input is the user choosing where to go - only
+        // dismissing the keyboard (focus lands on nothing) moves the page.
+        if (e.relatedTarget) return;
+        if (set.completed && !wasCompletedOnFocus.current) onFinished();
+      }}
+      className={`relative border-t border-border px-5 pb-3 pt-2.5 transition-colors duration-300 ${
+        set.isNewPr
+          ? "bg-[linear-gradient(90deg,hsl(var(--sessions-cyan)/0.06),transparent_70%)]"
+          : set.completed
+            ? "bg-[linear-gradient(90deg,hsl(var(--sessions-cyan)/0.045),transparent_55%)]"
+            : ""
       }`}
     >
+      {/* The logged-set rail: a thin teal line down the card's left edge. It
+          starts 1px up over the hairline so consecutive logged rows join into
+          one line, which reads as the exercise's progress bar. */}
+      <motion.span
+        aria-hidden
+        initial={false}
+        animate={{ scaleY: set.completed ? 1 : 0 }}
+        transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+        className="pointer-events-none absolute -top-px bottom-0 left-0 w-[2px] origin-top bg-[hsl(var(--sessions-cyan))]"
+      />
       <motion.div layout className="flex items-stretch" data-testid={`set-row-${exIdx}-${setIdx}`}>
         <div className="flex w-[52px] shrink-0 flex-col justify-center">
-          {/* The number goes from muted to white once the set has a weight and
-              reps - Sessions marks "done" with white, not with a colour. */}
+          {/* The number also goes from muted to white once the set has a
+              weight and reps, alongside the rail. */}
           <div
             className={`flex items-center gap-1 text-2xl font-light tabular-nums transition-colors ${
               set.completed ? "text-foreground" : "text-muted-foreground"
