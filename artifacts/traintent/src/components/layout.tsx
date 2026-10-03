@@ -11,6 +11,7 @@ import {
   Settings,
   Calendar,
   CircleUser,
+  Salad,
   Play,
   X,
   LogOut,
@@ -32,6 +33,7 @@ const navItems = [
   { name: "Log Workout", href: "/log", icon: Activity },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Progress", href: "/progress", icon: LineChart },
+  { name: "Nutrition", href: "/nutrition", icon: Salad },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -39,15 +41,17 @@ const navItems = [
 // sidebar entries only fit a phone at 9px labels and ~30px touch targets, so
 // Log and Calendar leave the bar - Start stands in for Log (it opens the
 // workout picker, or returns to the session in progress), and Calendar is
-// reached from the dashboard. Both routes still exist. `match` is every route that lights the tab, so the
-// section a page belongs to stays lit on it.
+// reached from the dashboard. Both routes still exist. Progress also left the
+// bar for Nutrition; it opens from the program page header and lights Program.
+// `match` is every route that lights the tab, so the section a page belongs to
+// stays lit on it.
 type MobileTab = { name: string; href: string; icon: LucideIcon; match: string[] };
 const mobileTabsLeft: MobileTab[] = [
   { name: "Home", href: "/dashboard", icon: House, match: ["/dashboard", "/calendar", "/checkin"] },
-  { name: "Program", href: "/program", icon: Dumbbell, match: ["/program", "/log"] },
+  { name: "Program", href: "/program", icon: Dumbbell, match: ["/program", "/log", "/progress"] },
 ];
 const mobileTabsRight: MobileTab[] = [
-  { name: "Progress", href: "/progress", icon: LineChart, match: ["/progress"] },
+  { name: "Nutrition", href: "/nutrition", icon: Salad, match: ["/nutrition"] },
   { name: "You", href: "/settings", icon: CircleUser, match: ["/settings"] },
 ];
 
