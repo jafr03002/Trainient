@@ -23,6 +23,7 @@ import MyProgram from "@/pages/program/my";
 import Log from "@/pages/log";
 import Checkin from "@/pages/checkin";
 import Progress from "@/pages/progress";
+import Nutrition from "@/pages/nutrition";
 import Settings from "@/pages/settings";
 import Calendar from "@/pages/calendar";
 import NotFound from "@/pages/not-found";
@@ -338,6 +339,7 @@ function App() {
                             <Route path="/checkin" component={Checkin} />
                             <Route path="/calendar" component={Calendar} />
                             <Route path="/progress" component={Progress} />
+                            <Route path="/nutrition" component={Nutrition} />
                             <Route path="/settings" component={Settings} />
                             <Route component={NotFound} />
                           </Switch>

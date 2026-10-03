@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays, Layers, Play } from "lucide-react";
+import { Dumbbell, Plus, Trash2, Save, Loader2, Pencil, ArrowUp, ArrowDown, GripVertical, Info, ListChecks, Timer, Clock, RotateCw, CalendarDays, Layers, Play, LineChart } from "lucide-react";
 import { useUser } from "@clerk/react";
 import {
   useGetProfile,
@@ -1436,17 +1436,29 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
               {badge}
             </p>
           </div>
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              aria-label="Edit program"
-              title="Edit program"
-              className="grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-accent"
-              data-testid="button-edit-program"
+          <div className="flex shrink-0 gap-2">
+            {/* Progress lives here since Nutrition took its tab-bar slot. */}
+            <Link
+              href="/progress"
+              aria-label="Progress"
+              title="Progress"
+              className="grid h-[50px] w-[50px] place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-accent"
+              data-testid="button-program-progress"
             >
-              <Pencil className="h-5 w-5" strokeWidth={1.6} />
-            </button>
-          )}
+              <LineChart className="h-5 w-5" strokeWidth={1.6} />
+            </Link>
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                aria-label="Edit program"
+                title="Edit program"
+                className="grid h-[50px] w-[50px] place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-accent"
+                data-testid="button-edit-program"
+              >
+                <Pencil className="h-5 w-5" strokeWidth={1.6} />
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
 
