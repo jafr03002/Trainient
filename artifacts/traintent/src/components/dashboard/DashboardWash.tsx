@@ -11,7 +11,9 @@ import { useEffect, useRef, useState } from "react";
  * banding.
  *
  * The light gathers over today's column of the week arc, so it points at the
- * day that matters. A finger (or mouse) pulls the light towards it, and a tap
+ * day that matters. A page can aim it elsewhere with `sunX` (the calendar
+ * points it at the selected day's column); the light glides to a new target
+ * rather than jumping. A finger (or mouse) pulls the light towards it, and a tap
  * sends a soft ripple out. The canvas never takes pointer events, so the date
  * circles and "Full month" still get every tap; the listeners are passive and
  * sit on the window.
@@ -163,10 +165,17 @@ function todayColumnX(): number {
   return (mondayFirst + 0.5) / 7;
 }
 
-export function DashboardWash({ className = "" }: { className?: string }) {
+export function DashboardWash({ className = "", sunX: sunXProp }: { className?: string; sunX?: number }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [live, setLive] = useState(false);
+  // Read every frame, so moving the light never restarts the GL context.
+  const sunXRef = useRef<number | undefined>(sunXProp);
+  const kickRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    sunXRef.current = sunXProp;
+    kickRef.current();
+  }, [sunXProp]);
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -223,7 +232,8 @@ export function DashboardWash({ className = "" }: { className?: string }) {
     };
     resize();
 
-    const baseSunX = todayColumnX();
+    const baseSunXOf = () => sunXRef.current ?? todayColumnX();
+    let baseSunX = baseSunXOf();
     const pointer = { x: baseSunX, y: 0.33, s: 0, tx: baseSunX, ty: 0.33, ts: 0, down: false };
     const ripple = { x: 0.5, y: 0.3, start: -100, s: 0 };
     let tilt = 0;
@@ -244,8 +254,10 @@ export function DashboardWash({ className = "" }: { className?: string }) {
       pointer.x += (pointer.tx - pointer.x) * ease;
       pointer.y += (pointer.ty - pointer.y) * ease;
       pointer.s += (pointer.ts - pointer.s) * (1 - Math.exp(-dt * (pointer.ts > pointer.s ? 6 : 1.6)));
+      baseSunX = baseSunXOf();
       const sunTarget = baseSunX + tilt * 0.12 + (pointer.x - baseSunX) * 0.4 * pointer.s;
-      sunX += (sunTarget - sunX) * (1 - Math.exp(-dt * 2.5));
+      // Reduced motion draws one still frame per change, so it can't glide there.
+      sunX = reduceMotion ? sunTarget : sunX + (sunTarget - sunX) * (1 - Math.exp(-dt * 2.5));
 
       gl.uniform1f(uTime, t);
       gl.uniform1f(uSunX, sunX);
@@ -267,6 +279,7 @@ export function DashboardWash({ className = "" }: { className?: string }) {
       }
     };
     kick();
+    kickRef.current = kick;
 
     const ro = new ResizeObserver(() => {
       resize();
@@ -344,6 +357,7 @@ export function DashboardWash({ className = "" }: { className?: string }) {
     canvas.addEventListener("webglcontextlost", onLost);
 
     return () => {
+      kickRef.current = () => {};
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
