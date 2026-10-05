@@ -195,8 +195,33 @@ a WebGL shader draws slow light shafts, a drifting teal pool and thin caustics
 over today's column. It follows a finger, ripples on tap and tilts on Android.
 `.sessions-wash` stays underneath as the fallback, and reduced motion gets one
 still frame. This is the one sanctioned exception to "no glows": keep it on the
-dashboard top and nowhere else. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
+dashboard top and the calendar top (which reuses `DashboardWash`, with `sunX` aiming
+the light at the selected day's column) and nowhere else. Screenshots: [mobile](docs/design/references/dashboard-mobile.png) ·
 [desktop](docs/design/references/dashboard-desktop.png).
+
+**Liquid glass (calendar):** real refraction from
+[liquid-glass-web-react](https://github.com/PallavAg/liquid-glass-web-react): an SVG
+`feDisplacementMap` over the content itself, not `backdrop-filter`, so it works on
+iOS Safari. The rule for where it goes: **glass is only for a control that floats over
+something that moves.** On a static black card it's invisible at best and
+decoration at worst, and it fights the "depth comes from grey steps" rule. The calendar has
+exactly one piece: the selected day, a glass lens over the month grid
+(`components/calendar/MonthGrid.tsx`). It glides on a slightly underdamped spring,
+stretches along its velocity, squeezes when pressed, and scrubs along a week under a
+horizontal drag. The month switcher above the grid stays plain, with no pill and no glass: a muted
+‹ and › at the edges and the month name centred (Jakob tried a glass pill there and
+rejected it).
+
+Don't add glass to cards, grouped lists, sheets or the tab bar. If a new screen
+seems to want it, ask whether something actually moves underneath it.
+
+**Calendar month grid:** phases are continuous `bg-white/[0.075]` bands per week row.
+The ends are fully round where a phase starts or ends, and only softly rounded where a run wraps
+onto the next row. The phase is named in caps at its start, with the phase colour only
+in a 5px dot. A trained day is a solid white disc with a black numeral, a planned day
+(fixed schedule only) is a faint outline, and today is a small white dot under its number. The
+selected day's sessions sit below as an inset grouped list. Tapping the selected day
+again opens its session.
 
 ## 8. Status and open work
 
@@ -217,10 +242,13 @@ sidebar only gets the tokens, with no design work of its own.
   a caps "N of M" count (no progress bar), a 1-5 scale as circles that fill white.
 - **Tours** use the white Intent sun on a black disc as the avatar (the robot
   mascot now only appears on the sign-in panel).
-- **Still to design, each in its own session:** the calendar (`/calendar`: month
-  grid, phases, calibration nudge, session sheet) and the sign-in / sign-up
-  screen (as a native-app screen, not a web split layout). Both already pick up
-  the tokens, but their layouts are still the old ones. The landing page is out
+- **The calendar** (`/calendar`) is designed: the storm wash, a plain month
+  switcher, the liquid-glass day lens, phase bands, white trained-day discs, a day panel, and the
+  session sheet in Sessions. Independent users get their current phase painted from
+  today onwards (they have no phase history).
+- **Still to design, in its own session:** the sign-in / sign-up screen (as a
+  native-app screen, not a web split layout). It already picks up the tokens,
+  but its layout is still the old one. The landing page is out
   of scope for an app.
 - `/progress` shows the metric-card pattern: a caps label, a big light number
   and a muted delta, above a minimal axis-less chart. Its volume card is
