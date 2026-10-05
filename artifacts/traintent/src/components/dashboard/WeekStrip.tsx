@@ -1,7 +1,7 @@
 import { useState, type ReactNode, type RefObject } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { Check, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   useGetCalendarColors,
   type DailyLogsWeekResult,
@@ -29,20 +29,18 @@ type WeekStripProps = {
   header?: ReactNode;
 };
 
-// A session name has about 45px at 390px wide, so a long label is shortened
-// rather than dropped: Jakob asked for names, not dots. Multi-word labels
-// become their initials ("Upper Body" -> "UB"), a single long word is clipped.
-export function abbreviateLabel(label: string): string {
-  const trimmed = label.trim();
-  if (trimmed.length <= 6) return trimmed;
-  const words = trimmed.split(/\s+/);
-  if (words.length > 1) {
-    return words
-      .slice(0, 3)
-      .map((w) => w[0]?.toUpperCase() ?? "")
-      .join("");
-  }
-  return `${trimmed.slice(0, 5)}…`;
+// The arc's geometry. Every circle's centre sits on the same parabola, whatever
+// size it is. Today is lifted a little off it, so the larger ringed circle
+// stands in front of its neighbours instead of colliding with them.
+const ARC_HEIGHT = 118;
+const ARC_TOP = 38;
+const ARC_SINK = 1.6;
+const TODAY_SIZE = 48;
+const TODAY_LIFT = 8;
+const DAY_SIZE = 38;
+
+function arcY(offset: number): number {
+  return ARC_TOP + ARC_SINK * offset * offset;
 }
 
 function addDays(from: string, days: number): string {
@@ -53,10 +51,11 @@ function addDays(from: string, days: number): string {
 
 /**
  * The tappable week at the top of the dashboard: seven days, Monday-first, on a
- * shallow arc over the Sessions wash, each carrying the session it belongs to.
- * A logged session fills its circle, a planned one is outlined, a rest day is
- * dashed, and today wears a white ring. Tapping any day opens its detail - the numbers the old "This
- * week" table used to spread across four columns.
+ * shallow arc over the Sessions wash. Only the date and weekday show; which
+ * session a day holds is in its detail sheet (and its accessible name). A logged session is a solid white disc (the app's white-on-black "done"), a
+ * planned one is outlined, a rest day is just its number, and today is the
+ * larger circle with a white ring. Tapping any day opens its detail - the
+ * numbers the old "This week" table used to spread across four columns.
  *
  * `programs.schedule` may be `rotating`, which the backend doesn't fully
  * implement yet. Rather than pinning a rotation to weekdays it can't know, this
@@ -142,58 +141,64 @@ export function WeekStrip({
       </div>
 
       {isLoading ? (
-        <div className="h-[128px]" aria-hidden />
+        <div style={{ height: ARC_HEIGHT }} aria-hidden />
       ) : (
         <>
-          {/* The week on a shallow arc, as in the reference: today is the
-              ringed circle, a logged session fills its day, a planned one is
-              outlined and a rest day is dashed. The edges sink and fade a
-              little so the middle of the week reads as the front. */}
-          <div className="relative mx-auto mt-4 h-[128px] max-w-[440px]" role="group" aria-label="This week">
+          {/* The week on a shallow arc, as in the reference. The fill says
+              what happened: a trained day is a white disc, a planned one an
+              outline, a rest day only its number, so the training days stand
+              out from the week at a glance. Today is the large ringed circle.
+              The edges sink and fade a little so the middle of the week reads
+              as the front. */}
+          <div
+            className="relative mx-auto mt-3 max-w-[440px]"
+            style={{ height: ARC_HEIGHT }}
+            role="group"
+            aria-label="This week"
+          >
             {week.map((day, i) => {
               const offset = i - 3;
+              const size = day.isToday ? TODAY_SIZE : DAY_SIZE;
               return (
                 <button
                   key={day.date}
                   onClick={() => setOpenDate(day.date)}
                   // Said out loud for a screen reader: the fills and rings can't be heard.
-                  aria-label={`${day.weekday} ${day.dayOfMonth}${day.label ? ` - ${day.label}${day.done ? ", done" : ""}` : " - rest day"}, open details`}
+                  aria-label={`${day.weekday} ${day.dayOfMonth}${day.label ? ` - ${day.label}${day.done ? ", done" : ""}` : " - rest day"}${day.isToday ? ", today" : ""}, open details`}
+                  aria-current={day.isToday ? "date" : undefined}
                   title={day.label ?? undefined}
-                  className="absolute flex w-[52px] -translate-x-1/2 flex-col items-center gap-1.5"
+                  className="group absolute flex w-[52px] -translate-x-1/2 flex-col items-center gap-2 rounded-2xl outline-none focus-visible:ring-1 focus-visible:ring-white/60"
                   style={{
                     left: `${((i + 0.5) / 7) * 100}%`,
-                    top: 6 + 1.5 * offset * offset + (day.isToday ? 0 : 4),
-                    opacity: 1 - 0.07 * Math.abs(offset),
+                    top: arcY(offset) - size / 2 - (day.isToday ? TODAY_LIFT : 0),
+                    opacity: 1 - 0.06 * Math.abs(offset),
                   }}
                   data-testid={`week-strip-day-${day.date}`}
                 >
                   <span
-                    className={`grid place-items-center rounded-full tabular-nums backdrop-blur-sm transition-colors ${
+                    className={`grid shrink-0 place-items-center rounded-full tabular-nums transition-transform duration-150 group-active:scale-95 ${
                       day.isToday
-                        ? "h-12 w-12 bg-black/30 text-[15px] font-medium text-white outline outline-[1.5px] outline-offset-[3px] outline-white"
-                        : "h-10 w-10 text-[13px]"
+                        ? "text-[21px] font-light tracking-[-0.02em] outline outline-[1.5px] outline-offset-[2.5px] outline-white"
+                        : "text-[14px]"
                     } ${
-                      day.isToday
-                        ? ""
-                        : day.done
-                        ? "border border-white/35 bg-white/[0.16] text-white"
+                      day.done
+                        ? "bg-white font-medium text-black"
+                        : day.isToday
+                        ? "bg-black/35 text-white backdrop-blur-sm"
                         : day.label
-                        ? "border border-white/25 bg-white/[0.06] text-white/85"
-                        : "border border-dashed border-white/20 text-white/50"
+                        ? "border border-white/45 bg-black/20 text-white backdrop-blur-sm"
+                        : "text-white/40"
                     }`}
+                    style={{ width: size, height: size }}
                   >
                     {day.dayOfMonth}
                   </span>
-                  <span className={`text-[12.5px] ${day.isToday ? "font-semibold text-white" : "text-white/60"}`}>
-                    {day.weekday}
-                  </span>
                   <span
-                    className={`flex max-w-full items-center gap-0.5 truncate text-[10px] leading-none ${
-                      day.done ? "text-white/80" : day.label ? "text-white/45" : "text-white/30"
+                    className={`text-[10.5px] uppercase leading-none tracking-[0.12em] ${
+                      day.isToday ? "font-semibold text-white" : "text-white/55"
                     }`}
                   >
-                    {day.done && <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={2} />}
-                    {day.label ? abbreviateLabel(day.label) : "Rest"}
+                    {day.weekday}
                   </span>
                 </button>
               );

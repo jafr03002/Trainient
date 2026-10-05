@@ -183,10 +183,13 @@ with black text. Secondary actions are either an outlined pill
 **Date arc + wash (dashboard):** the top of the dashboard (`WeekStrip` in
 `components/dashboard/`) is the week on a shallow arc, taken from the calendar row
 of [calendar_dashboard_example.jpg](docs/design/references/calendar_dashboard_example.jpg)
-but recoloured to Sessions. Seven circles, Monday-first. A logged session fills its
-circle (`bg-white/[0.16]`), a planned session is outlined, a rest day is dashed,
-and today is larger with a thin white ring. The ring shows no progress; it only
-marks the day. The outer days sink (`1.5px × offset²`) and fade slightly. Above the arc,
+but recoloured to Sessions. Seven circles, Monday-first. A logged session is a solid
+white disc with a black number (the app's white-on-black "done"), a planned session
+is outlined, a rest day is only its dimmed number with no circle, and today is the
+larger circle with a thin white ring, its number in light 21px like the dashboard's
+display numerals. The ring shows no progress; it only marks the day. Weekdays are
+small tracked caps. The outer days sink (`1.6px × offset²`) and fade slightly, and
+today is lifted 8px off the curve so its ring clears its neighbours. Above the arc,
 the white Intent sun (`src/assets/intent-sun.png`, from [intent-logo.png](docs/design/references/intent-logo.png))
 and the word "Intent" sit on the left, with a "Full month" chip on the right. Behind it,
 `.sessions-wash` is a grey-to-teal light that fades into black, and the greeting
