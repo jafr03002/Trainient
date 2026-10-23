@@ -26,7 +26,7 @@ type MonthGridProps = {
   days: MonthDay[];
   selected: string;
   onSelect: (date: string) => void;
-  /** Tapping the day that's already selected (or Enter on it). */
+  /** Tapping a day (after selecting it), or Enter on the selected one. */
   onActivate: (date: string) => void;
   /** Reports the selected day's column centre, 0..1 of the grid width, for the storm's light. */
   onColumnChange?: (x: number) => void;
@@ -269,8 +269,10 @@ export function MonthGrid({ padding, days, selected, onSelect, onActivate, onCol
 
   function handleClick(date: string) {
     if (suppressClick.current) return;
-    if (date === selected) onActivate(date);
-    else onSelect(date);
+    // A tap both selects and opens: there's no day agenda under the grid to
+    // open a session from, so making the user tap twice would just be friction.
+    if (date !== selected) onSelect(date);
+    onActivate(date);
   }
 
   // ---- Keyboard: arrows move by day / week, Enter opens ----

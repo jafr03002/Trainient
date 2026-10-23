@@ -439,7 +439,7 @@ export default function Calendar() {
     {
       kind: "awaitAction",
       target: tourGridRef,
-      text: "Here you can track and look back at your sessions - tap a white day, then its session to open it.",
+      text: "Here you can track and look back at your sessions - tap a white day to open its session.",
       done: !!selectedSession,
     },
     {
@@ -562,10 +562,6 @@ export default function Calendar() {
   const viewingThisMonth = year === now.getFullYear() && month === now.getMonth();
 
   const selectedSessions = workoutsByDate[selectedDate] ?? [];
-  const selectedDay = days.find((d) => d.date === selectedDate);
-  const selectedDateObj = new Date(year, month, selectedDay?.day ?? 1);
-  const selectedPlanned = selectedDay?.planned ? plannedLabelOn(selectedDate) : null;
-  const selectedRange = selectedDay ? visiblePhaseOn(selectedDateObj) : undefined;
 
   function activateDay(date: string) {
     const sessions = workoutsByDate[date] ?? [];
@@ -698,34 +694,18 @@ export default function Calendar() {
             </div>
           )}
 
-          {/* The selected day: what happened (or is planned) on it */}
+          {/* Tapping a day opens its session straight away; only a day with
+              more than one needs a list to choose from. */}
           <AnimatePresence mode="wait" initial={false}>
-            <motion.section
-              key={selectedDate}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              aria-live="polite"
-            >
-              <div className="mb-3">
-                <h2 className={`${SECTION_TITLE_CLASS} truncate`}>
-                  {selectedDate === todayStr
-                    ? "Today"
-                    : selectedDateObj.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
-                </h2>
-                {selectedRange && (
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: phaseSolid(selectedRange.phase) }} />
-                    <span className="truncate">
-                      <span className="capitalize">{phaseLabel(selectedRange.phase)}</span> phase
-                      {phaseWeek(selectedRange, selectedDateObj).total != null && <> · week {phaseWeek(selectedRange, selectedDateObj).week}</>}
-                    </span>
-                  </p>
-                )}
-              </div>
-
-              {selectedSessions.length > 0 ? (
+            {selectedSessions.length > 1 && (
+              <motion.section
+                key={selectedDate}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                aria-live="polite"
+              >
                 <div className="overflow-hidden rounded-[26px] bg-card">
                   {selectedSessions.map((session) => {
                     const label = session.dayLabel ?? "Workout";
@@ -753,25 +733,8 @@ export default function Calendar() {
                     );
                   })}
                 </div>
-              ) : (
-                <div className="flex items-center gap-3 rounded-[26px] bg-card px-5 py-[15px]">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] text-foreground">
-                      {selectedPlanned ?? (selectedDate < todayStr ? "Rest day" : "Nothing planned")}
-                    </span>
-                    <span className="block truncate text-[12.5px] text-muted-foreground">
-                      {selectedPlanned
-                        ? selectedDate === todayStr
-                          ? "Planned for today - start it from the tab bar"
-                          : "Planned session"
-                        : selectedDate < todayStr
-                        ? "No session logged"
-                        : "No session on your schedule"}
-                    </span>
-                  </span>
-                </div>
-              )}
-            </motion.section>
+              </motion.section>
+            )}
           </AnimatePresence>
         </div>
       </div>
