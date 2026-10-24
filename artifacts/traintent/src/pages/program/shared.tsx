@@ -36,7 +36,7 @@ import { DurationWheel } from "@/components/DurationWheel";
 import { FIELD_LIMITS, MAX_DAY_LABEL, MAX_EXERCISE_NAME, rangeError } from "@/lib/fieldLimits";
 import { WEEKDAY_LABELS, mondayIndexOf, todayDateString, upcomingSlots, type StoredSchedule } from "@/lib/programSchedule";
 import { formatSplitType } from "@/lib/utils";
-import { isPreCalibrationLocked } from "@/lib/calibration";
+import { calibrationBriefingHref, isCalibrationProgram, isPreCalibrationLocked } from "@/lib/calibration";
 import {
   type ActiveSessionPointer,
   resolveActiveSession,
@@ -1412,6 +1412,13 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
     // landing - storage the browser refused, or a `user` Clerk hadn't resolved
     // yet when the button was pressed - dead-ended on the logger's idle screen,
     // which reads as "you didn't press Start workout" to someone who just did.
+    //
+    // A new calibration session opens on the briefing instead, which starts
+    // the session itself once it has been read. Resuming one goes straight in.
+    if (!isSameSession && isCalibrationProgram(program)) {
+      setLocation(calibrationBriefingHref(day.dayNumber));
+      return;
+    }
     if (user?.id && !isSameSession) startSession(user.id, program.id, day.dayNumber);
     setLocation(`/log?day=${day.dayNumber}&start=1`);
   }
@@ -1609,12 +1616,13 @@ export function ProgramWeekView({ program, canStartWorkout, badge, onEdit, tourE
           setLocation("/log?resumed=1");
         }}
         onDiscard={() => {
+          const calibration = isCalibrationProgram(program);
           if (user?.id && day) {
             discardActiveSession(user.id);
-            startSession(user.id, program.id, day.dayNumber);
+            if (!calibration) startSession(user.id, program.id, day.dayNumber);
           }
           setConflict(null);
-          if (day) setLocation(`/log?day=${day.dayNumber}&start=1`);
+          if (day) setLocation(calibration ? calibrationBriefingHref(day.dayNumber) : `/log?day=${day.dayNumber}&start=1`);
         }}
       />
     </div>

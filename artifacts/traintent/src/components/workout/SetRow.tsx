@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Trophy } from "lucide-react";
+import { Check, Trophy } from "lucide-react";
 import { LOGGED_SET_BOUNDS } from "@/lib/fieldLimits";
 import type { LoggedSet } from "@/lib/workoutSession";
 import type { SetTarget } from "@/lib/trainingTargets";
@@ -201,6 +201,67 @@ export function SetRow({ set, exIdx, setIdx, isUnilateral, weightUnit, prevStr, 
           Last time <span className="font-medium normal-case tracking-[0.02em] text-foreground">{prevStr}</span>
         </p>
       ) : null}
+    </div>
+  );
+}
+
+// A calibration set: no weight or reps that week, just a tick. Same row, rail
+// and set number as SetRow so the log page reads the same; the prescribed reps
+// stay visible as a guide, not a target to hit.
+export function CalibrationSetRow({
+  set,
+  exIdx,
+  setIdx,
+  guide,
+  onToggle,
+}: {
+  set: LoggedSet;
+  exIdx: number;
+  setIdx: number;
+  guide: string;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      data-set-row={`${exIdx}-${setIdx}`}
+      className={`relative border-t border-border px-5 py-2.5 transition-colors duration-300 ${
+        set.completed ? "bg-[linear-gradient(90deg,hsl(var(--sessions-cyan)/0.045),transparent_55%)]" : ""
+      }`}
+    >
+      <motion.span
+        aria-hidden
+        initial={false}
+        animate={{ scaleY: set.completed ? 1 : 0 }}
+        transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
+        className="pointer-events-none absolute -top-px bottom-0 left-0 w-[2px] origin-top bg-[hsl(var(--sessions-cyan))]"
+      />
+      <div className="flex items-center" data-testid={`set-row-${exIdx}-${setIdx}`}>
+        <div className="flex w-[52px] shrink-0 flex-col justify-center">
+          <div
+            className={`text-2xl font-light tabular-nums transition-colors ${
+              set.completed ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {set.setNumber}
+          </div>
+          <span className="mt-px text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Set</span>
+        </div>
+        <div className="min-w-0 flex-1 border-l border-border pl-3.5 text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+          Guide <span className="font-medium normal-case tracking-[0.02em] text-foreground">{guide}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={set.completed}
+          aria-label={`Set ${set.setNumber} ${set.completed ? "done" : "not done"}`}
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors ${
+            set.completed ? "border-white bg-white text-black" : "border-muted-foreground/50 text-transparent hover:border-foreground"
+          }`}
+          data-testid={`button-tick-set-${exIdx}-${setIdx}`}
+        >
+          <Check className="h-[18px] w-[18px]" strokeWidth={2.2} />
+        </button>
+      </div>
     </div>
   );
 }

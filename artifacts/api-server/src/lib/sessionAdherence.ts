@@ -24,6 +24,7 @@ export type AdherenceLogRow = {
   dayNumber: number;
   dayLabel: string | null;
   mode: string;
+  loggingMode?: string;
   exercisesLogged: unknown;
 };
 
@@ -47,7 +48,10 @@ export type SessionAdherence = {
 // filters those out for display - counting them here would inflate adherence.
 function hasRealData(log: AdherenceLogRow): boolean {
   const exercises = (log.exercisesLogged as LoggedExercise[] | null) ?? [];
-  return exercises.some((ex) => Array.isArray(ex?.sets) && ex.sets.some(isPerformed));
+  // Calibration sessions tick sets off with no weight or reps, so a ticked set
+  // is the real data there - otherwise every one would score as a miss.
+  const counts = log.loggingMode === "calibration" ? (s: { completed?: boolean }) => !!s.completed : isPerformed;
+  return exercises.some((ex) => Array.isArray(ex?.sets) && ex.sets.some(counts));
 }
 
 export function computeSessionAdherence(args: {

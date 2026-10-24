@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Trophy, Dumbbell, Clock, X, Info } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { useGetCurrentProgram, useCreateWorkout, useGetPersonalRecords, useListWorkouts, useGetProfile, useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
-import { isPreCalibrationLocked } from "@/lib/calibration";
+import { isCalibrationProgram, isPreCalibrationLocked } from "@/lib/calibration";
 import { LOGGED_SET_BOUNDS, clampToBounds } from "@/lib/fieldLimits";
 import { formatClock } from "@/lib/sessionDuration";
 import type { LoggedExercise } from "@/lib/workoutSession";
@@ -18,6 +18,7 @@ import { WorkoutLogLockDialog } from "@/components/workout/WorkoutLogLockDialog"
 import { ExerciseCard } from "@/components/workout/ExerciseCard";
 import { ChecklistItemCard } from "@/components/workout/ChecklistItemCard";
 import { ConfirmSheet } from "@/components/workout/ConfirmSheet";
+import { CalibrationFinishSheet } from "@/components/calibration/CalibrationFinishSheet";
 import type { SetField } from "@/components/workout/SetRow";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { toast } from "@/hooks/use-toast";
@@ -40,6 +41,10 @@ export default function Log() {
   // first-timer case never flashes a target before it resolves. Independent
   // mode is exempt: those numbers are the user's own, typed into their program.
   const showTargets = isIndependent || (history != null && history.length > 0);
+  // Calibration week: sets are ticked off rather than logged with numbers, and
+  // finishing asks for a free-form note for the calibration review.
+  const isCalibration = isCalibrationProgram(program);
+  const [showCalibrationFinish, setShowCalibrationFinish] = useState(false);
   const createWorkout = useCreateWorkout();
   const { logs, setLogs, activeDay, hasSession, startFailed, resumedElsewhere, startedAt, endSession } =
     useWorkoutSession({ program, userId: user?.id, setLocation });
@@ -123,6 +128,18 @@ export default function Log() {
     });
   }
 
+  // A calibration set has no numbers to type, so the tick IS the completion -
+  // it can't go through updateSet's `weight > 0 && hasReps` rule.
+  function toggleSetDone(exIdx: number, setIdx: number) {
+    const done = !logs[exIdx].sets[setIdx].completed;
+    setLogs((prev) =>
+      prev.map((ex, i) =>
+        i === exIdx ? { ...ex, sets: ex.sets.map((s, si) => (si === setIdx ? { ...s, completed: done } : s)) } : ex
+      )
+    );
+    if (done) scrollToNextSet();
+  }
+
   // Checklist items get their own completion path. They must NOT go through
   // updateSet, whose `completed = weight > 0 && hasReps` can never be true for
   // something with no weight and no reps.
@@ -177,7 +194,9 @@ export default function Log() {
     });
   }
 
-  async function finishWorkout() {
+  // `note` is the session-level note from the calibration finish sheet; the
+  // regular logger has no such field and always sends null.
+  async function finishWorkout(note: string | null = null) {
     try {
       await createWorkout.mutateAsync({
         data: {
@@ -210,14 +229,18 @@ export default function Log() {
               muscle: ex.muscle,
               kind: "lift" as const,
               sets: ex.sets.map((s) =>
-                ex.isUnilateral
+                isCalibration
+                  ? // Ticked, never measured: no weight, no reps.
+                    { setNumber: s.setNumber, weight: 0, reps: null, completed: s.completed, isNewPr: false }
+                  : ex.isUnilateral
                   ? { setNumber: s.setNumber, weight: s.weight, reps: null, repsLeft: s.repsLeft, repsRight: s.repsRight, completed: s.completed, isNewPr: s.isNewPr }
                   : { setNumber: s.setNumber, weight: s.weight, reps: s.reps, completed: s.completed, isNewPr: s.isNewPr }
               ),
               notes: ex.notes || undefined,
             };
           }),
-          notes: null,
+          notes: note,
+          loggingMode: isCalibration ? "calibration" : "full",
         },
       });
     } catch {
@@ -231,6 +254,12 @@ export default function Log() {
       return;
     }
     endSession();
+    setShowCalibrationFinish(false);
+    if (isCalibration) {
+      toast({ title: "Session saved", description: "Your notes go to your coach for the review." });
+      setLocation("/dashboard");
+      return;
+    }
     const loggedCount = logs.filter((ex) => ex.name.trim()).length;
     toast({
       title: "Workout saved 🎉",
@@ -243,6 +272,12 @@ export default function Log() {
   }
 
   function handleFinishClick() {
+    // Calibration skips the "not every set is logged" gate: unticked sets are
+    // fine that week, and the finish sheet is the one step before saving.
+    if (isCalibration) {
+      setShowCalibrationFinish(true);
+      return;
+    }
     // Checklist items count toward the gate exactly like sets do. Nothing is
     // blocked either way - an unticked item only means Finish warns first, and
     // the confirm sheet still lets the session through.
@@ -262,7 +297,9 @@ export default function Log() {
   function cancelWorkout() {
     endSession();
     setShowCancelConfirm(false);
-    setLocation("/program");
+    // Calibration sessions start from the briefing, so there's no program page
+    // to return to - the flow tree sends a cancel back to the dashboard.
+    setLocation(isCalibration ? "/dashboard" : "/program");
   }
 
   if (program && isPreCalibrationLocked(program, new Date())) {
@@ -350,7 +387,14 @@ export default function Log() {
     // number boxes. Anchoring on the block also puts the bubble under it rather
     // than over the remaining sets.
     ...(firstLiftIdx >= 0
-      ? [{ target: tourSetsBlockRef, text: "Here you can track your weight and reps." } as CoachmarkStep]
+      ? [
+          {
+            target: tourSetsBlockRef,
+            text: isCalibration
+              ? "This week there's nothing to type - just tick each set off as you finish it."
+              : "Here you can track your weight and reps.",
+          } as CoachmarkStep,
+        ]
       : []),
     // Same idea for the help button - "this exercise" only means something with
     // the exercise's own header lit next to the "?".
@@ -399,6 +443,14 @@ export default function Log() {
           <div className="min-w-0">
             <h1 className={PROGRAM_TITLE_CLASS}>{day?.label ?? "Workout"}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+              {isCalibration && (
+                <span
+                  className="text-[10.5px] font-medium uppercase tracking-[0.1em] text-[hsl(var(--sessions-cyan))]"
+                  data-testid="badge-calibration-session"
+                >
+                  Calibration · tick each set
+                </span>
+              )}
               {/* Ambient information, not an achievement - kept as plain meta
                   text rather than given the PR badge's treatment. */}
               {elapsedSeconds != null && (
@@ -471,7 +523,9 @@ export default function Log() {
               // AI mode's forward-looking targets. Gated on showTargets for the
               // same reason the prescription is: a target is a comparison, and
               // a first-ever session has nothing to compare against.
-              showProgressionTargets={!isIndependent && showTargets}
+              showProgressionTargets={!isIndependent && showTargets && !isCalibration}
+              calibration={isCalibration}
+              onToggleSet={(setIdx) => toggleSetDone(exIdx, setIdx)}
               prevSets={lastSetsByExercise[nameKey]}
               prevNote={lastNoteByExercise[nameKey]}
               // The tour's first two steps are about weights, reps and how to
@@ -531,6 +585,13 @@ export default function Log() {
         confirmTestId="button-finish-anyway"
         onCancel={() => setShowIncompleteConfirm(false)}
         onConfirm={() => { setShowIncompleteConfirm(false); finishWorkout(); }}
+      />
+
+      <CalibrationFinishSheet
+        open={showCalibrationFinish}
+        saving={createWorkout.isPending}
+        onCancel={() => setShowCalibrationFinish(false)}
+        onFinish={(note) => finishWorkout(note)}
       />
 
       <ConfirmSheet

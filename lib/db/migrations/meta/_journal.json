@@ -15,6 +15,13 @@
       "when": 1789167179830,
       "tag": "0001_ai_jobs_and_stripe_event_time",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792855036676,
+      "tag": "0002_calibration_session_mode",
+      "breakpoints": true
     }
   ]
 }
