@@ -26,6 +26,8 @@ tags:
     description: Workout logging
   - name: checkins
     description: Weekly check-ins
+  - name: calibration
+    description: The calibration review - the readiness check that ends calibration
   - name: progress
     description: Progress analytics
   - name: bodyweight
@@ -516,6 +518,147 @@ paths:
                 $ref: "#/components/schemas/CheckinJob"
         "404":
           description: No such job for this user
+
+  # ── Calibration review ────────────────────────────────────────────────────────
+  # The readiness check that ends calibration. Not a weekly check-in (those stay
+  # closed until 7 days after it). Day 1 is the program's start date; the review
+  # opens on day 8 and the last day to take it is day 21. A client who hasn't
+  # passed by then leaves calibration on day 22 through POST /calibration/exit.
+  /calibration/status:
+    get:
+      operationId: getCalibrationStatus
+      tags: [calibration]
+      summary: Where the client is in calibration, the hard checks, and their session feedback so far
+      responses:
+        "200":
+          description: Calibration status. `inCalibration` is false outside calibration and every other field is then empty.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationStatus"
+
+  /calibration/reviews:
+    post:
+      operationId: submitCalibrationReview
+      tags: [calibration]
+      summary: Submit the calibration review and get the verdict (blocking)
+      description: >
+        illOrInjured=true pauses calibration with no AI call. Otherwise the AI
+        judges readiness. A failed hard check (rotation, weigh-ins, nutrition
+        logs) still records the answers, but the verdict is always extend. On
+        pass the next phase's program is written, with exercise swaps applied.
+        400 when the review isn't open (before day 8, after the last review
+        day, paused, already extended today, or not in calibration).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalibrationReviewInput"
+      responses:
+        "201":
+          description: Review recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationReviewResult"
+        "400":
+          description: Invalid input, or the review isn't open
+
+  /calibration/reviews/jobs:
+    post:
+      operationId: startCalibrationReviewJob
+      tags: [calibration]
+      summary: Submit the calibration review and run the AI judgement as a background job
+      description: Same input and the same 400s as POST /calibration/reviews, answered immediately. Otherwise 202 with a job id to poll at GET /calibration/jobs/{jobId}.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalibrationReviewInput"
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiJobAccepted"
+        "400":
+          description: Invalid input, or the review isn't open
+
+  /calibration/exit:
+    post:
+      operationId: finishCalibration
+      tags: [calibration]
+      summary: End calibration automatically once the last review day has passed (blocking)
+      description: >
+        Only allowed when GET /calibration/status reports autoExitDue (day 22 or
+        later, not paused). The AI writes a summary from the session notes, logs
+        and the last review. The client moves into the next phase with any
+        exercise swaps applied. The verdict is always pass_with_notes.
+      responses:
+        "201":
+          description: Calibration ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationReviewResult"
+        "400":
+          description: Calibration isn't due to end yet
+
+  /calibration/exit/jobs:
+    post:
+      operationId: startCalibrationExitJob
+      tags: [calibration]
+      summary: End calibration automatically, as a background job
+      description: Same 400s as POST /calibration/exit. Otherwise 202 with a job id to poll at GET /calibration/jobs/{jobId}.
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiJobAccepted"
+        "400":
+          description: Calibration isn't due to end yet
+
+  /calibration/jobs/{jobId}:
+    get:
+      operationId: getCalibrationJob
+      tags: [calibration]
+      summary: Poll a calibration review or exit job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job state; `result` is the CalibrationReviewResult once status is succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationJob"
+        "404":
+          description: No such job for this user
+
+  /calibration/recovered:
+    post:
+      operationId: resumeCalibration
+      tags: [calibration]
+      summary: End a pause - the client has recovered from illness or injury
+      description: Opens a fresh window. The review can be taken straight away, and the automatic exit moves to 7 days after today at the earliest.
+      responses:
+        "200":
+          description: Updated calibration status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalibrationStatus"
+        "400":
+          description: Calibration isn't paused
 
   # ── Progress ──────────────────────────────────────────────────────────────────
   /progress/volume:
@@ -1171,6 +1314,10 @@ components:
         dayLabel:         { type: ["string", "null"] }
         mode:             { type: string, enum: [ai, independent], description: "Training mode the user was in when this session was logged" }
         loggingMode:      { type: string, enum: [full, calibration], description: "calibration = a calibration-phase session: sets are ticked off with no weight or reps" }
+        calibrationFeedback:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationSessionFeedback"
+            - type: "null"
         exercisesLogged:
           type: array
           items:
@@ -1196,6 +1343,12 @@ components:
         # Only accepted while the current AI-lineage program is a calibration
         # week - otherwise rejected with 400 rather than silently downgraded.
         loggingMode:      { type: string, enum: [full, calibration], default: full }
+        # The questions after a calibration session. Only accepted with
+        # loggingMode calibration (400 otherwise). Null = finished without answering.
+        calibrationFeedback:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationSessionFeedback"
+            - type: "null"
         startedAt:        { type: ["string", "null"], format: date-time }
         durationSeconds:  { type: ["integer", "null"], minimum: 0, maximum: 86400 }
 
@@ -1352,6 +1505,217 @@ components:
         error:       { type: ["string", "null"], description: "User-facing message; set only when status is failed." }
         createdAt:   { type: string }
         completedAt: { type: ["string", "null"] }
+
+    # ── Calibration review ───────────────────────────────────────────────────
+    CalibrationSessionFeedback:
+      type: object
+      description: Answered on the finish screen of every calibration session.
+      required: [equipment, formConfidence, pain, overallFeel]
+      properties:
+        equipment:      { type: string, enum: ["yes", some_missing, "no"], description: "Did you find and use the machines/equipment?" }
+        formConfidence: { type: integer, minimum: 1, maximum: 5, description: "How confident are you in your form today?" }
+        pain:           { type: string, enum: [none, discomfort, pain] }
+        painWhere:      { type: ["string", "null"], maxLength: 200, description: "Where it hurt - only meaningful when pain isn't none." }
+        overallFeel:    { type: integer, minimum: 1, maximum: 5, description: "How did the session feel overall?" }
+
+    CalibrationReviewInput:
+      type: object
+      description: >
+        The review form. The per-session feedback is already known, so the form
+        shows its summary (GET /calibration/status) and asks what has changed.
+        When illOrInjured is true the rest may be left out - calibration pauses
+        and nothing else is evaluated. Otherwise both nutrition answers are required.
+      required: [illOrInjured]
+      properties:
+        illOrInjured:          { type: boolean, description: "Are you ill, or injured to the point where you can't train?" }
+        nutritionSustainable:  { type: ["integer", "null"], minimum: 1, maximum: 5, description: "How sustainable does the nutrition plan feel long term?" }
+        nutritionFitsSchedule: { type: ["string", "null"], enum: ["yes", mostly, "no", null], description: "Does it fit your schedule?" }
+        anythingChanged:       { type: ["string", "null"], maxLength: 2000, description: "Has anything changed since your sessions? (shown under the session summary)" }
+        notes:                 { type: ["string", "null"], maxLength: 2000, description: "Anything else your coach should know?" }
+
+    CalibrationCheckRotation:
+      type: object
+      required: [met, logged, planned, missingDays]
+      properties:
+        met:         { type: boolean }
+        logged:      { type: integer }
+        planned:     { type: integer }
+        missingDays: { type: array, items: { type: string }, description: "Labels of program days not logged in the window." }
+
+    CalibrationCheckCount:
+      type: object
+      required: [met, count, required]
+      properties:
+        met:      { type: boolean }
+        count:    { type: integer }
+        required: { type: integer }
+
+    CalibrationChecks:
+      type: object
+      description: The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.
+      required: [allMet, windowStart, windowEnd, fullRotation, weighIns, nutritionLogs]
+      properties:
+        allMet:        { type: boolean }
+        windowStart:   { type: string }
+        windowEnd:     { type: string }
+        fullRotation:  { $ref: "#/components/schemas/CalibrationCheckRotation" }
+        weighIns:      { $ref: "#/components/schemas/CalibrationCheckCount" }
+        nutritionLogs: { $ref: "#/components/schemas/CalibrationCheckCount" }
+
+    CalibrationExerciseNote:
+      type: object
+      required: [exercise, note]
+      properties:
+        exercise: { type: string }
+        note:     { type: string }
+
+    CalibrationSession:
+      type: object
+      required: [workoutLogId, date, dayNumber, dayLabel, note, exerciseNotes, feedback]
+      properties:
+        workoutLogId:  { type: integer }
+        date:          { type: string }
+        dayNumber:     { type: integer }
+        dayLabel:      { type: ["string", "null"] }
+        note:          { type: ["string", "null"] }
+        exerciseNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalibrationExerciseNote"
+        feedback:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationSessionFeedback"
+            - type: "null"
+
+    CalibrationPainReport:
+      type: object
+      required: [date, dayLabel, pain, where]
+      properties:
+        date:     { type: string }
+        dayLabel: { type: ["string", "null"] }
+        pain:     { type: string, enum: [discomfort, pain] }
+        where:    { type: ["string", "null"] }
+
+    CalibrationEquipmentCounts:
+      type: object
+      required: ["yes", some_missing, "no"]
+      properties:
+        "yes":        { type: integer }
+        some_missing: { type: integer }
+        "no":         { type: integer }
+
+    CalibrationFeedbackSummary:
+      type: object
+      description: The per-session answers rolled up - what the review form shows before asking "anything changed?".
+      required: [sessionsLogged, sessionsWithFeedback, averageFormConfidence, averageOverallFeel, equipment, painReports]
+      properties:
+        sessionsLogged:        { type: integer }
+        sessionsWithFeedback:  { type: integer }
+        averageFormConfidence: { type: ["number", "null"] }
+        averageOverallFeel:    { type: ["number", "null"] }
+        equipment:             { $ref: "#/components/schemas/CalibrationEquipmentCounts" }
+        painReports:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalibrationPainReport"
+
+    CalibrationExerciseSwap:
+      type: object
+      required: [dayNumber, dayLabel, replaced, replacement, why]
+      properties:
+        dayNumber:   { type: integer }
+        dayLabel:    { type: ["string", "null"] }
+        replaced:    { type: string }
+        replacement: { $ref: "#/components/schemas/Exercise" }
+        why:         { type: string }
+
+    CalibrationReview:
+      type: object
+      required: [id, programId, kind, calibrationDay, illOrInjured, nutritionSustainable, nutritionFitsSchedule, anythingChanged, notes, checks, verdict, reasons, workOn, exerciseSwaps, messageToUser, nextProgramId, resumedAt, submittedAt]
+      properties:
+        id:                    { type: integer }
+        programId:             { type: integer }
+        kind:                  { type: string, enum: [review, auto_exit] }
+        calibrationDay:        { type: integer }
+        illOrInjured:          { type: ["boolean", "null"] }
+        nutritionSustainable:  { type: ["integer", "null"] }
+        nutritionFitsSchedule: { type: ["string", "null"] }
+        anythingChanged:       { type: ["string", "null"] }
+        notes:                 { type: ["string", "null"] }
+        checks:                { $ref: "#/components/schemas/CalibrationChecks" }
+        verdict:               { type: string, enum: [pass, pass_with_notes, extend, paused] }
+        reasons:               { type: array, items: { type: string } }
+        workOn:                { type: array, items: { type: string }, description: "What to keep working on - in the next phase after a pass, or before retaking after extend." }
+        exerciseSwaps:
+          type: array
+          description: Swaps applied to the next phase's program (empty unless calibration ended).
+          items:
+            $ref: "#/components/schemas/CalibrationExerciseSwap"
+        messageToUser:         { type: string }
+        nextProgramId:         { type: ["integer", "null"] }
+        resumedAt:             { type: ["string", "null"], description: "Set on a paused review once the client said they've recovered." }
+        submittedAt:           { type: string }
+
+    CalibrationReviewResult:
+      type: object
+      required: [review, updatedProgram]
+      properties:
+        review:
+          $ref: "#/components/schemas/CalibrationReview"
+        updatedProgram:
+          description: The next phase's program when calibration ended, otherwise null.
+          oneOf:
+            - $ref: "#/components/schemas/Program"
+            - type: "null"
+
+    CalibrationJob:
+      type: object
+      required: [jobId, status, result, error, createdAt, completedAt]
+      properties:
+        jobId:       { type: string }
+        status:      { $ref: "#/components/schemas/AiJobStatus" }
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationReviewResult"
+            - type: "null"
+        error:       { type: ["string", "null"], description: "User-facing message; set only when status is failed." }
+        createdAt:   { type: string }
+        completedAt: { type: ["string", "null"] }
+
+    CalibrationStatus:
+      type: object
+      required: [inCalibration, calibrationDay, startDate, reviewOpensOn, lastReviewDate, autoExitOn, reviewOpen, reviewBlockedReason, nextReviewAvailableOn, paused, autoExitDue, checks, sessions, feedbackSummary, latestReview]
+      properties:
+        inCalibration:  { type: boolean }
+        calibrationDay: { type: ["integer", "null"], description: "Day 1 = start date. 0 or less before the start date." }
+        startDate:      { type: ["string", "null"] }
+        reviewOpensOn:  { type: ["string", "null"], description: "Day 8." }
+        lastReviewDate: { type: ["string", "null"], description: "Day 21, or later after a pause (7 days after recovering at the earliest)." }
+        autoExitOn:     { type: ["string", "null"], description: "The day after lastReviewDate." }
+        reviewOpen:     { type: boolean }
+        reviewBlockedReason:
+          type: ["string", "null"]
+          enum: [not_in_calibration, not_ai_mode, too_early, paused, retake_tomorrow, ended, null]
+        nextReviewAvailableOn: { type: ["string", "null"], description: "When the review opens again (too_early, or retake_tomorrow after an extend)." }
+        paused:         { type: boolean }
+        autoExitDue:    { type: boolean, description: "Past the last review day and not paused - the client should call POST /calibration/exit(/jobs)." }
+        checks:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationChecks"
+            - type: "null"
+        sessions:
+          type: array
+          description: Calibration sessions logged since day 1, oldest first.
+          items:
+            $ref: "#/components/schemas/CalibrationSession"
+        feedbackSummary:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationFeedbackSummary"
+            - type: "null"
+        latestReview:
+          oneOf:
+            - $ref: "#/components/schemas/CalibrationReview"
+            - type: "null"
 
     # ── Progress ──────────────────────────────────────────────────────────────
     VolumePoint:

@@ -95,6 +95,11 @@ router.post("/workouts", requireAuth, async (req, res) => {
       return;
     }
   }
+  // The post-session questions are calibration evidence and nothing else.
+  if (parsed.data.calibrationFeedback && parsed.data.loggingMode !== "calibration") {
+    res.status(400).json({ error: "Calibration feedback can only be sent with a calibration session" });
+    return;
+  }
   const durationSeconds = resolveDurationSeconds(parsed.data.startedAt ?? null, parsed.data.durationSeconds ?? null);
   const [log] = await db
     .insert(workoutLogsTable)

@@ -13,6 +13,10 @@ export const workoutLogsTable = pgTable("workout_logs", {
   // "calibration": a calibration-phase session, where sets are ticked off with
   // no weight or reps. The server only accepts it during a calibration week.
   loggingMode: text("logging_mode").notNull().default("full"),
+  // The short questionnaire after a calibration session (equipment found, form
+  // confidence, pain, overall feel) - evidence for the calibration review.
+  // Only accepted on calibration logs; null everywhere else.
+  calibrationFeedback: jsonb("calibration_feedback"),
   exercisesLogged: jsonb("exercises_logged").notNull().default([]),
   // Wall-clock session timing: the clock runs from the moment the log page
   // opens to the moment Finish is tapped. Both nullable - sessions logged

@@ -1,4 +1,4 @@
-import type { checkinsTable, programsTable } from "@workspace/db";
+import type { calibrationReviewsTable, checkinsTable, programsTable } from "@workspace/db";
 import { PHASE_TEMPLATES, type LongTermPhase } from "./phaseTemplate";
 import { trainingWeekNumber } from "./trainingWeek";
 
@@ -35,5 +35,18 @@ export function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
   return {
     ...c,
     submittedAt: c.submittedAt.toISOString(),
+  };
+}
+
+export function serializeCalibrationReview(r: typeof calibrationReviewsTable.$inferSelect) {
+  const { userId: _userId, ...rest } = r;
+  return {
+    ...rest,
+    checks: r.checks as object,
+    reasons: r.reasons as string[],
+    workOn: r.workOn as string[],
+    exerciseSwaps: r.exerciseSwaps as object[],
+    resumedAt: r.resumedAt?.toISOString() ?? null,
+    submittedAt: r.submittedAt.toISOString(),
   };
 }

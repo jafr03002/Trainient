@@ -151,3 +151,47 @@ export const checkinAdjustmentOutputSchema = {
   required: ["message", "updated_program"],
   additionalProperties: false,
 };
+
+// The calibration review's judgement (see lib/calibrationReview.ts and
+// knowledge/ti-calibration-review.md). No program and no targets: the review
+// never touches calories or phase timing, it only decides readiness and swaps
+// exercises that don't work for the client. The server overrides the verdict
+// when a hard check failed, and on the automatic exit.
+export const calibrationReviewOutputSchema = {
+  type: "object",
+  properties: {
+    verdict: { type: "string", enum: ["pass", "pass_with_notes", "extend"] },
+    reasons: {
+      type: "array",
+      items: { type: "string" },
+      description: "1-4 short reasons for the verdict, citing what the client wrote or rated.",
+    },
+    work_on: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "What to keep working on - in the next phase after a pass, or before retaking the review after extend. Can be empty.",
+    },
+    exercise_swaps: {
+      type: "array",
+      description: "Exercises to replace in the next phase's program. Empty on extend.",
+      items: {
+        type: "object",
+        properties: {
+          day_number: { type: "integer" },
+          replace: { type: "string", description: "The exact exercise name as it appears on that day." },
+          with: exerciseSchema,
+          why: { type: "string" },
+        },
+        required: ["day_number", "replace", "with", "why"],
+        additionalProperties: false,
+      },
+    },
+    message_to_user: {
+      type: "string",
+      description: "A few sentences in coach voice, specific to what you observed.",
+    },
+  },
+  required: ["verdict", "reasons", "work_on", "exercise_swaps", "message_to_user"],
+  additionalProperties: false,
+};

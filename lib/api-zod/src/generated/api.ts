@@ -809,6 +809,12 @@ export const ListWorkoutsQueryParams = zod.object({
   "offset": zod.coerce.number().default(listWorkoutsQueryOffsetDefault)
 })
 
+export const listWorkoutsResponseCalibrationFeedbackOneFormConfidenceMax = 5;
+
+export const listWorkoutsResponseCalibrationFeedbackOnePainWhereMax = 200;
+
+export const listWorkoutsResponseCalibrationFeedbackOneOverallFeelMax = 5;
+
 export const listWorkoutsResponseExercisesLoggedItemNameMax = 80;
 
 export const listWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
@@ -847,6 +853,13 @@ export const ListWorkoutsResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
+  "calibrationFeedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(listWorkoutsResponseCalibrationFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(listWorkoutsResponseCalibrationFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(listWorkoutsResponseCalibrationFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()]).optional(),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(listWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
@@ -910,6 +923,12 @@ export const createWorkoutBodyExercisesLoggedItemTargetSecondsMax = 86400;
 export const createWorkoutBodyNotesMax = 2000;
 
 export const createWorkoutBodyLoggingModeDefault = `full`;
+export const createWorkoutBodyCalibrationFeedbackOneFormConfidenceMax = 5;
+
+export const createWorkoutBodyCalibrationFeedbackOnePainWhereMax = 200;
+
+export const createWorkoutBodyCalibrationFeedbackOneOverallFeelMax = 5;
+
 export const createWorkoutBodyDurationSecondsMin = 0;
 export const createWorkoutBodyDurationSecondsMax = 86400;
 
@@ -941,6 +960,13 @@ export const CreateWorkoutBody = zod.object({
 })),
   "notes": zod.string().max(createWorkoutBodyNotesMax).nullish(),
   "loggingMode": zod.enum(['full', 'calibration']).default(createWorkoutBodyLoggingModeDefault),
+  "calibrationFeedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(createWorkoutBodyCalibrationFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(createWorkoutBodyCalibrationFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(createWorkoutBodyCalibrationFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()]).optional(),
   "startedAt": zod.coerce.date().nullish(),
   "durationSeconds": zod.number().min(createWorkoutBodyDurationSecondsMin).max(createWorkoutBodyDurationSecondsMax).nullish()
 })
@@ -949,6 +975,12 @@ export const CreateWorkoutBody = zod.object({
 /**
  * @summary Get the 3 most recent workout logs (dashboard use)
  */
+export const getRecentWorkoutsResponseCalibrationFeedbackOneFormConfidenceMax = 5;
+
+export const getRecentWorkoutsResponseCalibrationFeedbackOnePainWhereMax = 200;
+
+export const getRecentWorkoutsResponseCalibrationFeedbackOneOverallFeelMax = 5;
+
 export const getRecentWorkoutsResponseExercisesLoggedItemNameMax = 80;
 
 export const getRecentWorkoutsResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
@@ -987,6 +1019,13 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
+  "calibrationFeedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(getRecentWorkoutsResponseCalibrationFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(getRecentWorkoutsResponseCalibrationFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(getRecentWorkoutsResponseCalibrationFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()]).optional(),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(getRecentWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
@@ -1045,6 +1084,12 @@ export const GetWorkoutsByDayLabelQueryParams = zod.object({
   "label": zod.coerce.string()
 })
 
+export const getWorkoutsByDayLabelResponseCalibrationFeedbackOneFormConfidenceMax = 5;
+
+export const getWorkoutsByDayLabelResponseCalibrationFeedbackOnePainWhereMax = 200;
+
+export const getWorkoutsByDayLabelResponseCalibrationFeedbackOneOverallFeelMax = 5;
+
 export const getWorkoutsByDayLabelResponseExercisesLoggedItemNameMax = 80;
 
 export const getWorkoutsByDayLabelResponseExercisesLoggedItemSetsItemSetNumberMax = 50;
@@ -1083,6 +1128,13 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
   "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
+  "calibrationFeedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(getWorkoutsByDayLabelResponseCalibrationFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(getWorkoutsByDayLabelResponseCalibrationFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(getWorkoutsByDayLabelResponseCalibrationFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()]).optional(),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(getWorkoutsByDayLabelResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
@@ -1372,6 +1424,540 @@ export const GetCheckinJobResponse = zod.object({
   "error": zod.string().nullable().describe('User-facing message; set only when status is failed.'),
   "createdAt": zod.string(),
   "completedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary Where the client is in calibration, the hard checks, and their session feedback so far
+ */
+export const getCalibrationStatusResponseSessionsItemFeedbackOneFormConfidenceMax = 5;
+
+export const getCalibrationStatusResponseSessionsItemFeedbackOnePainWhereMax = 200;
+
+export const getCalibrationStatusResponseSessionsItemFeedbackOneOverallFeelMax = 5;
+
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementNameMax = 80;
+
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementSetsMax = 50;
+
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementRepsMax = 50;
+
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementKindDefault = `lift`;
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMin = 0;
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMax = 86400;
+
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMin = 0;
+export const getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMax = 100000;
+
+
+
+export const GetCalibrationStatusResponse = zod.object({
+  "inCalibration": zod.boolean(),
+  "calibrationDay": zod.number().nullable().describe('Day 1 = start date. 0 or less before the start date.'),
+  "startDate": zod.string().nullable(),
+  "reviewOpensOn": zod.string().nullable().describe('Day 8.'),
+  "lastReviewDate": zod.string().nullable().describe('Day 21, or later after a pause (7 days after recovering at the earliest).'),
+  "autoExitOn": zod.string().nullable().describe('The day after lastReviewDate.'),
+  "reviewOpen": zod.boolean(),
+  "reviewBlockedReason": zod.union([zod.literal('not_in_calibration'),zod.literal('not_ai_mode'),zod.literal('too_early'),zod.literal('paused'),zod.literal('retake_tomorrow'),zod.literal('ended'),zod.literal(null)]).nullable(),
+  "nextReviewAvailableOn": zod.string().nullable().describe('When the review opens again (too_early, or retake_tomorrow after an extend).'),
+  "paused": zod.boolean(),
+  "autoExitDue": zod.boolean().describe('Past the last review day and not paused - the client should call POST \/calibration\/exit(\/jobs).'),
+  "checks": zod.union([zod.object({
+  "allMet": zod.boolean(),
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "fullRotation": zod.object({
+  "met": zod.boolean(),
+  "logged": zod.number(),
+  "planned": zod.number(),
+  "missingDays": zod.array(zod.string()).describe('Labels of program days not logged in the window.')
+}),
+  "weighIns": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+}),
+  "nutritionLogs": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+})
+}).describe('The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.'),zod.null()]),
+  "sessions": zod.array(zod.object({
+  "workoutLogId": zod.number(),
+  "date": zod.string(),
+  "dayNumber": zod.number(),
+  "dayLabel": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "exerciseNotes": zod.array(zod.object({
+  "exercise": zod.string(),
+  "note": zod.string()
+})),
+  "feedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(getCalibrationStatusResponseSessionsItemFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(getCalibrationStatusResponseSessionsItemFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(getCalibrationStatusResponseSessionsItemFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()])
+})).describe('Calibration sessions logged since day 1, oldest first.'),
+  "feedbackSummary": zod.union([zod.object({
+  "sessionsLogged": zod.number(),
+  "sessionsWithFeedback": zod.number(),
+  "averageFormConfidence": zod.number().nullable(),
+  "averageOverallFeel": zod.number().nullable(),
+  "equipment": zod.object({
+  "yes": zod.number(),
+  "some_missing": zod.number(),
+  "no": zod.number()
+}),
+  "painReports": zod.array(zod.object({
+  "date": zod.string(),
+  "dayLabel": zod.string().nullable(),
+  "pain": zod.enum(['discomfort', 'pain']),
+  "where": zod.string().nullable()
+}))
+}).describe('The per-session answers rolled up - what the review form shows before asking \"anything changed?\".'),zod.null()]),
+  "latestReview": zod.union([zod.object({
+  "id": zod.number(),
+  "programId": zod.number(),
+  "kind": zod.enum(['review', 'auto_exit']),
+  "calibrationDay": zod.number(),
+  "illOrInjured": zod.boolean().nullable(),
+  "nutritionSustainable": zod.number().nullable(),
+  "nutritionFitsSchedule": zod.string().nullable(),
+  "anythingChanged": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "checks": zod.object({
+  "allMet": zod.boolean(),
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "fullRotation": zod.object({
+  "met": zod.boolean(),
+  "logged": zod.number(),
+  "planned": zod.number(),
+  "missingDays": zod.array(zod.string()).describe('Labels of program days not logged in the window.')
+}),
+  "weighIns": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+}),
+  "nutritionLogs": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+})
+}).describe('The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.'),
+  "verdict": zod.enum(['pass', 'pass_with_notes', 'extend', 'paused']),
+  "reasons": zod.array(zod.string()),
+  "workOn": zod.array(zod.string()).describe('What to keep working on - in the next phase after a pass, or before retaking after extend.'),
+  "exerciseSwaps": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "dayLabel": zod.string().nullable(),
+  "replaced": zod.string(),
+  "replacement": zod.object({
+  "name": zod.string().max(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementNameMax),
+  "sets": zod.number().min(1).max(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementSetsMax),
+  "reps": zod.string().max(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMin).max(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMin).max(getCalibrationStatusResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}),
+  "why": zod.string()
+})).describe('Swaps applied to the next phase\'s program (empty unless calibration ended).'),
+  "messageToUser": zod.string(),
+  "nextProgramId": zod.number().nullable(),
+  "resumedAt": zod.string().nullable().describe('Set on a paused review once the client said they\'ve recovered.'),
+  "submittedAt": zod.string()
+}),zod.null()])
+})
+
+
+/**
+ * illOrInjured=true pauses calibration with no AI call. Otherwise the AI judges readiness. A failed hard check (rotation, weigh-ins, nutrition logs) still records the answers, but the verdict is always extend. On pass the next phase's program is written, with exercise swaps applied. 400 when the review isn't open (before day 8, after the last review day, paused, already extended today, or not in calibration).
+
+ * @summary Submit the calibration review and get the verdict (blocking)
+ */
+export const submitCalibrationReviewBodyNutritionSustainableMax = 5;
+
+export const submitCalibrationReviewBodyAnythingChangedMax = 2000;
+
+export const submitCalibrationReviewBodyNotesMax = 2000;
+
+
+
+export const SubmitCalibrationReviewBody = zod.object({
+  "illOrInjured": zod.boolean().describe('Are you ill, or injured to the point where you can\'t train?'),
+  "nutritionSustainable": zod.number().min(1).max(submitCalibrationReviewBodyNutritionSustainableMax).nullish().describe('How sustainable does the nutrition plan feel long term?'),
+  "nutritionFitsSchedule": zod.union([zod.literal('yes'),zod.literal('mostly'),zod.literal('no'),zod.literal(null)]).nullish().describe('Does it fit your schedule?'),
+  "anythingChanged": zod.string().max(submitCalibrationReviewBodyAnythingChangedMax).nullish().describe('Has anything changed since your sessions? (shown under the session summary)'),
+  "notes": zod.string().max(submitCalibrationReviewBodyNotesMax).nullish().describe('Anything else your coach should know?')
+}).describe('The review form. The per-session feedback is already known, so the form shows its summary (GET \/calibration\/status) and asks what has changed. When illOrInjured is true the rest may be left out - calibration pauses and nothing else is evaluated. Otherwise both nutrition answers are required.\n')
+
+
+/**
+ * Same input and the same 400s as POST /calibration/reviews, answered immediately. Otherwise 202 with a job id to poll at GET /calibration/jobs/{jobId}.
+ * @summary Submit the calibration review and run the AI judgement as a background job
+ */
+export const startCalibrationReviewJobBodyNutritionSustainableMax = 5;
+
+export const startCalibrationReviewJobBodyAnythingChangedMax = 2000;
+
+export const startCalibrationReviewJobBodyNotesMax = 2000;
+
+
+
+export const StartCalibrationReviewJobBody = zod.object({
+  "illOrInjured": zod.boolean().describe('Are you ill, or injured to the point where you can\'t train?'),
+  "nutritionSustainable": zod.number().min(1).max(startCalibrationReviewJobBodyNutritionSustainableMax).nullish().describe('How sustainable does the nutrition plan feel long term?'),
+  "nutritionFitsSchedule": zod.union([zod.literal('yes'),zod.literal('mostly'),zod.literal('no'),zod.literal(null)]).nullish().describe('Does it fit your schedule?'),
+  "anythingChanged": zod.string().max(startCalibrationReviewJobBodyAnythingChangedMax).nullish().describe('Has anything changed since your sessions? (shown under the session summary)'),
+  "notes": zod.string().max(startCalibrationReviewJobBodyNotesMax).nullish().describe('Anything else your coach should know?')
+}).describe('The review form. The per-session feedback is already known, so the form shows its summary (GET \/calibration\/status) and asks what has changed. When illOrInjured is true the rest may be left out - calibration pauses and nothing else is evaluated. Otherwise both nutrition answers are required.\n')
+
+
+/**
+ * @summary Poll a calibration review or exit job
+ */
+export const GetCalibrationJobParams = zod.object({
+  "jobId": zod.coerce.string()
+})
+
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementNameMax = 80;
+
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementSetsMax = 50;
+
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementRepsMax = 50;
+
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementKindDefault = `lift`;
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetSecondsMin = 0;
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetSecondsMax = 86400;
+
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetValueMin = 0;
+export const getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetValueMax = 100000;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemLabelMax = 60;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemFocusMax = 60;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemEstimatedDurationMinutesMax = 300;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemNameMax = 80;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemSetsMax = 50;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemRepsMax = 50;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemKindDefault = `lift`;
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetSecondsMin = 0;
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetSecondsMax = 86400;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetValueMin = 0;
+export const getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetValueMax = 100000;
+
+export const getCalibrationJobResponseResultOneUpdatedProgramOneScheduleOneSlotsMin = 2;
+export const getCalibrationJobResponseResultOneUpdatedProgramOneScheduleOneSlotsMax = 14;
+
+
+
+export const GetCalibrationJobResponse = zod.object({
+  "jobId": zod.string(),
+  "status": zod.enum(['pending', 'running', 'succeeded', 'failed']),
+  "result": zod.union([zod.object({
+  "review": zod.object({
+  "id": zod.number(),
+  "programId": zod.number(),
+  "kind": zod.enum(['review', 'auto_exit']),
+  "calibrationDay": zod.number(),
+  "illOrInjured": zod.boolean().nullable(),
+  "nutritionSustainable": zod.number().nullable(),
+  "nutritionFitsSchedule": zod.string().nullable(),
+  "anythingChanged": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "checks": zod.object({
+  "allMet": zod.boolean(),
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "fullRotation": zod.object({
+  "met": zod.boolean(),
+  "logged": zod.number(),
+  "planned": zod.number(),
+  "missingDays": zod.array(zod.string()).describe('Labels of program days not logged in the window.')
+}),
+  "weighIns": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+}),
+  "nutritionLogs": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+})
+}).describe('The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.'),
+  "verdict": zod.enum(['pass', 'pass_with_notes', 'extend', 'paused']),
+  "reasons": zod.array(zod.string()),
+  "workOn": zod.array(zod.string()).describe('What to keep working on - in the next phase after a pass, or before retaking after extend.'),
+  "exerciseSwaps": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "dayLabel": zod.string().nullable(),
+  "replaced": zod.string(),
+  "replacement": zod.object({
+  "name": zod.string().max(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementNameMax),
+  "sets": zod.number().min(1).max(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementSetsMax),
+  "reps": zod.string().max(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetSecondsMin).max(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetValueMin).max(getCalibrationJobResponseResultOneReviewExerciseSwapsItemReplacementTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}),
+  "why": zod.string()
+})).describe('Swaps applied to the next phase\'s program (empty unless calibration ended).'),
+  "messageToUser": zod.string(),
+  "nextProgramId": zod.number().nullable(),
+  "resumedAt": zod.string().nullable().describe('Set on a paused review once the client said they\'ve recovered.'),
+  "submittedAt": zod.string()
+}),
+  "updatedProgram": zod.union([zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "weekNumber": zod.number(),
+  "programName": zod.string(),
+  "splitType": zod.string(),
+  "programHighlights": zod.array(zod.object({
+  "title": zod.string(),
+  "detail": zod.string()
+})),
+  "aiGenerated": zod.boolean(),
+  "days": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "label": zod.string().max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemLabelMax),
+  "focus": zod.string().max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemFocusMax),
+  "estimatedDurationMinutes": zod.number().min(1).max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemEstimatedDurationMinutesMax).nullish().describe('The AI\'s predicted wall-clock length for this session, including warm-up and prescribed rest. Null for days the AI never generated (Independent mode), which fall back to an arithmetic estimate client-side.'),
+  "exercises": zod.array(zod.object({
+  "name": zod.string().max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemNameMax),
+  "sets": zod.number().min(1).max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemSetsMax),
+  "reps": zod.string().max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetSecondsMin).max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetValueMin).max(getCalibrationJobResponseResultOneUpdatedProgramOneDaysItemExercisesItemTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}))
+})),
+  "generatedAt": zod.string(),
+  "longTermPhase": zod.union([zod.literal('gain_weight'),zod.literal('lose_weight'),zod.literal('maintain'),zod.literal(null)]).nullish(),
+  "shortTermPhase": zod.union([zod.literal('calibration'),zod.literal('calibration_review'),zod.literal('bulk'),zod.literal('maintenance'),zod.literal('reverse_diet'),zod.literal('diet'),zod.literal('mini_cut'),zod.literal('deload'),zod.literal(null)]).nullish(),
+  "energyBalance": zod.union([zod.literal('surplus'),zod.literal('maintenance'),zod.literal('deficit'),zod.literal('high_deficit'),zod.literal(null)]).nullish(),
+  "trainingWorkload": zod.object({
+  "daysTrained": zod.number().optional(),
+  "totalVolumeSets": zod.number().optional()
+}).nullish(),
+  "longTermGoalWeight": zod.number().nullish(),
+  "shortTermGoalWeight": zod.number().nullish(),
+  "dailyStepTarget": zod.number().nullish(),
+  "dailyCalorieTarget": zod.number().nullish(),
+  "weekInPhase": zod.number().nullish(),
+  "phaseTotalWeeks": zod.number().nullish(),
+  "cardioIntensity": zod.object({
+  "bpmMin": zod.number().optional(),
+  "bpmMax": zod.number().optional(),
+  "level": zod.enum(['low', 'moderate', 'high']).optional()
+}).nullish(),
+  "startDate": zod.string().nullish(),
+  "schedule": zod.union([zod.object({
+  "mode": zod.enum(['fixed', 'rotating']),
+  "slots": zod.array(zod.number().nullable()).min(getCalibrationJobResponseResultOneUpdatedProgramOneScheduleOneSlotsMin).max(getCalibrationJobResponseResultOneUpdatedProgramOneScheduleOneSlotsMax)
+}),zod.null()]).optional()
+}),zod.null()]).describe('The next phase\'s program when calibration ended, otherwise null.')
+}),zod.null()]),
+  "error": zod.string().nullable().describe('User-facing message; set only when status is failed.'),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullable()
+})
+
+
+/**
+ * Opens a fresh window. The review can be taken straight away, and the automatic exit moves to 7 days after today at the earliest.
+ * @summary End a pause - the client has recovered from illness or injury
+ */
+export const resumeCalibrationResponseSessionsItemFeedbackOneFormConfidenceMax = 5;
+
+export const resumeCalibrationResponseSessionsItemFeedbackOnePainWhereMax = 200;
+
+export const resumeCalibrationResponseSessionsItemFeedbackOneOverallFeelMax = 5;
+
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementNameMax = 80;
+
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementSetsMax = 50;
+
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementRepsMax = 50;
+
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementKindDefault = `lift`;
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMin = 0;
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMax = 86400;
+
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMin = 0;
+export const resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMax = 100000;
+
+
+
+export const ResumeCalibrationResponse = zod.object({
+  "inCalibration": zod.boolean(),
+  "calibrationDay": zod.number().nullable().describe('Day 1 = start date. 0 or less before the start date.'),
+  "startDate": zod.string().nullable(),
+  "reviewOpensOn": zod.string().nullable().describe('Day 8.'),
+  "lastReviewDate": zod.string().nullable().describe('Day 21, or later after a pause (7 days after recovering at the earliest).'),
+  "autoExitOn": zod.string().nullable().describe('The day after lastReviewDate.'),
+  "reviewOpen": zod.boolean(),
+  "reviewBlockedReason": zod.union([zod.literal('not_in_calibration'),zod.literal('not_ai_mode'),zod.literal('too_early'),zod.literal('paused'),zod.literal('retake_tomorrow'),zod.literal('ended'),zod.literal(null)]).nullable(),
+  "nextReviewAvailableOn": zod.string().nullable().describe('When the review opens again (too_early, or retake_tomorrow after an extend).'),
+  "paused": zod.boolean(),
+  "autoExitDue": zod.boolean().describe('Past the last review day and not paused - the client should call POST \/calibration\/exit(\/jobs).'),
+  "checks": zod.union([zod.object({
+  "allMet": zod.boolean(),
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "fullRotation": zod.object({
+  "met": zod.boolean(),
+  "logged": zod.number(),
+  "planned": zod.number(),
+  "missingDays": zod.array(zod.string()).describe('Labels of program days not logged in the window.')
+}),
+  "weighIns": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+}),
+  "nutritionLogs": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+})
+}).describe('The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.'),zod.null()]),
+  "sessions": zod.array(zod.object({
+  "workoutLogId": zod.number(),
+  "date": zod.string(),
+  "dayNumber": zod.number(),
+  "dayLabel": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "exerciseNotes": zod.array(zod.object({
+  "exercise": zod.string(),
+  "note": zod.string()
+})),
+  "feedback": zod.union([zod.object({
+  "equipment": zod.enum(['yes', 'some_missing', 'no']).describe('Did you find and use the machines\/equipment?'),
+  "formConfidence": zod.number().min(1).max(resumeCalibrationResponseSessionsItemFeedbackOneFormConfidenceMax).describe('How confident are you in your form today?'),
+  "pain": zod.enum(['none', 'discomfort', 'pain']),
+  "painWhere": zod.string().max(resumeCalibrationResponseSessionsItemFeedbackOnePainWhereMax).nullish().describe('Where it hurt - only meaningful when pain isn\'t none.'),
+  "overallFeel": zod.number().min(1).max(resumeCalibrationResponseSessionsItemFeedbackOneOverallFeelMax).describe('How did the session feel overall?')
+}).describe('Answered on the finish screen of every calibration session.'),zod.null()])
+})).describe('Calibration sessions logged since day 1, oldest first.'),
+  "feedbackSummary": zod.union([zod.object({
+  "sessionsLogged": zod.number(),
+  "sessionsWithFeedback": zod.number(),
+  "averageFormConfidence": zod.number().nullable(),
+  "averageOverallFeel": zod.number().nullable(),
+  "equipment": zod.object({
+  "yes": zod.number(),
+  "some_missing": zod.number(),
+  "no": zod.number()
+}),
+  "painReports": zod.array(zod.object({
+  "date": zod.string(),
+  "dayLabel": zod.string().nullable(),
+  "pain": zod.enum(['discomfort', 'pain']),
+  "where": zod.string().nullable()
+}))
+}).describe('The per-session answers rolled up - what the review form shows before asking \"anything changed?\".'),zod.null()]),
+  "latestReview": zod.union([zod.object({
+  "id": zod.number(),
+  "programId": zod.number(),
+  "kind": zod.enum(['review', 'auto_exit']),
+  "calibrationDay": zod.number(),
+  "illOrInjured": zod.boolean().nullable(),
+  "nutritionSustainable": zod.number().nullable(),
+  "nutritionFitsSchedule": zod.string().nullable(),
+  "anythingChanged": zod.string().nullable(),
+  "notes": zod.string().nullable(),
+  "checks": zod.object({
+  "allMet": zod.boolean(),
+  "windowStart": zod.string(),
+  "windowEnd": zod.string(),
+  "fullRotation": zod.object({
+  "met": zod.boolean(),
+  "logged": zod.number(),
+  "planned": zod.number(),
+  "missingDays": zod.array(zod.string()).describe('Labels of program days not logged in the window.')
+}),
+  "weighIns": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+}),
+  "nutritionLogs": zod.object({
+  "met": zod.boolean(),
+  "count": zod.number(),
+  "required": zod.number()
+})
+}).describe('The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.'),
+  "verdict": zod.enum(['pass', 'pass_with_notes', 'extend', 'paused']),
+  "reasons": zod.array(zod.string()),
+  "workOn": zod.array(zod.string()).describe('What to keep working on - in the next phase after a pass, or before retaking after extend.'),
+  "exerciseSwaps": zod.array(zod.object({
+  "dayNumber": zod.number(),
+  "dayLabel": zod.string().nullable(),
+  "replaced": zod.string(),
+  "replacement": zod.object({
+  "name": zod.string().max(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementNameMax),
+  "sets": zod.number().min(1).max(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementSetsMax),
+  "reps": zod.string().max(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementRepsMax),
+  "rpe": zod.number().nullish(),
+  "restSeconds": zod.number().nullish(),
+  "cue": zod.string().nullish(),
+  "muscle": zod.string(),
+  "secondaryMuscle": zod.string().nullish(),
+  "isUnilateral": zod.boolean().optional(),
+  "kind": zod.enum(['lift', 'checklist']).default(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementKindDefault),
+  "targetType": zod.union([zod.literal('duration'),zod.literal('count'),zod.literal('distance'),zod.literal('none'),zod.literal(null)]).nullish(),
+  "targetSeconds": zod.number().min(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMin).max(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetSecondsMax).nullish(),
+  "targetValue": zod.number().min(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMin).max(resumeCalibrationResponseLatestReviewOneExerciseSwapsItemReplacementTargetValueMax).nullish(),
+  "targetUnit": zod.union([zod.literal('reps'),zod.literal('m'),zod.literal('km'),zod.literal(null)]).nullish(),
+  "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
+}),
+  "why": zod.string()
+})).describe('Swaps applied to the next phase\'s program (empty unless calibration ended).'),
+  "messageToUser": zod.string(),
+  "nextProgramId": zod.number().nullable(),
+  "resumedAt": zod.string().nullable().describe('Set on a paused review once the client said they\'ve recovered.'),
+  "submittedAt": zod.string()
+}),zod.null()])
 })
 
 

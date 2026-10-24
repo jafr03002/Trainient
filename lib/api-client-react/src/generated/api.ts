@@ -26,6 +26,10 @@ import type {
   BodyweightPoint,
   CalendarColor,
   CalendarColorInput,
+  CalibrationJob,
+  CalibrationReviewInput,
+  CalibrationReviewResult,
+  CalibrationStatus,
   Checkin,
   CheckinInput,
   CheckinJob,
@@ -2031,6 +2035,519 @@ export function useGetCheckinJob<TData = Awaited<ReturnType<typeof getCheckinJob
 
 
 
+
+export const getGetCalibrationStatusUrl = () => {
+
+
+
+
+  return `/api/calibration/status`
+}
+
+/**
+ * @summary Where the client is in calibration, the hard checks, and their session feedback so far
+ */
+export const getCalibrationStatus = async ( options?: RequestInit): Promise<CalibrationStatus> => {
+
+  return customFetch<CalibrationStatus>(getGetCalibrationStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalibrationStatusQueryKey = () => {
+    return [
+    `/api/calibration/status`
+    ] as const;
+    }
+
+
+export const getGetCalibrationStatusQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationStatus>>> = ({ signal }) => getCalibrationStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalibrationStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationStatus>>>
+export type GetCalibrationStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Where the client is in calibration, the hard checks, and their session feedback so far
+ */
+
+export function useGetCalibrationStatus<TData = Awaited<ReturnType<typeof getCalibrationStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalibrationStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitCalibrationReviewUrl = () => {
+
+
+
+
+  return `/api/calibration/reviews`
+}
+
+/**
+ * illOrInjured=true pauses calibration with no AI call. Otherwise the AI judges readiness. A failed hard check (rotation, weigh-ins, nutrition logs) still records the answers, but the verdict is always extend. On pass the next phase's program is written, with exercise swaps applied. 400 when the review isn't open (before day 8, after the last review day, paused, already extended today, or not in calibration).
+
+ * @summary Submit the calibration review and get the verdict (blocking)
+ */
+export const submitCalibrationReview = async (calibrationReviewInput: CalibrationReviewInput, options?: RequestInit): Promise<CalibrationReviewResult> => {
+
+  return customFetch<CalibrationReviewResult>(getSubmitCalibrationReviewUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      calibrationReviewInput,)
+  }
+);}
+
+
+
+
+export const getSubmitCalibrationReviewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitCalibrationReview>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitCalibrationReview>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext> => {
+
+const mutationKey = ['submitCalibrationReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitCalibrationReview>>, {data: BodyType<CalibrationReviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitCalibrationReview(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitCalibrationReviewMutationResult = NonNullable<Awaited<ReturnType<typeof submitCalibrationReview>>>
+    export type SubmitCalibrationReviewMutationBody = BodyType<CalibrationReviewInput>
+    export type SubmitCalibrationReviewMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit the calibration review and get the verdict (blocking)
+ */
+export const useSubmitCalibrationReview = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitCalibrationReview>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitCalibrationReview>>,
+        TError,
+        {data: BodyType<CalibrationReviewInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitCalibrationReviewMutationOptions(options));
+    }
+
+export const getStartCalibrationReviewJobUrl = () => {
+
+
+
+
+  return `/api/calibration/reviews/jobs`
+}
+
+/**
+ * Same input and the same 400s as POST /calibration/reviews, answered immediately. Otherwise 202 with a job id to poll at GET /calibration/jobs/{jobId}.
+ * @summary Submit the calibration review and run the AI judgement as a background job
+ */
+export const startCalibrationReviewJob = async (calibrationReviewInput: CalibrationReviewInput, options?: RequestInit): Promise<AiJobAccepted> => {
+
+  return customFetch<AiJobAccepted>(getStartCalibrationReviewJobUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      calibrationReviewInput,)
+  }
+);}
+
+
+
+
+export const getStartCalibrationReviewJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCalibrationReviewJob>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startCalibrationReviewJob>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext> => {
+
+const mutationKey = ['startCalibrationReviewJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startCalibrationReviewJob>>, {data: BodyType<CalibrationReviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startCalibrationReviewJob(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartCalibrationReviewJobMutationResult = NonNullable<Awaited<ReturnType<typeof startCalibrationReviewJob>>>
+    export type StartCalibrationReviewJobMutationBody = BodyType<CalibrationReviewInput>
+    export type StartCalibrationReviewJobMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit the calibration review and run the AI judgement as a background job
+ */
+export const useStartCalibrationReviewJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCalibrationReviewJob>>, TError,{data: BodyType<CalibrationReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startCalibrationReviewJob>>,
+        TError,
+        {data: BodyType<CalibrationReviewInput>},
+        TContext
+      > => {
+      return useMutation(getStartCalibrationReviewJobMutationOptions(options));
+    }
+
+export const getFinishCalibrationUrl = () => {
+
+
+
+
+  return `/api/calibration/exit`
+}
+
+/**
+ * Only allowed when GET /calibration/status reports autoExitDue (day 22 or later, not paused). The AI writes a summary from the session notes, logs and the last review. The client moves into the next phase with any exercise swaps applied. The verdict is always pass_with_notes.
+
+ * @summary End calibration automatically once the last review day has passed (blocking)
+ */
+export const finishCalibration = async ( options?: RequestInit): Promise<CalibrationReviewResult> => {
+
+  return customFetch<CalibrationReviewResult>(getFinishCalibrationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getFinishCalibrationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof finishCalibration>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof finishCalibration>>, TError,void, TContext> => {
+
+const mutationKey = ['finishCalibration'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof finishCalibration>>, void> = () => {
+
+
+          return  finishCalibration(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FinishCalibrationMutationResult = NonNullable<Awaited<ReturnType<typeof finishCalibration>>>
+
+    export type FinishCalibrationMutationError = ErrorType<void>
+
+    /**
+ * @summary End calibration automatically once the last review day has passed (blocking)
+ */
+export const useFinishCalibration = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof finishCalibration>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof finishCalibration>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getFinishCalibrationMutationOptions(options));
+    }
+
+export const getStartCalibrationExitJobUrl = () => {
+
+
+
+
+  return `/api/calibration/exit/jobs`
+}
+
+/**
+ * Same 400s as POST /calibration/exit. Otherwise 202 with a job id to poll at GET /calibration/jobs/{jobId}.
+ * @summary End calibration automatically, as a background job
+ */
+export const startCalibrationExitJob = async ( options?: RequestInit): Promise<AiJobAccepted> => {
+
+  return customFetch<AiJobAccepted>(getStartCalibrationExitJobUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getStartCalibrationExitJobMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCalibrationExitJob>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startCalibrationExitJob>>, TError,void, TContext> => {
+
+const mutationKey = ['startCalibrationExitJob'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startCalibrationExitJob>>, void> = () => {
+
+
+          return  startCalibrationExitJob(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartCalibrationExitJobMutationResult = NonNullable<Awaited<ReturnType<typeof startCalibrationExitJob>>>
+
+    export type StartCalibrationExitJobMutationError = ErrorType<void>
+
+    /**
+ * @summary End calibration automatically, as a background job
+ */
+export const useStartCalibrationExitJob = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCalibrationExitJob>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startCalibrationExitJob>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartCalibrationExitJobMutationOptions(options));
+    }
+
+export const getGetCalibrationJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/calibration/jobs/${jobId}`
+}
+
+/**
+ * @summary Poll a calibration review or exit job
+ */
+export const getCalibrationJob = async (jobId: string, options?: RequestInit): Promise<CalibrationJob> => {
+
+  return customFetch<CalibrationJob>(getGetCalibrationJobUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalibrationJobQueryKey = (jobId: string,) => {
+    return [
+    `/api/calibration/jobs/${jobId}`
+    ] as const;
+    }
+
+
+export const getGetCalibrationJobQueryOptions = <TData = Awaited<ReturnType<typeof getCalibrationJob>>, TError = ErrorType<void>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalibrationJobQueryKey(jobId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalibrationJob>>> = ({ signal }) => getCalibrationJob(jobId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(jobId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalibrationJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalibrationJobQueryResult = NonNullable<Awaited<ReturnType<typeof getCalibrationJob>>>
+export type GetCalibrationJobQueryError = ErrorType<void>
+
+
+/**
+ * @summary Poll a calibration review or exit job
+ */
+
+export function useGetCalibrationJob<TData = Awaited<ReturnType<typeof getCalibrationJob>>, TError = ErrorType<void>>(
+ jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalibrationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalibrationJobQueryOptions(jobId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getResumeCalibrationUrl = () => {
+
+
+
+
+  return `/api/calibration/recovered`
+}
+
+/**
+ * Opens a fresh window. The review can be taken straight away, and the automatic exit moves to 7 days after today at the earliest.
+ * @summary End a pause - the client has recovered from illness or injury
+ */
+export const resumeCalibration = async ( options?: RequestInit): Promise<CalibrationStatus> => {
+
+  return customFetch<CalibrationStatus>(getResumeCalibrationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResumeCalibrationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeCalibration>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resumeCalibration>>, TError,void, TContext> => {
+
+const mutationKey = ['resumeCalibration'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resumeCalibration>>, void> = () => {
+
+
+          return  resumeCalibration(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResumeCalibrationMutationResult = NonNullable<Awaited<ReturnType<typeof resumeCalibration>>>
+
+    export type ResumeCalibrationMutationError = ErrorType<void>
+
+    /**
+ * @summary End a pause - the client has recovered from illness or injury
+ */
+export const useResumeCalibration = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resumeCalibration>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resumeCalibration>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResumeCalibrationMutationOptions(options));
+    }
 
 export const getGetVolumeProgressUrl = () => {
 

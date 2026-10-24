@@ -35,7 +35,9 @@ import { logger } from "./logger";
 // is a real queue (Vercel Queues, Inngest, QStash). This table is already the
 // state such a queue would need.
 
-export type AiJobKind = "program_generation" | "checkin";
+// A calibration review and the automatic calibration exit share one kind, so
+// the one-active-job index also stops the two from racing each other.
+export type AiJobKind = "program_generation" | "checkin" | "calibration_review";
 
 // What the shared handler modules (programGeneration.ts, checkinSubmission.ts)
 // hand back once the cheap checks are done: either a client error to return
@@ -61,6 +63,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const FAILURE_MESSAGE: Record<AiJobKind, string> = {
   program_generation: "Program generation failed. Please try again.",
   checkin: "Your check-in could not be processed. Please try again.",
+  calibration_review: "Your calibration review could not be processed. Please try again.",
 };
 const TIMEOUT_MESSAGE = "This took too long and was stopped. Please try again.";
 
