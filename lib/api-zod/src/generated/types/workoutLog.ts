@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LoggedExercise } from './loggedExercise';
+import type { WorkoutLogLoggingMode } from './workoutLogLoggingMode';
 import type { WorkoutLogMode } from './workoutLogMode';
 
 export interface WorkoutLog {
@@ -18,6 +19,8 @@ export interface WorkoutLog {
   dayLabel?: string | null;
   /** Training mode the user was in when this session was logged */
   mode: WorkoutLogMode;
+  /** calibration = a calibration-phase session: sets are ticked off with no weight or reps */
+  loggingMode: WorkoutLogLoggingMode;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;

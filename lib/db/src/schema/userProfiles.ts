@@ -31,6 +31,10 @@ export const userProfilesTable = pgTable("user_profiles", {
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
   calibrationWalkthroughSeenAt: timestamp("calibration_walkthrough_seen_at", { withTimezone: true }),
+  // Set the first time the pre-session calibration briefing is read through to
+  // the end. The briefing still shows before every calibration session after
+  // that, but offers a Skip.
+  calibrationBriefingSeenAt: timestamp("calibration_briefing_seen_at", { withTimezone: true }),
   programPageTourSeenAt: timestamp("program_page_tour_seen_at", { withTimezone: true }),
   weightLoggingTourSeenAt: timestamp("weight_logging_tour_seen_at", { withTimezone: true }),
   dashboardTourSeenAt: timestamp("dashboard_tour_seen_at", { withTimezone: true }),

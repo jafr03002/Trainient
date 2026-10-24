@@ -47,6 +47,8 @@ export interface UserProfile {
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
   /** @nullable */
+  calibrationBriefingSeenAt?: string | null;
+  /** @nullable */
   programPageTourSeenAt?: string | null;
   /** @nullable */
   weightLoggingTourSeenAt?: string | null;

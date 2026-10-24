@@ -21,6 +21,7 @@ import ProgramRedirect from "@/pages/program";
 import AiProgram from "@/pages/program/ai";
 import MyProgram from "@/pages/program/my";
 import Log from "@/pages/log";
+import CalibrationBriefing from "@/pages/calibration-briefing";
 import Checkin from "@/pages/checkin";
 import Progress from "@/pages/progress";
 import Nutrition from "@/pages/nutrition";
@@ -336,6 +337,7 @@ function App() {
                             <Route path="/program/ai" component={AiProgram} />
                             <Route path="/program/my" component={MyProgram} />
                             <Route path="/log" component={Log} />
+                            <Route path="/calibration/briefing" component={CalibrationBriefing} />
                             <Route path="/checkin" component={Checkin} />
                             <Route path="/calendar" component={Calendar} />
                             <Route path="/progress" component={Progress} />

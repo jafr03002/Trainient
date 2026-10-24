@@ -4,7 +4,7 @@ import { MessageSquare, ChevronDown, HelpCircle } from "lucide-react";
 import type { LoggedExercise } from "@/lib/workoutSession";
 import { formatPrevSet, formatShortDate, type LastNote } from "@/lib/sessionLogs";
 import { targetFromPreviousSet } from "@/lib/trainingTargets";
-import { SetRow, type SetField } from "@/components/workout/SetRow";
+import { CalibrationSetRow, SetRow, type SetField } from "@/components/workout/SetRow";
 
 // Refs the log page's coachmark tour hangs off. Only the first lift card gets
 // them - see the note on `firstLiftIdx` in log.tsx.
@@ -29,6 +29,9 @@ type ExerciseCardProps = {
   prevSets: any[] | undefined;
   prevNote: LastNote | undefined;
   tourRefs?: ExerciseCardTourRefs;
+  // Calibration week: each set is ticked off instead of logged with numbers.
+  calibration?: boolean;
+  onToggleSet?: (setIdx: number) => void;
   onHelp: () => void;
   onUpdateSet: (setIdx: number, field: SetField, value: number) => void;
   onSetFinished: () => void;
@@ -49,6 +52,8 @@ export function ExerciseCard({
   prevSets,
   prevNote,
   tourRefs,
+  calibration = false,
+  onToggleSet,
   onHelp,
   onUpdateSet,
   onSetFinished,
@@ -69,7 +74,7 @@ export function ExerciseCard({
           <span className="min-w-0 truncate text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
             {ex.muscle}
             {ex.isUnilateral && " · Unilateral"}
-            {showTargets && ` · ${ex.targetSets} × ${ex.targetReps}`}
+            {(showTargets || calibration) && ` · ${ex.targetSets} × ${ex.targetReps}`}
           </span>
           {showHelp && (
             <button
@@ -92,7 +97,17 @@ export function ExerciseCard({
           tour's "weight and reps" step rings this whole block. */}
       <div ref={tourRefs?.setsBlock}>
         <div>
-          {ex.sets.map((set, setIdx) => (
+          {ex.sets.map((set, setIdx) =>
+            calibration ? (
+              <CalibrationSetRow
+                key={set.setNumber}
+                set={set}
+                exIdx={exIdx}
+                setIdx={setIdx}
+                guide={`${ex.targetReps} reps${ex.isUnilateral ? " / side" : ""}`}
+                onToggle={() => onToggleSet?.(setIdx)}
+              />
+            ) : (
             <SetRow
               key={set.setNumber}
               set={set}
@@ -113,7 +128,8 @@ export function ExerciseCard({
               onChange={(field, value) => onUpdateSet(setIdx, field, value)}
               onFinished={onSetFinished}
             />
-          ))}
+            )
+          )}
         </div>
       </div>
 
@@ -167,7 +183,11 @@ export function ExerciseCard({
               <textarea
                 value={ex.notes}
                 onChange={(e) => onUpdateNotes(e.target.value)}
-                placeholder="How did this feel? e.g. felt strong, elbow pain, grip gave out..."
+                placeholder={
+                  calibration
+                    ? "Anything get in the way? e.g. couldn't find the machine, swapped it, felt off..."
+                    : "How did this feel? e.g. felt strong, elbow pain, grip gave out..."
+                }
                 rows={2}
                 autoFocus
                 className="mt-2.5 w-full resize-none rounded-[20px] border border-transparent bg-secondary px-3.5 py-3 text-[13.5px] text-foreground placeholder:text-muted-foreground/60 focus:border-foreground/35 focus:outline-none"

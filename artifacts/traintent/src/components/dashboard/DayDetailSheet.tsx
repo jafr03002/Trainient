@@ -22,8 +22,13 @@ type DayDetailSheetProps = {
 };
 
 function exerciseCount(session: WorkoutLog): number {
+  // A calibration set carries no numbers, only its tick.
+  const calibration = session.loggingMode === "calibration";
   return ((session.exercisesLogged as any[]) ?? []).filter(
-    (ex) => ex?.kind === "checklist" || (Array.isArray(ex?.sets) && ex.sets.some((s: any) => s?.weight || s?.reps || s?.repsLeft || s?.repsRight)),
+    (ex) =>
+      ex?.kind === "checklist" ||
+      (Array.isArray(ex?.sets) &&
+        ex.sets.some((s: any) => (calibration ? s?.completed : s?.weight || s?.reps || s?.repsLeft || s?.repsRight))),
   ).length;
 }
 

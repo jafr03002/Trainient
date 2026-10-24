@@ -78,5 +78,7 @@ export * from './userProfileUpdateInjurySeverity';
 export * from './volumePoint';
 export * from './workoutLog';
 export * from './workoutLogInput';
+export * from './workoutLogInputLoggingMode';
+export * from './workoutLogLoggingMode';
 export * from './workoutLogMode';
 export * from './workoutStats';

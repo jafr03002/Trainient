@@ -27,7 +27,7 @@ import {
 } from "@workspace/api-client-react";
 import { phaseSolid } from "@/lib/phaseColors";
 import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
-import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString, localDateString, trainingStart, checkinGate } from "@/lib/calibration";
+import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, isCalibrationProgram, parseLocalDateString, localDateString, trainingStart, checkinGate } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
@@ -97,6 +97,8 @@ export default function Dashboard() {
   const tourCalendarLinkRef = useRef<HTMLAnchorElement>(null);
   const programNavTarget = useNavTourTarget("/program");
   const calendarNavTarget = useNavTourTarget("/calendar");
+  const nutritionNavTarget = useNavTourTarget("/nutrition");
+  const youNavTarget = useNavTourTarget("/settings");
   const resolveTourSteps = useTourSteps();
   // Whether the first-run tour is open, held here rather than read back off the
   // profile: the seen flag is now written when the tour OPENS (see below), and
@@ -368,6 +370,19 @@ export default function Dashboard() {
     { target: tourDailyCheckinRef, text: "This is your daily check-in that you need to do every day." },
     ...(heroTourStep ? [heroTourStep] : []),
     { target: tourProgressRef, text: "And down here you can track your progress." },
+    // The overall navigation leg: the tabs this tour doesn't otherwise visit.
+    // A target with no visible nav link drops its step (useResolvedTourSteps).
+    { target: nutritionNavTarget, text: "Your nutrition lives here." },
+    { target: youNavTarget, text: "And your profile and settings live under You." },
+    // Calibration only: Start no longer goes straight into the logger.
+    ...(isCalibrationProgram(program.data)
+      ? [
+          {
+            kind: "center",
+            text: "While you're in calibration, every session starts with a short briefing. Read it, then just tick off your sets - no numbers this week.",
+          } as CoachmarkStep,
+        ]
+      : []),
     // A clear end rather than the tour simply vanishing on the last tap: it
     // says the dashboard leg is over and names what comes next, so the hand-off
     // to the program page reads as the end of something.

@@ -61,6 +61,8 @@ export interface UserProfile {
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
   /** @nullable */
+  calibrationBriefingSeenAt?: string | null;
+  /** @nullable */
   programPageTourSeenAt?: string | null;
   /** @nullable */
   weightLoggingTourSeenAt?: string | null;
@@ -219,6 +221,8 @@ export interface UserProfileUpdate {
   cardioMinutes?: number | null;
   /** @nullable */
   calibrationWalkthroughSeenAt?: string | null;
+  /** @nullable */
+  calibrationBriefingSeenAt?: string | null;
   /** @nullable */
   programPageTourSeenAt?: string | null;
   /** @nullable */
@@ -588,6 +592,17 @@ export const WorkoutLogMode = {
   independent: 'independent',
 } as const;
 
+/**
+ * calibration = a calibration-phase session: sets are ticked off with no weight or reps
+ */
+export type WorkoutLogLoggingMode = typeof WorkoutLogLoggingMode[keyof typeof WorkoutLogLoggingMode];
+
+
+export const WorkoutLogLoggingMode = {
+  full: 'full',
+  calibration: 'calibration',
+} as const;
+
 export interface WorkoutLog {
   id: number;
   userId: string;
@@ -598,6 +613,8 @@ export interface WorkoutLog {
   dayLabel?: string | null;
   /** Training mode the user was in when this session was logged */
   mode: WorkoutLogMode;
+  /** calibration = a calibration-phase session: sets are ticked off with no weight or reps */
+  loggingMode: WorkoutLogLoggingMode;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
@@ -613,6 +630,14 @@ export interface WorkoutLog {
   durationSeconds?: number | null;
   createdAt: string;
 }
+
+export type WorkoutLogInputLoggingMode = typeof WorkoutLogInputLoggingMode[keyof typeof WorkoutLogInputLoggingMode];
+
+
+export const WorkoutLogInputLoggingMode = {
+  full: 'full',
+  calibration: 'calibration',
+} as const;
 
 export interface WorkoutLogInput {
   /** @pattern ^\d{4}-\d{2}-\d{2}$ */
@@ -630,6 +655,7 @@ export interface WorkoutLogInput {
      * @nullable
      */
   notes?: string | null;
+  loggingMode?: WorkoutLogInputLoggingMode;
   /** @nullable */
   startedAt?: string | null;
   /**

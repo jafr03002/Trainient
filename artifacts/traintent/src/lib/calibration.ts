@@ -191,6 +191,23 @@ export function shouldShowCalibrationWalkthrough(
   return !!findCalibrationGroup(groups, today);
 }
 
+// A session started against this program is a calibration session: sets get
+// ticked off with no weight or reps, and a briefing runs before it starts.
+// Mirrors the server's guard on POST /workouts - the latest AI-lineage program
+// stays on "calibration" until the calibration review advances it. Callers pass the mode's
+// current program, which is only ever AI-generated in AI mode.
+export function isCalibrationProgram(
+  program: { aiGenerated?: boolean; shortTermPhase?: string | null } | null | undefined
+): boolean {
+  return !!program?.aiGenerated && program.shortTermPhase === "calibration";
+}
+
+// Where a Start press goes during calibration: the briefing, which starts the
+// session itself once it has been read (see pages/calibration-briefing.tsx).
+export function calibrationBriefingHref(dayNumber: number): string {
+  return `/calibration/briefing?day=${dayNumber}`;
+}
+
 // Local YYYY-MM-DD for a Date, matching how program.startDate is stored
 // server-side (see api-server's programs.ts PATCH handler). Comparing
 // calendar strings avoids parsing startDate with `new Date()`, which reads

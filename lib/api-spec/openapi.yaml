@@ -864,6 +864,7 @@ components:
         onboardingComplete:     { type: boolean }
         onboardingCompletedAt:  { type: ["string", "null"] }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
+        calibrationBriefingSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
         dashboardTourSeenAt: { type: ["string", "null"] }
@@ -920,6 +921,7 @@ components:
         cardioDays:             { type: array, items: { type: string } }
         cardioMinutes:          { type: ["integer", "null"], minimum: 0, maximum: 1440 }
         calibrationWalkthroughSeenAt: { type: ["string", "null"] }
+        calibrationBriefingSeenAt: { type: ["string", "null"] }
         programPageTourSeenAt: { type: ["string", "null"] }
         weightLoggingTourSeenAt: { type: ["string", "null"] }
         dashboardTourSeenAt: { type: ["string", "null"] }
@@ -1159,7 +1161,7 @@ components:
 
     WorkoutLog:
       type: object
-      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, createdAt, mode]
+      required: [id, userId, date, dayNumber, weekNumber, exercisesLogged, createdAt, mode, loggingMode]
       properties:
         id:               { type: integer }
         userId:           { type: string }
@@ -1168,6 +1170,7 @@ components:
         weekNumber:       { type: integer }
         dayLabel:         { type: ["string", "null"] }
         mode:             { type: string, enum: [ai, independent], description: "Training mode the user was in when this session was logged" }
+        loggingMode:      { type: string, enum: [full, calibration], description: "calibration = a calibration-phase session: sets are ticked off with no weight or reps" }
         exercisesLogged:
           type: array
           items:
@@ -1190,6 +1193,9 @@ components:
           items:
             $ref: "#/components/schemas/LoggedExercise"
         notes:            { type: ["string", "null"], maxLength: 2000 }
+        # Only accepted while the current AI-lineage program is a calibration
+        # week - otherwise rejected with 400 rather than silently downgraded.
+        loggingMode:      { type: string, enum: [full, calibration], default: full }
         startedAt:        { type: ["string", "null"], format: date-time }
         durationSeconds:  { type: ["integer", "null"], minimum: 0, maximum: 86400 }
 

@@ -1,0 +1,2 @@
+ALTER TABLE "user_profiles" ADD COLUMN "calibration_briefing_seen_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "workout_logs" ADD COLUMN "logging_mode" text DEFAULT 'full' NOT NULL;
