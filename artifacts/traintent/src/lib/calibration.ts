@@ -38,8 +38,8 @@ export function trainingStart(programs: PhaseRow[], onboardingCompletedAt: strin
 // each row's week is derived from when it was written instead:
 // - a fresh start into calibration (generation, or a goal change at check-in)
 //   covers the week it was written in - week 1 when written before day 1;
-// - a check-in's output is next week's program, so it starts the week after the
-//   previous row's, or later if the check-in itself came later.
+// - the output of the calibration review or a check-in is next week's program,
+//   so it starts the week after the previous row's, or later if it came later.
 // The newest row runs through today, so a calibration nobody has reviewed yet
 // keeps covering the days after its first week. Adjacent weeks sharing a phase
 // merge into one range.
@@ -97,13 +97,54 @@ export function findPhaseRange(ranges: PhaseRange[], date: Date): PhaseRange | u
   return ranges.find((r) => t >= r.start.getTime() && t <= r.end.getTime());
 }
 
-// Calibration is the first week; the review is the client's first check-in
-// after it, which moves them into the next phase. Until they check in it keeps
+// Calibration is the first week; the calibration review (a readiness check,
+// not a weekly check-in) moves them into the next phase. Until then it keeps
 // running (see buildPhaseRanges). While "today" falls anywhere in it, other
 // (still-provisional) future phases stay hidden from the calendar, and a
 // persistent "review possible" nudge appears from day 8 onward.
 // calibration_review is a legacy enum value the API never produces.
 export const CALIBRATION_FAMILY = new Set(["calibration", "calibration_review"]);
+
+export const FIRST_CHECKIN_AFTER_REVIEW_DAYS = 7;
+
+export type CheckinGate =
+  | { open: true; firstAfterReview: boolean }
+  | { open: false; reason: "calibration" }
+  | { open: false; reason: "after_review"; opensAt: Date };
+
+// When a weekly check-in is allowed. Mirrors api-server's lib/checkinGate.ts,
+// which enforces it - keep the two in step. None during calibration (the
+// calibration review ends it, not a check-in); the first one opens a week after
+// that review, read off the rows as the moment the AI lineage first left
+// calibration. firstAfterReview: open, and nothing checked in since the review.
+export function checkinGate(
+  programs: PhaseRow[],
+  latestCheckinAt: string | null | undefined,
+  now: Date = new Date()
+): CheckinGate {
+  const newestFirst = programs
+    .filter((p) => p.aiGenerated)
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt));
+  if (newestFirst.length === 0) return { open: true, firstAfterReview: false };
+  if (newestFirst[0]!.shortTermPhase === "calibration") return { open: false, reason: "calibration" };
+
+  let reviewAt: Date | null = null;
+  let sawCalibration = false;
+  for (const p of newestFirst) {
+    if (p.shortTermPhase === "calibration") {
+      sawCalibration = true;
+      break;
+    }
+    reviewAt = new Date(p.generatedAt);
+  }
+  if (!sawCalibration || !reviewAt) return { open: true, firstAfterReview: false };
+  if (latestCheckinAt && new Date(latestCheckinAt).getTime() >= reviewAt.getTime()) return { open: true, firstAfterReview: false };
+
+  const opensAt = new Date(reviewAt.getTime() + FIRST_CHECKIN_AFTER_REVIEW_DAYS * 86_400_000);
+  return now.getTime() >= opensAt.getTime()
+    ? { open: true, firstAfterReview: true }
+    : { open: false, reason: "after_review", opensAt };
+}
 
 export type CalibrationGroup = { start: Date; end: Date };
 

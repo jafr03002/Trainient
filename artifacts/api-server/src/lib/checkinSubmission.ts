@@ -13,6 +13,7 @@ import { generateStructured } from "./anthropic";
 import { checkinAdjustmentOutputSchema } from "./programSchema";
 import { checkInEngineKnowledge } from "./knowledge";
 import { buildCheckinEvidence } from "./checkinData";
+import { checkinGate, checkinGateMessage } from "./checkinGate";
 import { computeSessionAdherence, MISSED_REASON_TEXT } from "./sessionAdherence";
 import { trainingWeekNumber } from "./trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "./programMonitoring";
@@ -108,12 +109,6 @@ How to apply it:
 Phase-name mapping (the document speaks in phase names; the client's current phase is given below):
 - mini_cut = the document's "high-deficit" phase; diet = "diet"; bulk = "bulk"; reverse_diet ≈ bulk but gentler; calibration / maintenance / deload = the document's "deload/maintenance".
 
-Calibration review (applies only while the client's current phase is "calibration"):
-- The client has been told calibration is their first week - learning the program, the gym and their form at maintenance calories - and that this check-in is the review where you look back at that week and set their real targets for what comes next. Exiting calibration here is the default.
-- Recommend "advance" unless the week's data is too thin to set targets from (e.g. only a couple of bodyweight entries, or most sessions not logged). Only then recommend "stay", and say in your message that you want one more week of data and what to log.
-- Use the calibration week's average bodyweight and logged calories to judge the client's real maintenance intake, then set daily_calorie_target for the NEXT phase's energy balance (e.g. a surplus for bulk, a high deficit for mini_cut) from that, not from the original estimate.
-- Write the message as the end of calibration: what the week showed, and what the next phase asks of them. Do not mention how many weeks calibration can last.
-
 Whenever you recommend "advance" (or the server will advance regardless, as stated below), every target you return - calories, steps, cardio, short_term_goal_weight and training - must fit the phase the client moves INTO, not the one they are leaving.
 
 Then return:
@@ -174,6 +169,15 @@ export async function prepareCheckinSubmission(
 
   if (!currentProgram) {
     return { ok: false, status: 400, error: "No program to adjust" };
+  }
+
+  const aiPrograms = await db.query.programsTable.findMany({
+    where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
+    columns: { shortTermPhase: true, generatedAt: true },
+  });
+  const gate = checkinGate(aiPrograms, priorCheckins[0]?.submittedAt ?? null);
+  if (!gate.open) {
+    return { ok: false, status: 400, error: checkinGateMessage(gate) };
   }
 
   const run = async (): Promise<CheckinSubmissionResult> => {

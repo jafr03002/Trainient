@@ -20,7 +20,7 @@ Step 12: review: Build your program button
 ## Backend AI monitoring parameters that will be generated:
 Long term phase (Gain weight, lose weight, maintain)
 Short term phase (kgs are in weekly weight gain)
-calibration (maintenance +/-1kg entering weight into the phase; the client's first week - learning the program, the gym and their form, not lifting heavy. The client is told it lasts about a week. Its review is the client's first weekly check-in, which sets the real targets and moves them into the next phase of the timeline below; it is not a separate phase or week),
+calibration (maintenance +/-1kg entering weight into the phase; the client's first week - learning the program, the gym and their form, not lifting heavy. The client is told it lasts about a week. It ends with the calibration review - a readiness check, not a weekly check-in: exercises found, form standardised, set up to train safely, nothing hurting - which moves them into the next phase of the timeline below. There are no weekly check-ins during calibration; the first one comes a week after the review),
 bulk phase (surplus +0.25 to 0.5kg), 
 maintenance (maintenance+/-1kg entering weight into the phase), 
 reverse diet (small surplus +0,25 to 0.5kg compared to bulk phase here we are just reversing the diet), 
@@ -48,15 +48,15 @@ recommendation to each phase's min/max week window below. The AI can never inven
 reorder a phase.
 
 IF: Gaining weight/Building muscle choice
-     THEN: Enter calibration week (1W - can extend to at most 3W only if the first review lacks the data to set targets) > Bulk phase (18-26W) with a 1-week deload every 8 weeks (deload is a display-only overlay on top of Bulk, not a separate step - see phaseTemplate.ts).
+     THEN: Enter calibration week (1W - can extend to at most 3W only if the calibration review finds the client is not ready yet) > Bulk phase (18-26W) with a 1-week deload every 8 weeks (deload is a display-only overlay on top of Bulk, not a separate step - see phaseTemplate.ts).
      Nothing is defined once the 26-week ceiling is reached - the phase simply holds there. Reassessing the goal at that point is a separate, not-yet-built feature.
 
 IF: Losing weight/building muscle
-     THEN: Enter calibration week (1W - can extend to at most 3W only if the first review lacks the data to set targets) > Mini cut 4-6W(HIGH DEFICIT) > Maintenance/deload 1 Week > Diet 4W-14W (depending on weight goal).
+     THEN: Enter calibration week (1W - can extend to at most 3W only if the calibration review finds the client is not ready yet) > Mini cut 4-6W(HIGH DEFICIT) > Maintenance/deload 1 Week > Diet 4W-14W (depending on weight goal).
      Nothing is defined once Diet ends - the phase simply holds there. `reverse_diet` is a known gap in this template (it's a valid short-term phase, but this sequence never reaches it) - deferred to a future revision alongside goal reassessment.
 
 IF General fitness
-     THEN:Enter calibration week (1W - can extend to at most 3W only if the first review lacks the data to set targets) > maintenance forever until client changes goals. No weight goals here.
+     THEN:Enter calibration week (1W - can extend to at most 3W only if the calibration review finds the client is not ready yet) > maintenance forever until client changes goals. No weight goals here.
 
 Each short-term phase shall have weight goals. To stay in between certain bodyweight go down to a spciefic or go up to a speicifc
 

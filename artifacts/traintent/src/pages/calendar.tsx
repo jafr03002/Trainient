@@ -688,7 +688,7 @@ export default function Calendar() {
               <Info className="mt-px h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.6} />
               <p className="text-[12.5px] leading-relaxed text-muted-foreground">
                 {reviewOpen
-                  ? "Calibration review possible - it happens with your weekly check-in."
+                  ? "Calibration review possible."
                   : `Calibration review possible from ${reviewFrom.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}.`}
               </p>
             </div>

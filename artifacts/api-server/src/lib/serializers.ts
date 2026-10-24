@@ -21,8 +21,8 @@ export function serializeProgram(p: typeof programsTable.$inferSelect, onboardin
     ...rest,
     weekNumber: trainingWeekNumber(onboardingCompletedAt),
     weekInPhase: weeksInPhaseSegment,
-    // Calibration's maxWeeks is a ceiling for the rare client who needs a second
-    // week of data, not its length, so it is never shown as "week 1 of 3".
+    // Calibration's maxWeeks is a ceiling for the rare client the review finds
+    // not ready yet, not its length, so it is never shown as "week 1 of 3".
     phaseTotalWeeks: segment?.phase === "calibration" ? null : (segment?.maxWeeks ?? null),
     days: rest.days as object[],
     generatedAt: p.generatedAt.toISOString(),

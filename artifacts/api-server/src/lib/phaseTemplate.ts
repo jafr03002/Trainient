@@ -19,11 +19,11 @@ export type PhaseSegment = {
   deload?: { everyWeeks: number }; // periodic 1-week overlay, bulk only
 };
 
-// Calibration is one week by design: the client's first check-in after it IS
-// the calibration review, and the check-in prompt tells the AI to advance there
-// unless the week's data is too thin. maxWeeks: 3 is only the ceiling for that
-// exception, never a length to present (serializeProgram hides it as
-// phaseTotalWeeks).
+// Calibration is one week by design. It ends with the calibration review (a
+// readiness check, separate from the weekly check-in - see checkinGate.ts, which
+// keeps check-ins closed throughout calibration). maxWeeks: 3 is only the
+// ceiling for a client the review finds not ready yet, never a length to
+// present (serializeProgram hides it as phaseTotalWeeks).
 export const PHASE_TEMPLATES: Record<LongTermPhase, PhaseSegment[]> = {
   gain_weight: [
     { phase: "calibration", minWeeks: 1, maxWeeks: 3 },

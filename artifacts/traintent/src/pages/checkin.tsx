@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
 import {
   useGetCheckinAdherence,
+  useGetLatestCheckin,
+  useListPrograms,
   getGetCurrentProgramQueryKey,
   type SessionAdherence,
   type CheckinResult,
@@ -20,6 +22,7 @@ import {
   optionCardClass,
 } from "@/lib/sessionsForm";
 import { useCheckinJob } from "@/hooks/useAiJob";
+import { checkinGate } from "@/lib/calibration";
 
 // One question per screen, mirroring the onboarding flow - the old
 // single-screen form asked for a dozen answers at once, which nobody enjoys
@@ -80,6 +83,14 @@ export default function Checkin() {
   // 404s until an AI-generated program exists; the sessions step handles that.
   const adherenceQuery = useGetCheckinAdherence();
   const adherence = adherenceQuery.data;
+  // Closed during calibration and until a week after the calibration review;
+  // the server refuses a submission then too.
+  const programsQuery = useListPrograms();
+  const latestCheckinQuery = useGetLatestCheckin();
+  const gate =
+    programsQuery.data && !latestCheckinQuery.isLoading
+      ? checkinGate(programsQuery.data, latestCheckinQuery.data?.submittedAt)
+      : null;
 
   const [step, setStep] = useState(0);
   const [energy, setEnergy] = useState(0);
@@ -202,6 +213,22 @@ export default function Checkin() {
       <div className="min-h-page flex flex-col items-center justify-center gap-3 px-4 text-muted-foreground">
         <Loader2 className="w-6 h-6 animate-spin" />
         <p className="text-sm">Your AI coach is reviewing your week...</p>
+      </div>
+    );
+  }
+
+  if (gate && !gate.open) {
+    return (
+      <div className="mx-auto max-w-lg p-6">
+        <div className="flex justify-end">{closeButton}</div>
+        <div className="pt-6" data-testid="checkin-closed">
+          <h1 className={TITLE_CLASS}>Not yet</h1>
+          <p className={cn(LEDE_CLASS, "mb-0")}>
+            {gate.reason === "calibration"
+              ? "There are no check-ins during calibration. Your weekly check-ins start a week after your calibration review."
+              : `Your first check-in opens on ${gate.opensAt.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}, a week after your calibration review.`}
+          </p>
+        </div>
       </div>
     );
   }
