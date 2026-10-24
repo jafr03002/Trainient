@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetProgramStartDate, getGetCurrentProgramQueryKey } from "@workspace/api-client-react";
+import { useSetProgramStartDate, getGetCurrentProgramQueryKey, getListProgramsQueryKey, getGetProfileQueryKey } from "@workspace/api-client-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -13,6 +13,7 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
+import { localDateString } from "@/lib/calibration";
 
 // Blocking pop-up shown wherever a client tries to log a workout while still
 // in preCalibrationPhase (committed to a future start date). AlertDialog
@@ -40,9 +41,13 @@ export function WorkoutLogLockDialog({
     try {
       await setProgramStartDate.mutateAsync({
         id: programId,
-        data: { startDate: new Date().toISOString() },
+        data: { startDate: localDateString(new Date()) },
       });
+      // Starting moves day 1 (the server re-anchors the training clock), which
+      // the program list and the profile carry too.
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     } catch {
       toast({
         title: "Couldn't update your start date",

@@ -79,8 +79,8 @@ router.post("/workouts", requireAuth, async (req, res) => {
   const mode = profile?.mode ?? "ai";
   // A calibration log has ticked sets with no weight or reps, so it's only
   // valid while the user is actually in calibration: AI mode, with the latest
-  // AI-lineage program still on the calibration phase (it stays there until a
-  // check-in advances it). Rejected rather than downgraded, so the client can
+  // AI-lineage program still on the calibration phase (it stays there until the
+  // calibration review advances it). Rejected rather than downgraded, so the client can
   // tell the user instead of silently saving an empty "full" session.
   if (parsed.data.loggingMode === "calibration") {
     const program =

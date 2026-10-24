@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
-import { db, userProfilesTable, programsTable } from "@workspace/db";
+import { db, userProfilesTable, programsTable, checkinsTable } from "@workspace/db";
 import {
   SetProgramStartDateBody,
   CreateManualProgramBody,
@@ -140,15 +140,37 @@ router.patch("/programs/:id", requireAuth, async (req, res) => {
     return;
   }
 
+  // The body is a calendar date (YYYY-MM-DD), which coerces to UTC midnight of
+  // that same date, so the slice keeps the day the client picked.
+  const startDate = parsed.data.startDate.toISOString().slice(0, 10);
   const [program] = await db
     .update(programsTable)
-    .set({ startDate: parsed.data.startDate.toISOString().slice(0, 10) })
+    .set({ startDate })
     .where(and(eq(programsTable.id, id), eq(programsTable.userId, userId)))
     .returning();
 
   if (!program) {
     res.status(404).json({ error: "Program not found" });
     return;
+  }
+
+  // Day 1 of training is the day they start, not the day they filled in the
+  // profile: onboardingCompletedAt is the clock every "Week N", the check-in
+  // nudge and the calibration review date count from, and the start can be up
+  // to 30 days out. Only moved before the first check-in, so a clock that weeks
+  // of phase progress already hang off is never reset.
+  if (program.aiGenerated) {
+    const firstCheckin = await db.query.checkinsTable.findFirst({
+      where: eq(checkinsTable.userId, userId),
+      columns: { id: true },
+    });
+    if (!firstCheckin) {
+      const [y, m, d] = startDate.split("-").map(Number);
+      await db
+        .update(userProfilesTable)
+        .set({ onboardingCompletedAt: new Date(y!, m! - 1, d!) })
+        .where(eq(userProfilesTable.userId, userId));
+    }
   }
 
   const profile = await db.query.userProfilesTable.findFirst({ where: eq(userProfilesTable.userId, userId) });

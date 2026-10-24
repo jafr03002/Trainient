@@ -13,6 +13,7 @@ import { generateStructured } from "./anthropic";
 import { checkinAdjustmentOutputSchema } from "./programSchema";
 import { checkInEngineKnowledge } from "./knowledge";
 import { buildCheckinEvidence } from "./checkinData";
+import { checkinGate, checkinGateMessage } from "./checkinGate";
 import { computeSessionAdherence, MISSED_REASON_TEXT } from "./sessionAdherence";
 import { trainingWeekNumber } from "./trainingWeek";
 import { longTermPhaseFor, trainingWorkloadFor, cardioIntensityFrom } from "./programMonitoring";
@@ -108,6 +109,8 @@ How to apply it:
 Phase-name mapping (the document speaks in phase names; the client's current phase is given below):
 - mini_cut = the document's "high-deficit" phase; diet = "diet"; bulk = "bulk"; reverse_diet ≈ bulk but gentler; calibration / maintenance / deload = the document's "deload/maintenance".
 
+Whenever you recommend "advance" (or the server will advance regardless, as stated below), every target you return - calories, steps, cardio, short_term_goal_weight and training - must fit the phase the client moves INTO, not the one they are leaving.
+
 Then return:
 1. A short message to the client (2-3 sentences, encouraging and specific, referencing what you actually observed).
 2. An updated program JSON for next week.
@@ -168,6 +171,15 @@ export async function prepareCheckinSubmission(
     return { ok: false, status: 400, error: "No program to adjust" };
   }
 
+  const aiPrograms = await db.query.programsTable.findMany({
+    where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
+    columns: { shortTermPhase: true, generatedAt: true },
+  });
+  const gate = checkinGate(aiPrograms, priorCheckins[0]?.submittedAt ?? null);
+  if (!gate.open) {
+    return { ok: false, status: 400, error: checkinGateMessage(gate) };
+  }
+
   const run = async (): Promise<CheckinSubmissionResult> => {
     const today = todayDateString();
 
@@ -225,7 +237,15 @@ export async function prepareCheckinSubmission(
     const currentSegment = template[priorSegmentIndex]!;
     const isTerminal = priorSegmentIndex === template.length - 1;
     const nextSegment = isTerminal ? null : template[priorSegmentIndex + 1]!;
-    const weekWindowLabel = `${currentSegment.maxWeeks ?? "unbounded"}`;
+    // The week the client is finishing now: the stored counter already names the
+    // week the current row covers (a fresh program row is week 1), so it is not
+    // incremented here. A fresh start has no counter yet and is in its first week.
+    const finishingWeek = Math.max(1, priorWeeksInSegment);
+    const weekWindowLabel = currentSegment.maxWeeks != null ? `at most ${currentSegment.maxWeeks}` : "no upper limit";
+    // Mirrors resolvePhaseProgression: the AI's "stay" is overruled once the
+    // segment's ceiling is reached, so tell it up front and its targets match.
+    const forcedAdvance =
+      !isTerminal && currentSegment.maxWeeks != null && priorWeeksInSegment + 1 >= currentSegment.maxWeeks;
 
     const userPrompt = `Client profile: ${JSON.stringify(profile)}
 Current program (this week's training days): ${JSON.stringify(currentProgram.days)}
@@ -233,9 +253,13 @@ Current targets: ${currentProgram.dailyCalorieTarget ?? "n/a"} kcal/day, ${curre
 
 Current phase-template position (server-tracked context - do not restate these values in your output):
 - Long-term goal: ${longTermPhase}
-- Current phase: ${currentProgram.shortTermPhase ?? currentSegment.phase} (energy balance: ${currentProgram.energyBalance ?? "n/a"}), week ${priorWeeksInSegment + 1} of ${weekWindowLabel}
-- If you recommend "stay": next week continues as "${currentSegment.phase}"
-- If you recommend "advance": ${nextSegment ? `next week moves to "${nextSegment.phase}"` : `there is no next phase defined yet for this goal - the server will keep the client in "${currentSegment.phase}" regardless of your recommendation`}
+- Current phase: ${currentProgram.shortTermPhase ?? currentSegment.phase} (energy balance: ${currentProgram.energyBalance ?? "n/a"}), finishing week ${finishingWeek} of this phase (${weekWindowLabel} weeks)
+${
+  forcedAdvance
+    ? `- This phase has reached its limit: next week moves to "${nextSegment!.phase}" whatever you recommend - recommend "advance" and write next week's targets for "${nextSegment!.phase}"`
+    : `- If you recommend "stay": next week continues as "${currentSegment.phase}"
+- If you recommend "advance": ${nextSegment ? `next week moves to "${nextSegment.phase}"` : `there is no next phase defined yet for this goal - the server will keep the client in "${currentSegment.phase}" regardless of your recommendation`}`
+}
 
 This week's check-in questionnaire (energy, sleep and hunger are answered on a 1-5 scale):
 - Energy: ${input.energy}/5

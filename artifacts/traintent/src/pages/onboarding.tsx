@@ -27,6 +27,7 @@ import { PresentationDeck } from "@/components/onboarding/PresentationDeck";
 import { CommitmentScreen } from "@/components/onboarding/CommitmentScreen";
 import { type ProgramFeedback } from "@/components/onboarding/SatisfactionGate";
 import { toast } from "@/hooks/use-toast";
+import { localDateString } from "@/lib/calibration";
 import { useProgramGenerationJob } from "@/hooks/useAiJob";
 
 const GOALS = [
@@ -467,7 +468,9 @@ export default function Onboarding() {
     try {
       await setProgramStartDate.mutateAsync({
         id: program.id,
-        data: { startDate: startDate.toISOString() },
+        // The API wants the calendar day (YYYY-MM-DD). A local-midnight ISO
+        // string reads as the previous day anywhere east of UTC.
+        data: { startDate: localDateString(startDate) },
       });
     } catch {
       toast({

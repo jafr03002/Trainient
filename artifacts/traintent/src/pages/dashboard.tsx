@@ -23,10 +23,11 @@ import {
   getGetGoalProgressQueryKey,
   getGetProfileQueryKey,
   getGetCurrentProgramQueryKey,
+  getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { phaseSolid } from "@/lib/phaseColors";
 import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
-import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, isCalibrationProgram, parseLocalDateString } from "@/lib/calibration";
+import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, isCalibrationProgram, parseLocalDateString, localDateString, trainingStart, checkinGate } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
@@ -252,9 +253,13 @@ export default function Dashboard() {
     try {
       await setProgramStartDate.mutateAsync({
         id: program.data.id,
-        data: { startDate: new Date().toISOString() },
+        data: { startDate: localDateString(new Date()) },
       });
+      // Starting moves day 1 (the server re-anchors the training clock), which
+      // the program list and the profile carry too.
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     } catch {
       toast({
         title: "Couldn't update your start date",
@@ -319,13 +324,19 @@ export default function Dashboard() {
     // No AI program means AI coaching was never set up (e.g. the user switched
     // over from Independent mode without generating one). The weekly check-in
     // has nothing to adjust and its submit would 400, so don't invite them in.
-    if (program.isLoading || !program.data) return false;
-    if (!profile?.onboardingCompletedAt) return false;
+    if (program.isLoading || !program.data || programsQuery.isLoading) return false;
 
-    const daysSinceOnboarding = daysSince(profile.onboardingCompletedAt);
-    if (daysSinceOnboarding < 6) return false;
+    // No check-in during calibration, and the first one waits a week after the
+    // calibration review (see lib/calibration.ts's checkinGate).
+    const gate = checkinGate(programsQuery.data ?? [], latestCheckin.data?.submittedAt);
+    if (!gate.open) return false;
+    if (gate.firstAfterReview) return true;
 
-    if (!latestCheckin.data) return true;
+    // A program from before calibration existed: the original day-6 nudge.
+    if (!latestCheckin.data) {
+      const start = trainingStart(programsQuery.data ?? [], profile?.onboardingCompletedAt);
+      return !!start && daysSince(start.toISOString()) >= 6;
+    }
 
     const daysSinceCheckin = daysSince(latestCheckin.data.submittedAt);
     return daysSinceCheckin >= 7;
