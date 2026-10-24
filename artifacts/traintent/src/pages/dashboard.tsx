@@ -23,10 +23,11 @@ import {
   getGetGoalProgressQueryKey,
   getGetProfileQueryKey,
   getGetCurrentProgramQueryKey,
+  getListProgramsQueryKey,
 } from "@workspace/api-client-react";
 import { phaseSolid } from "@/lib/phaseColors";
 import { FIELD_LIMITS, rangeError } from "@/lib/fieldLimits";
-import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString } from "@/lib/calibration";
+import { buildPhaseRanges, buildCalibrationGroups, findCalibrationGroup, shouldShowCalibrationWalkthrough, isPreCalibrationLocked, parseLocalDateString, localDateString, trainingStart } from "@/lib/calibration";
 import { CalibrationWalkthrough } from "@/components/calibration/CalibrationWalkthrough";
 import { CoachmarkTour, type CoachmarkStep } from "@/components/onboarding/CoachmarkTour";
 import { IndependentTargetsCard } from "@/components/dashboard/IndependentTargetsCard";
@@ -250,9 +251,13 @@ export default function Dashboard() {
     try {
       await setProgramStartDate.mutateAsync({
         id: program.data.id,
-        data: { startDate: new Date().toISOString() },
+        data: { startDate: localDateString(new Date()) },
       });
+      // Starting moves day 1 (the server re-anchors the training clock), which
+      // the program list and the profile carry too.
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListProgramsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
     } catch {
       toast({
         title: "Couldn't update your start date",
@@ -318,12 +323,13 @@ export default function Dashboard() {
     // over from Independent mode without generating one). The weekly check-in
     // has nothing to adjust and its submit would 400, so don't invite them in.
     if (program.isLoading || !program.data) return false;
-    if (!profile?.onboardingCompletedAt) return false;
+    const start = trainingStart(programsQuery.data ?? [], profile?.onboardingCompletedAt);
+    if (!start) return false;
 
-    const daysSinceOnboarding = daysSince(profile.onboardingCompletedAt);
-    if (daysSinceOnboarding < 6) return false;
-
-    if (!latestCheckin.data) return true;
+    // The first check-in is the calibration review, which the walkthrough
+    // promises from day 8 - after the whole first week. Later check-ins keep the
+    // usual day-6 nudge.
+    if (!latestCheckin.data) return daysSince(start.toISOString()) >= (program.data.shortTermPhase === "calibration" ? 7 : 6);
 
     const daysSinceCheckin = daysSince(latestCheckin.data.submittedAt);
     return daysSinceCheckin >= 7;

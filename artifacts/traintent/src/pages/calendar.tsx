@@ -394,11 +394,13 @@ function dateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-// "Week 2 of 8" for a phase on a given day; an open-ended phase has no "of".
-function phaseWeek(range: PhaseRange, on: Date): { week: number; total: number | null } {
-  const week = Math.floor((on.getTime() - range.start.getTime()) / (7 * DAY_MS)) + 1;
-  const total = range.end.getTime() >= OPEN_END.getTime() ? null : Math.round((range.end.getTime() - range.start.getTime()) / DAY_MS + 1) / 7;
-  return { week, total: total == null ? null : Math.ceil(total) };
+// "Week 2" of the phase a day falls in. Today's range only runs to the end of
+// this week, so a total would just count the weeks so far. Null for an
+// open-ended phase (Independent mode has no weeks) and for calibration, which
+// is presented as one week.
+function phaseWeek(range: PhaseRange, on: Date): number | null {
+  if (range.end.getTime() >= OPEN_END.getTime() || CALIBRATION_FAMILY.has(range.phase)) return null;
+  return Math.floor((on.getTime() - range.start.getTime()) / (7 * DAY_MS)) + 1;
 }
 
 export default function Calendar() {
@@ -622,9 +624,7 @@ export default function Calendar() {
                 {/* The phase colour survives as a small signal only. */}
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: phaseSolid(todayRange.phase) }} />
                 {phaseLabel(todayRange.phase)} phase
-                {todayWeek && todayWeek.total != null && (
-                  <span className="text-white/60">· week {todayWeek.week} of {todayWeek.total}</span>
-                )}
+                {todayWeek != null && <span className="text-white/60">· week {todayWeek}</span>}
               </span>
             )}
           </div>

@@ -6,28 +6,79 @@ export function addDays(date: Date, days: number): Date {
 
 export type PhaseRange = { phase: string; start: Date; end: Date };
 
-// Program rows only carry a week number and a phase enum value - no dates.
-// A week's real calendar range is onboardingCompletedAt + (weekNumber-1)*7
-// through +6 days (mirrors trainingWeekNumber() on the API). Adjacent weeks
-// sharing the same phase are merged into one continuous range.
-export function buildPhaseRanges(
-  programs: { weekNumber: number; shortTermPhase?: string | null }[],
-  onboardingCompletedAt: string | null | undefined
-): PhaseRange[] {
-  if (!onboardingCompletedAt) return [];
-  // Calendar day cells are midnight-aligned local dates, but onboardingCompletedAt
-  // carries a time-of-day - normalize to that calendar date so week boundaries
-  // land on whole days instead of splitting a day between two phases.
-  const base = new Date(onboardingCompletedAt);
-  base.setHours(0, 0, 0, 0);
+export type PhaseRow = {
+  shortTermPhase?: string | null;
+  weekInPhase?: number | null;
+  generatedAt: string;
+  aiGenerated?: boolean | null;
+  startDate?: string | null;
+};
 
-  const weeks = programs
-    .filter((p): p is { weekNumber: number; shortTermPhase: string } => !!p.shortTermPhase)
-    .map((p) => {
-      const start = addDays(base, (p.weekNumber - 1) * 7);
-      return { phase: p.shortTermPhase, start, end: addDays(start, 6) };
-    })
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
+function localMidnight(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Day 1 of AI training: the start date the client committed to, from the newest
+// AI row that carries one (only the accepted generation row does, plus check-in
+// rows of a rotating schedule, which copy it). Read as a local calendar date, so
+// it lands on the day they picked in any timezone. Falls back to the server's
+// training clock, which PATCH /programs/:id also moves to the start date.
+export function trainingStart(programs: PhaseRow[], onboardingCompletedAt: string | null | undefined): Date | null {
+  const started = programs
+    .filter((p) => p.aiGenerated && p.startDate)
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+  if (started) return parseLocalDateString(started.startDate!);
+  return onboardingCompletedAt ? localMidnight(new Date(onboardingCompletedAt)) : null;
+}
+
+// Program rows carry no dates of their own, and the API stamps every row with
+// the CURRENT week (weekNumber is the live training week, not the row's), so
+// each row's week is derived from when it was written instead:
+// - a fresh start into calibration (generation, or a goal change at check-in)
+//   covers the week it was written in - week 1 when written before day 1;
+// - a check-in's output is next week's program, so it starts the week after the
+//   previous row's, or later if the check-in itself came later.
+// The newest row runs through today, so a calibration nobody has reviewed yet
+// keeps covering the days after its first week. Adjacent weeks sharing a phase
+// merge into one range.
+export function buildPhaseRanges(
+  programs: PhaseRow[],
+  onboardingCompletedAt: string | null | undefined,
+  today: Date = new Date()
+): PhaseRange[] {
+  const base = trainingStart(programs, onboardingCompletedAt);
+  if (!base) return [];
+  const weekIndexAt = (date: Date) =>
+    Math.max(0, Math.floor(Math.round((localMidnight(date).getTime() - base.getTime()) / 86_400_000) / 7));
+
+  const rows = programs
+    .filter((p) => p.aiGenerated && !!p.shortTermPhase)
+    .sort((a, b) => a.generatedAt.localeCompare(b.generatedAt));
+
+  // Later rows win a week they share (a regenerated program, or two check-ins
+  // landing on one week).
+  const phaseByWeek = new Map<number, string>();
+  let prevWeek = -1;
+  for (const p of rows) {
+    const writtenWeek = weekIndexAt(new Date(p.generatedAt));
+    const freshStart = p.shortTermPhase === "calibration" && (p.weekInPhase ?? 1) <= 1;
+    const week = freshStart || prevWeek < 0 ? writtenWeek : Math.max(writtenWeek, prevWeek + 1);
+    phaseByWeek.set(week, p.shortTermPhase!);
+    for (const w of phaseByWeek.keys()) if (w > week) phaseByWeek.delete(w);
+    prevWeek = week;
+  }
+
+  const lastWeek = Math.max(prevWeek, weekIndexAt(today));
+  const weeks: PhaseRange[] = [];
+  let phase: string | undefined;
+  for (let w = 0; w <= lastWeek; w++) {
+    phase = phaseByWeek.get(w) ?? phase;
+    if (!phase) continue;
+    const start = addDays(base, w * 7);
+    weeks.push({ phase, start, end: addDays(start, 6) });
+  }
 
   const ranges: PhaseRange[] = [];
   for (const w of weeks) {
@@ -46,10 +97,12 @@ export function findPhaseRange(ranges: PhaseRange[], date: Date): PhaseRange | u
   return ranges.find((r) => t >= r.start.getTime() && t <= r.end.getTime());
 }
 
-// calibration can run 1-3 weeks before a calibration_review week hands off to
-// whatever phase comes next. While "today" falls anywhere in that stretch,
-// other (still-provisional) future phases stay hidden from the calendar, and
-// a persistent "review possible" nudge appears from day 8 onward.
+// Calibration is the first week; the review is the client's first check-in
+// after it, which moves them into the next phase. Until they check in it keeps
+// running (see buildPhaseRanges). While "today" falls anywhere in it, other
+// (still-provisional) future phases stay hidden from the calendar, and a
+// persistent "review possible" nudge appears from day 8 onward.
+// calibration_review is a legacy enum value the API never produces.
 export const CALIBRATION_FAMILY = new Set(["calibration", "calibration_review"]);
 
 export type CalibrationGroup = { start: Date; end: Date };
@@ -87,7 +140,7 @@ export function isReviewPossible(group: CalibrationGroup, date: Date): boolean {
 // active calibration window - not gated by a route, just this computed boolean
 // (mirrors dashboard.tsx's showCheckinBanner pattern).
 export function shouldShowCalibrationWalkthrough(
-  programs: { weekNumber: number; shortTermPhase?: string | null }[],
+  programs: PhaseRow[],
   onboardingCompletedAt: string | null | undefined,
   calibrationWalkthroughSeenAt: string | null | undefined,
   today: Date
