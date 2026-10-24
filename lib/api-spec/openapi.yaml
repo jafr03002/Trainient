@@ -908,6 +908,7 @@ components:
         name:           { type: string, maxLength: 80 }
         mode:           { type: string }
         goal:           { type: string }
+        trainingDays:   { type: integer, minimum: 1, maximum: 7 }
         goalWeight:     { type: ["number", "null"], minimum: 20, maximum: 1000 }
         age:            { type: ["integer", "null"], minimum: 13, maximum: 120 }
         weight:         { type: ["number", "null"], minimum: 20, maximum: 1000 }

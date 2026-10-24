@@ -4,7 +4,9 @@ import { Dumbbell } from "lucide-react";
 import {
   useGetCurrentProgram,
   useGetProfile,
+  useUpdateProfile,
   getGetCurrentProgramQueryKey,
+  getGetProfileQueryKey,
   type Program,
 } from "@workspace/api-client-react";
 import { Link, useLocation } from "wouter";
@@ -25,6 +27,7 @@ export default function AiProgram() {
   const profileQuery = useGetProfile();
   const queryClient = useQueryClient();
   const generateProgram = useProgramGenerationJob();
+  const updateProfile = useUpdateProfile();
   // A generation left running by an earlier visit (the app was closed or the
   // screen locked mid-way) opens straight back onto the loading screen.
   const [phase, setPhase] = useState<"idle" | "generating" | "presentation">(
@@ -66,6 +69,12 @@ export default function AiProgram() {
     setPhase("generating");
     setRegenerateCount((c) => c + 1);
     try {
+      // A new day count is saved first: the generator builds from the profile's
+      // trainingDays, not from the feedback.
+      if (feedback.trainingDays != null) {
+        await updateProfile.mutateAsync({ data: { trainingDays: feedback.trainingDays } });
+        await queryClient.invalidateQueries({ queryKey: getGetProfileQueryKey() });
+      }
       const result = await generateProgram.run({ feedback });
       queryClient.invalidateQueries({ queryKey: getGetCurrentProgramQueryKey() });
       setFreshProgram(result);
@@ -99,7 +108,7 @@ export default function AiProgram() {
             onSubmitFeedback={handleRegenerateFeedback}
             isSubmitting={generateProgram.isPending}
             showRegenerateNudge={regenerateCount >= 3}
-            error={generateProgram.isError}
+            error={generateProgram.isError || updateProfile.isError}
           />
         </div>
       </div>

@@ -18,7 +18,7 @@ import {
   suffixFieldClass,
 } from "@/lib/sessionsForm";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCreateProfile, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
+import { useCreateProfile, useUpdateProfile, useGetCurrentProgram, getGetCurrentProgramQueryKey, getGetProfileQueryKey, useGetProfile, useSetProgramStartDate, type Program, type UserProfileInputInjurySeverity } from "@workspace/api-client-react";
 import { MUSCLE_OPTIONS } from "@/lib/muscles";
 import { CARDIO_DAYS, orderCardioDays } from "@/lib/independentTargets";
 import { FIELD_LIMITS, MAX_PROFILE_NAME, rangeError } from "@/lib/fieldLimits";
@@ -224,6 +224,7 @@ export default function Onboarding() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const createProfile = useCreateProfile();
+  const updateProfile = useUpdateProfile();
   const generateProgram = useProgramGenerationJob();
   const setProgramStartDate = useSetProgramStartDate();
   const profileQuery = useGetProfile();
@@ -483,6 +484,13 @@ export default function Onboarding() {
     setPhase("generating");
     setRegenerateCount((c) => c + 1);
     try {
+      // A new day count is saved first: the generator builds from the profile's
+      // trainingDays, not from the feedback.
+      if (feedback.trainingDays != null) {
+        const profile = await updateProfile.mutateAsync({ data: { trainingDays: feedback.trainingDays } });
+        queryClient.setQueryData(getGetProfileQueryKey(), profile);
+        setForm((f) => ({ ...f, trainingDays: profile.trainingDays }));
+      }
       const result = await generateProgram.run({ feedback });
       setProgram(result);
     } catch {
@@ -524,7 +532,7 @@ export default function Onboarding() {
             onSubmitFeedback={handleRegenerateFeedback}
             isSubmitting={generateProgram.isPending}
             showRegenerateNudge={regenerateCount >= 3}
-            error={generateProgram.isError}
+            error={generateProgram.isError || updateProfile.isError}
           />
         </div>
       </div>
