@@ -110,6 +110,8 @@ export const CreateProfileBody = zod.object({
  */
 export const updateProfileBodyNameMax = 80;
 
+export const updateProfileBodyTrainingDaysMax = 7;
+
 export const updateProfileBodyGoalWeightMin = 20;
 export const updateProfileBodyGoalWeightMax = 1000;
 
@@ -136,6 +138,7 @@ export const UpdateProfileBody = zod.object({
   "name": zod.string().max(updateProfileBodyNameMax).optional(),
   "mode": zod.string().optional(),
   "goal": zod.string().optional(),
+  "trainingDays": zod.number().min(1).max(updateProfileBodyTrainingDaysMax).optional(),
   "goalWeight": zod.number().min(updateProfileBodyGoalWeightMin).max(updateProfileBodyGoalWeightMax).nullish(),
   "age": zod.number().min(updateProfileBodyAgeMin).max(updateProfileBodyAgeMax).nullish(),
   "weight": zod.number().min(updateProfileBodyWeightMin).max(updateProfileBodyWeightMax).nullish(),

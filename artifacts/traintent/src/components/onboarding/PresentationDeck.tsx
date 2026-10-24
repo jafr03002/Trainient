@@ -347,6 +347,7 @@ export function PresentationDeck({
                   onSubmitFeedback={onSubmitFeedback}
                   isSubmitting={isSubmitting}
                   showRegenerateNudge={showRegenerateNudge}
+                  currentTrainingDays={program.days.length}
                 />
               </>
             )}

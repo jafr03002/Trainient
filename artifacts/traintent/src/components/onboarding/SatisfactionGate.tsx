@@ -11,7 +11,13 @@ export type FeedbackCategory =
 export type ProgramFeedback = {
   categories: FeedbackCategory[];
   note: string;
+  // Set only when "Training days" is picked. The caller saves it to the profile
+  // before regenerating - the generator reads the day count from the profile,
+  // so a number left in the note alone would lose to the old value.
+  trainingDays?: number;
 };
+
+const TRAINING_DAY_OPTIONS = [2, 3, 4, 5, 6];
 
 const CATEGORY_LABELS: Record<FeedbackCategory, string> = {
   training_days: "Training days",
@@ -32,15 +38,19 @@ export function SatisfactionGate({
   onSubmitFeedback,
   isSubmitting,
   showRegenerateNudge,
+  currentTrainingDays,
 }: {
   onSatisfied: () => void;
   onSubmitFeedback: (feedback: ProgramFeedback) => void;
   isSubmitting?: boolean;
   showRegenerateNudge?: boolean;
+  currentTrainingDays: number;
 }) {
   const [askingWhy, setAskingWhy] = useState(false);
   const [categories, setCategories] = useState<FeedbackCategory[]>([]);
   const [note, setNote] = useState("");
+  const [trainingDays, setTrainingDays] = useState(currentTrainingDays);
+  const changingDays = categories.includes("training_days");
 
   function toggleCategory(category: FeedbackCategory) {
     setCategories((c) =>
@@ -49,7 +59,11 @@ export function SatisfactionGate({
   }
 
   function handleSubmit() {
-    onSubmitFeedback({ categories, note: note.trim() });
+    onSubmitFeedback({
+      categories,
+      note: note.trim(),
+      ...(changingDays ? { trainingDays } : {}),
+    });
   }
 
   if (!askingWhy) {
@@ -109,6 +123,25 @@ export function SatisfactionGate({
             </button>
           ))}
         </div>
+
+        {changingDays && (
+          <div className="mb-4" data-testid="feedback-training-days">
+            <p className="text-[13.5px] text-muted-foreground mb-2">Days per week</p>
+            <div className="flex gap-2">
+              {TRAINING_DAY_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  data-testid={`feedback-training-days-${n}`}
+                  onClick={() => setTrainingDays(n)}
+                  aria-pressed={trainingDays === n}
+                  className={chipClass(trainingDays === n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <textarea
           value={note}

@@ -13,6 +13,11 @@ export interface UserProfileUpdate {
   mode?: string;
   goal?: string;
   /**
+     * @minimum 1
+     * @maximum 7
+     */
+  trainingDays?: number;
+  /**
      * @minimum 20
      * @maximum 1000
      * @nullable
