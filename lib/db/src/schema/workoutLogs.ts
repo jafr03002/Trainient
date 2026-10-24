@@ -10,6 +10,9 @@ export const workoutLogsTable = pgTable("workout_logs", {
   weekNumber: integer("week_number").notNull(),
   dayLabel: text("day_label"),
   mode: text("mode").notNull().default("ai"),
+  // "calibration": a calibration-phase session, where sets are ticked off with
+  // no weight or reps. The server only accepts it during a calibration week.
+  loggingMode: text("logging_mode").notNull().default("full"),
   exercisesLogged: jsonb("exercises_logged").notNull().default([]),
   // Wall-clock session timing: the clock runs from the moment the log page
   // opens to the moment Finish is tapped. Both nullable - sessions logged

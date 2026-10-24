@@ -44,6 +44,7 @@ export const GetProfileResponse = zod.object({
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
+  "calibrationBriefingSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
   "dashboardTourSeenAt": zod.string().nullish(),
@@ -150,6 +151,7 @@ export const UpdateProfileBody = zod.object({
   "cardioDays": zod.array(zod.string()).optional(),
   "cardioMinutes": zod.number().min(updateProfileBodyCardioMinutesMin).max(updateProfileBodyCardioMinutesMax).nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
+  "calibrationBriefingSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
   "dashboardTourSeenAt": zod.string().nullish(),
@@ -181,6 +183,7 @@ export const UpdateProfileResponse = zod.object({
   "onboardingComplete": zod.boolean(),
   "onboardingCompletedAt": zod.string().nullish(),
   "calibrationWalkthroughSeenAt": zod.string().nullish(),
+  "calibrationBriefingSeenAt": zod.string().nullish(),
   "programPageTourSeenAt": zod.string().nullish(),
   "weightLoggingTourSeenAt": zod.string().nullish(),
   "dashboardTourSeenAt": zod.string().nullish(),
@@ -843,6 +846,7 @@ export const ListWorkoutsResponseItem = zod.object({
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
+  "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(listWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
@@ -905,6 +909,7 @@ export const createWorkoutBodyExercisesLoggedItemTargetSecondsMax = 86400;
 
 export const createWorkoutBodyNotesMax = 2000;
 
+export const createWorkoutBodyLoggingModeDefault = `full`;
 export const createWorkoutBodyDurationSecondsMin = 0;
 export const createWorkoutBodyDurationSecondsMax = 86400;
 
@@ -935,6 +940,7 @@ export const CreateWorkoutBody = zod.object({
   "category": zod.union([zod.literal('stretch'),zod.literal('mobility'),zod.literal('core'),zod.literal('breathing'),zod.literal('other'),zod.literal(null)]).nullish()
 })),
   "notes": zod.string().max(createWorkoutBodyNotesMax).nullish(),
+  "loggingMode": zod.enum(['full', 'calibration']).default(createWorkoutBodyLoggingModeDefault),
   "startedAt": zod.coerce.date().nullish(),
   "durationSeconds": zod.number().min(createWorkoutBodyDurationSecondsMin).max(createWorkoutBodyDurationSecondsMax).nullish()
 })
@@ -980,6 +986,7 @@ export const GetRecentWorkoutsResponseItem = zod.object({
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
+  "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(getRecentWorkoutsResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),
@@ -1075,6 +1082,7 @@ export const GetWorkoutsByDayLabelResponseItem = zod.object({
   "weekNumber": zod.number(),
   "dayLabel": zod.string().nullish(),
   "mode": zod.enum(['ai', 'independent']).describe('Training mode the user was in when this session was logged'),
+  "loggingMode": zod.enum(['full', 'calibration']).describe('calibration = a calibration-phase session: sets are ticked off with no weight or reps'),
   "exercisesLogged": zod.array(zod.object({
   "name": zod.string().max(getWorkoutsByDayLabelResponseExercisesLoggedItemNameMax),
   "muscle": zod.string(),

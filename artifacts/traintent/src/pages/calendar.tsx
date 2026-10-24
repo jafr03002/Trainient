@@ -48,7 +48,9 @@ type WorkoutLog = {
   dayNumber: number;
   weekNumber: number;
   mode: string;
+  loggingMode?: string;
   exercisesLogged: any[];
+  notes?: string | null;
   startedAt?: string | null;
   durationSeconds?: number | null;
 };
@@ -111,6 +113,15 @@ function setRepsLabel(s: any): string {
 }
 
 function sessionSummary(session: WorkoutLog): string {
+  // Calibration sessions tick sets off with no numbers, so every set reads as
+  // empty above - count the ticks instead.
+  if (session.loggingMode === "calibration") {
+    const lifts = (session.exercisesLogged as any[]).filter((ex) => ex?.kind !== "checklist");
+    const ticked = lifts.reduce((n, ex) => n + ((ex.sets as any[]) ?? []).filter((s) => s?.completed).length, 0);
+    const parts = ["Calibration", `${lifts.length} exercise${lifts.length === 1 ? "" : "s"}`, `${ticked} set${ticked === 1 ? "" : "s"} done`];
+    if (session.durationSeconds != null) parts.push(formatSessionLength(session.durationSeconds));
+    return parts.join(" · ");
+  }
   const exercises = (session.exercisesLogged as any[]).filter(exerciseHasData);
   const sets = exercises.reduce((n, ex) => n + (ex.sets as any[]).filter((s) => !isEmptySet(s)).length, 0);
   const parts = [`${exercises.length} exercise${exercises.length === 1 ? "" : "s"}`];
@@ -121,6 +132,7 @@ function sessionSummary(session: WorkoutLog): string {
 
 function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef, panelRef }: SessionModalProps) {
   const exercises = session.exercisesLogged as any[];
+  const isCalibration = session.loggingMode === "calibration";
   const queryClient = useQueryClient();
   const deleteWorkout = useDeleteWorkout();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -191,7 +203,10 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
               </div>
               <p className="text-[12.5px] text-muted-foreground mt-1">
                 {new Date(session.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                <span className="text-muted-foreground/60"> · {session.mode === "independent" ? "Independent mode" : "AI mode"}</span>
+                <span className="text-muted-foreground/60">
+                  {" "}
+                  · {session.loggingMode === "calibration" ? "Calibration" : session.mode === "independent" ? "Independent mode" : "AI mode"}
+                </span>
               </p>
               {/* Timing gets its own line rather than extending the date line
                   sideways. This is also the only place in the calendar that has
@@ -267,11 +282,17 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
                     <span className="rounded-full bg-secondary px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-foreground whitespace-nowrap">
                       {ex.muscle}
                     </span>
-                    {!prevSets && (
+                    {!prevSets && !isCalibration && (
                       <span className="text-[11px] text-muted-foreground truncate">First time logging this exercise</span>
                     )}
                   </div>
                   <h3 className="mt-2 text-[17px] font-normal text-foreground">{ex.name}</h3>
+                  {isCalibration && (
+                    <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                      <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                      {(ex.sets as any[]).filter((s: any) => s?.completed).length} of {(ex.sets as any[]).length} sets done
+                    </p>
+                  )}
 
                   {/* Sets - with per-set progression vs the previous session */}
                   <div className="mt-2 rounded-[22px] bg-secondary/60 overflow-hidden empty:hidden">
@@ -322,6 +343,15 @@ function SessionModal({ session, allWorkouts, colorHex, onClose, closeButtonRef,
                 </div>
               );
             })}
+
+            {/* The free-form note from the end of the session (calibration's
+                "Good job" sheet) - the session-level twin of the exercise notes. */}
+            {session.notes && (
+              <div className="flex items-start gap-2.5 rounded-[18px] bg-secondary/60 px-4 py-3">
+                <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" strokeWidth={1.6} />
+                <p className="text-[12.5px] text-muted-foreground leading-relaxed">{session.notes}</p>
+              </div>
+            )}
 
             {/* Delete session - destructive is red text, never a red surface */}
             <div className="pt-4 border-t border-border">

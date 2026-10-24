@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { StartWorkoutMenu } from "@/components/StartWorkoutMenu";
 import { useActiveSession } from "@/hooks/useActiveSession";
 import { startSession } from "@/lib/workoutSession";
-import { isPreCalibrationLocked } from "@/lib/calibration";
+import { calibrationBriefingHref, isCalibrationProgram, isPreCalibrationLocked } from "@/lib/calibration";
 import { formatClock } from "@/lib/sessionDuration";
 
 // Desktop sidebar: every destination.
@@ -375,8 +375,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             onClose={closeStartMenu}
             onPick={(dayNumber) => {
               const program = currentProgramQuery.data!;
-              if (user?.id) startSession(user.id, program.id, dayNumber);
               setStartMenuOpen(false);
+              // Calibration sessions open on the briefing, which starts the
+              // session itself once it has been read.
+              if (isCalibrationProgram(program)) {
+                setLocation(calibrationBriefingHref(dayNumber));
+                return;
+              }
+              if (user?.id) startSession(user.id, program.id, dayNumber);
               // `start=1` carries the press across, exactly as the program
               // page does, so the logger still begins the day if the write
               // above didn't land (see useWorkoutSession).

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, desc, and } from "drizzle-orm";
-import { db, workoutLogsTable, userProfilesTable } from "@workspace/db";
+import { db, workoutLogsTable, userProfilesTable, programsTable } from "@workspace/db";
 import { requireAuth, getUserId } from "../lib/auth";
 import { CreateWorkoutBody, ListWorkoutsQueryParams } from "@workspace/api-zod";
 import { trainingWeekNumber } from "../lib/trainingWeek";
@@ -77,6 +77,24 @@ router.post("/workouts", requireAuth, async (req, res) => {
   // Mode is stamped from the profile at logging time, not the client, so a
   // session's recorded mode reflects what the user was actually in.
   const mode = profile?.mode ?? "ai";
+  // A calibration log has ticked sets with no weight or reps, so it's only
+  // valid while the user is actually in calibration: AI mode, with the latest
+  // AI-lineage program still on the calibration phase (it stays there until a
+  // check-in advances it). Rejected rather than downgraded, so the client can
+  // tell the user instead of silently saving an empty "full" session.
+  if (parsed.data.loggingMode === "calibration") {
+    const program =
+      mode === "ai"
+        ? await db.query.programsTable.findFirst({
+            where: and(eq(programsTable.userId, userId), eq(programsTable.aiGenerated, true)),
+            orderBy: [desc(programsTable.weekNumber), desc(programsTable.generatedAt)],
+          })
+        : undefined;
+    if (program?.shortTermPhase !== "calibration") {
+      res.status(400).json({ error: "Calibration sessions can only be logged during the calibration phase" });
+      return;
+    }
+  }
   const durationSeconds = resolveDurationSeconds(parsed.data.startedAt ?? null, parsed.data.durationSeconds ?? null);
   const [log] = await db
     .insert(workoutLogsTable)
