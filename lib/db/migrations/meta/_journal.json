@@ -22,6 +22,13 @@
       "when": 1792855036676,
       "tag": "0002_calibration_session_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792868223668,
+      "tag": "0003_calibration_review",
+      "breakpoints": true
     }
   ]
 }

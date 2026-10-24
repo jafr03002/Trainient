@@ -5,6 +5,7 @@
  * Trainient AI Gym Coaching API
  * OpenAPI spec version: 0.1.0
  */
+import type { CalibrationSessionFeedback } from './calibrationSessionFeedback';
 import type { LoggedExercise } from './loggedExercise';
 import type { WorkoutLogLoggingMode } from './workoutLogLoggingMode';
 import type { WorkoutLogMode } from './workoutLogMode';
@@ -21,6 +22,7 @@ export interface WorkoutLog {
   mode: WorkoutLogMode;
   /** calibration = a calibration-phase session: sets are ticked off with no weight or reps */
   loggingMode: WorkoutLogLoggingMode;
+  calibrationFeedback?: CalibrationSessionFeedback | null;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;

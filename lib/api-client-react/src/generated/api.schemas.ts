@@ -603,6 +603,54 @@ export const WorkoutLogLoggingMode = {
   calibration: 'calibration',
 } as const;
 
+/**
+ * Did you find and use the machines/equipment?
+ */
+export type CalibrationSessionFeedbackEquipment = typeof CalibrationSessionFeedbackEquipment[keyof typeof CalibrationSessionFeedbackEquipment];
+
+
+export const CalibrationSessionFeedbackEquipment = {
+  yes: 'yes',
+  some_missing: 'some_missing',
+  no: 'no',
+} as const;
+
+export type CalibrationSessionFeedbackPain = typeof CalibrationSessionFeedbackPain[keyof typeof CalibrationSessionFeedbackPain];
+
+
+export const CalibrationSessionFeedbackPain = {
+  none: 'none',
+  discomfort: 'discomfort',
+  pain: 'pain',
+} as const;
+
+/**
+ * Answered on the finish screen of every calibration session.
+ */
+export interface CalibrationSessionFeedback {
+  /** Did you find and use the machines/equipment? */
+  equipment: CalibrationSessionFeedbackEquipment;
+  /**
+     * How confident are you in your form today?
+     * @minimum 1
+     * @maximum 5
+     */
+  formConfidence: number;
+  pain: CalibrationSessionFeedbackPain;
+  /**
+     * Where it hurt - only meaningful when pain isn't none.
+     * @maxLength 200
+     * @nullable
+     */
+  painWhere?: string | null;
+  /**
+     * How did the session feel overall?
+     * @minimum 1
+     * @maximum 5
+     */
+  overallFeel: number;
+}
+
 export interface WorkoutLog {
   id: number;
   userId: string;
@@ -615,6 +663,7 @@ export interface WorkoutLog {
   mode: WorkoutLogMode;
   /** calibration = a calibration-phase session: sets are ticked off with no weight or reps */
   loggingMode: WorkoutLogLoggingMode;
+  calibrationFeedback?: CalibrationSessionFeedback | null;
   exercisesLogged: LoggedExercise[];
   /** @nullable */
   notes?: string | null;
@@ -656,6 +705,7 @@ export interface WorkoutLogInput {
      */
   notes?: string | null;
   loggingMode?: WorkoutLogInputLoggingMode;
+  calibrationFeedback?: CalibrationSessionFeedback | null;
   /** @nullable */
   startedAt?: string | null;
   /**
@@ -834,6 +884,269 @@ export interface CheckinJob {
   createdAt: string;
   /** @nullable */
   completedAt: string | null;
+}
+
+/**
+ * Does it fit your schedule?
+ * @nullable
+ */
+export type CalibrationReviewInputNutritionFitsSchedule = typeof CalibrationReviewInputNutritionFitsSchedule[keyof typeof CalibrationReviewInputNutritionFitsSchedule] | null;
+
+
+export const CalibrationReviewInputNutritionFitsSchedule = {
+  yes: 'yes',
+  mostly: 'mostly',
+  no: 'no',
+} as const;
+
+/**
+ * The review form. The per-session feedback is already known, so the form shows its summary (GET /calibration/status) and asks what has changed. When illOrInjured is true the rest may be left out - calibration pauses and nothing else is evaluated. Otherwise both nutrition answers are required.
+
+ */
+export interface CalibrationReviewInput {
+  /** Are you ill, or injured to the point where you can't train? */
+  illOrInjured: boolean;
+  /**
+     * How sustainable does the nutrition plan feel long term?
+     * @minimum 1
+     * @maximum 5
+     * @nullable
+     */
+  nutritionSustainable?: number | null;
+  /**
+     * Does it fit your schedule?
+     * @nullable
+     */
+  nutritionFitsSchedule?: CalibrationReviewInputNutritionFitsSchedule;
+  /**
+     * Has anything changed since your sessions? (shown under the session summary)
+     * @maxLength 2000
+     * @nullable
+     */
+  anythingChanged?: string | null;
+  /**
+     * Anything else your coach should know?
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+}
+
+export interface CalibrationCheckRotation {
+  met: boolean;
+  logged: number;
+  planned: number;
+  /** Labels of program days not logged in the window. */
+  missingDays: string[];
+}
+
+export interface CalibrationCheckCount {
+  met: boolean;
+  count: number;
+  required: number;
+}
+
+/**
+ * The hard checks, computed by the server over the 7 days ending today. Any one not met forces the verdict to extend.
+ */
+export interface CalibrationChecks {
+  allMet: boolean;
+  windowStart: string;
+  windowEnd: string;
+  fullRotation: CalibrationCheckRotation;
+  weighIns: CalibrationCheckCount;
+  nutritionLogs: CalibrationCheckCount;
+}
+
+export interface CalibrationExerciseNote {
+  exercise: string;
+  note: string;
+}
+
+export interface CalibrationSession {
+  workoutLogId: number;
+  date: string;
+  dayNumber: number;
+  /** @nullable */
+  dayLabel: string | null;
+  /** @nullable */
+  note: string | null;
+  exerciseNotes: CalibrationExerciseNote[];
+  feedback: CalibrationSessionFeedback | null;
+}
+
+export type CalibrationPainReportPain = typeof CalibrationPainReportPain[keyof typeof CalibrationPainReportPain];
+
+
+export const CalibrationPainReportPain = {
+  discomfort: 'discomfort',
+  pain: 'pain',
+} as const;
+
+export interface CalibrationPainReport {
+  date: string;
+  /** @nullable */
+  dayLabel: string | null;
+  pain: CalibrationPainReportPain;
+  /** @nullable */
+  where: string | null;
+}
+
+export interface CalibrationEquipmentCounts {
+  yes: number;
+  some_missing: number;
+  no: number;
+}
+
+/**
+ * The per-session answers rolled up - what the review form shows before asking "anything changed?".
+ */
+export interface CalibrationFeedbackSummary {
+  sessionsLogged: number;
+  sessionsWithFeedback: number;
+  /** @nullable */
+  averageFormConfidence: number | null;
+  /** @nullable */
+  averageOverallFeel: number | null;
+  equipment: CalibrationEquipmentCounts;
+  painReports: CalibrationPainReport[];
+}
+
+export interface CalibrationExerciseSwap {
+  dayNumber: number;
+  /** @nullable */
+  dayLabel: string | null;
+  replaced: string;
+  replacement: Exercise;
+  why: string;
+}
+
+export type CalibrationReviewKind = typeof CalibrationReviewKind[keyof typeof CalibrationReviewKind];
+
+
+export const CalibrationReviewKind = {
+  review: 'review',
+  auto_exit: 'auto_exit',
+} as const;
+
+export type CalibrationReviewVerdict = typeof CalibrationReviewVerdict[keyof typeof CalibrationReviewVerdict];
+
+
+export const CalibrationReviewVerdict = {
+  pass: 'pass',
+  pass_with_notes: 'pass_with_notes',
+  extend: 'extend',
+  paused: 'paused',
+} as const;
+
+export interface CalibrationReview {
+  id: number;
+  programId: number;
+  kind: CalibrationReviewKind;
+  calibrationDay: number;
+  /** @nullable */
+  illOrInjured: boolean | null;
+  /** @nullable */
+  nutritionSustainable: number | null;
+  /** @nullable */
+  nutritionFitsSchedule: string | null;
+  /** @nullable */
+  anythingChanged: string | null;
+  /** @nullable */
+  notes: string | null;
+  checks: CalibrationChecks;
+  verdict: CalibrationReviewVerdict;
+  reasons: string[];
+  /** What to keep working on - in the next phase after a pass, or before retaking after extend. */
+  workOn: string[];
+  /** Swaps applied to the next phase's program (empty unless calibration ended). */
+  exerciseSwaps: CalibrationExerciseSwap[];
+  messageToUser: string;
+  /** @nullable */
+  nextProgramId: number | null;
+  /**
+     * Set on a paused review once the client said they've recovered.
+     * @nullable
+     */
+  resumedAt: string | null;
+  submittedAt: string;
+}
+
+export interface CalibrationReviewResult {
+  review: CalibrationReview;
+  /** The next phase's program when calibration ended, otherwise null. */
+  updatedProgram: Program | null;
+}
+
+export interface CalibrationJob {
+  jobId: string;
+  status: AiJobStatus;
+  result: CalibrationReviewResult | null;
+  /**
+     * User-facing message; set only when status is failed.
+     * @nullable
+     */
+  error: string | null;
+  createdAt: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type CalibrationStatusReviewBlockedReason = typeof CalibrationStatusReviewBlockedReason[keyof typeof CalibrationStatusReviewBlockedReason] | null;
+
+
+export const CalibrationStatusReviewBlockedReason = {
+  not_in_calibration: 'not_in_calibration',
+  not_ai_mode: 'not_ai_mode',
+  too_early: 'too_early',
+  paused: 'paused',
+  retake_tomorrow: 'retake_tomorrow',
+  ended: 'ended',
+} as const;
+
+export interface CalibrationStatus {
+  inCalibration: boolean;
+  /**
+     * Day 1 = start date. 0 or less before the start date.
+     * @nullable
+     */
+  calibrationDay: number | null;
+  /** @nullable */
+  startDate: string | null;
+  /**
+     * Day 8.
+     * @nullable
+     */
+  reviewOpensOn: string | null;
+  /**
+     * Day 21, or later after a pause (7 days after recovering at the earliest).
+     * @nullable
+     */
+  lastReviewDate: string | null;
+  /**
+     * The day after lastReviewDate.
+     * @nullable
+     */
+  autoExitOn: string | null;
+  reviewOpen: boolean;
+  /** @nullable */
+  reviewBlockedReason: CalibrationStatusReviewBlockedReason;
+  /**
+     * When the review opens again (too_early, or retake_tomorrow after an extend).
+     * @nullable
+     */
+  nextReviewAvailableOn: string | null;
+  paused: boolean;
+  /** Past the last review day and not paused - the client should call POST /calibration/exit(/jobs). */
+  autoExitDue: boolean;
+  checks: CalibrationChecks | null;
+  /** Calibration sessions logged since day 1, oldest first. */
+  sessions: CalibrationSession[];
+  feedbackSummary: CalibrationFeedbackSummary | null;
+  latestReview: CalibrationReview | null;
 }
 
 export interface VolumePoint {
