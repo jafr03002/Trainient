@@ -213,6 +213,15 @@
   pointer-events: none;
 }
 
+/* The storm wash drained of colour - grey-white light falling to black. The
+   presentation deck's middle pages use it; the full wash only bookends the deck. */
+.sessions-wash-mono {
+  background:
+    radial-gradient(60% 50% at 50% 22%, rgb(255 255 255 / 0.07), transparent 70%),
+    linear-gradient(180deg, #17181a 0%, #0b0b0c 42%, hsl(var(--background)) 100%);
+  pointer-events: none;
+}
+
 /* A thin grey track with a white thumb (onboarding's training-days slider). */
 .sessions-range {
   -webkit-appearance: none;

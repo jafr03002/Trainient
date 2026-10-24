@@ -57,7 +57,9 @@ inputs from the profile above actually drove that part of the program (e.g. one 
 covering the split choice + why it fits their training-days/experience/injuries, a second
 covering volume/progression choices + any priority-muscle bump). Do not write generic
 filler - each headline should still reference specific choices this program actually makes,
-just fewer, denser headlines instead of many thin ones.
+just fewer, denser headlines instead of many thin ones. Do not mention calibration or the
+calibration phase in the highlights - they explain the program itself (why this split, why
+this frequency, what it focuses on), and the phases are shown to the client elsewhere.
 
 Return ONLY valid JSON (no markdown, no explanation) structured as:
 { "program_name": "...", "split_type": "...",

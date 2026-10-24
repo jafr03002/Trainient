@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   addDays,
   addMonths,
@@ -9,15 +9,15 @@ import {
   isBefore,
   isSameDay,
   isSameMonth,
+  nextMonday,
   startOfMonth,
   startOfToday,
 } from "date-fns";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Program } from "@workspace/api-client-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { phaseSolid } from "@/lib/phaseColors";
+import { LetterDock, LetterWash, PageHead } from "@/components/onboarding/letter";
 
 type Cell = { date: Date | null };
 
@@ -39,6 +39,55 @@ function monthCells(month: Date): Cell[] {
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Most people start today, tomorrow or at the top of next week, so those are
+// one tap. "Another day" opens the month grid for the rest of the 30-day window.
+function quickPicks(today: Date) {
+  const picks = [
+    { key: "today", title: "Today", date: today },
+    { key: "tomorrow", title: "Tomorrow", date: addDays(today, 1) },
+  ];
+  const monday = nextMonday(today);
+  if (!picks.some((p) => isSameDay(p.date, monday))) {
+    picks.push({ key: "monday", title: "Monday", date: monday });
+  }
+  return picks;
+}
+
+function OptionCard({
+  selected,
+  title,
+  subtitle,
+  onClick,
+  trailing,
+  testId,
+}: {
+  selected: boolean;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+  trailing?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-3xl px-5 py-4 text-left transition-colors",
+        selected ? "bg-white text-black" : "bg-card text-foreground",
+      )}
+      data-testid={testId}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-normal">{title}</span>
+        <span className={cn("mt-0.5 block text-[12.5px]", selected ? "text-black/60" : "text-muted-foreground")}>{subtitle}</span>
+      </span>
+      {selected ? <Check className="h-4 w-4 shrink-0" strokeWidth={2} /> : trailing}
+    </button>
+  );
+}
+
 export function CommitmentScreen({
   program,
   onConfirm,
@@ -50,162 +99,128 @@ export function CommitmentScreen({
   const rangeEnd = useMemo(() => addDays(today, 30), [today]);
   const firstMonth = useMemo(() => startOfMonth(today), [today]);
   const lastMonth = useMemo(() => startOfMonth(rangeEnd), [rangeEnd]);
+  const picks = useMemo(() => quickPicks(today), [today]);
 
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [pickingOther, setPickingOther] = useState(false);
   const [viewMonth, setViewMonth] = useState<Date>(firstMonth);
 
   const firstSession = program.days[0];
   const isToday = isSameDay(selectedDate, today);
+  const isQuickPick = picks.some((p) => isSameDay(p.date, selectedDate));
   const cells = useMemo(() => monthCells(viewMonth), [viewMonth]);
   const canGoPrev = !isSameMonth(viewMonth, firstMonth);
   const canGoNext = !isSameMonth(viewMonth, lastMonth);
 
   return (
-    <div className="w-full max-w-lg mx-auto" data-testid="commitment-screen">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-        <div
-          className="text-[11px] tracking-[0.14em] uppercase mb-2"
-          style={{ color: phaseSolid("calibration") }}
-        >
-          Starting phase
-        </div>
-        <h1 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-6">Time to put in the work</h1>
-      </motion.div>
+    <div className="relative min-h-page w-full bg-background text-foreground" data-testid="commitment-screen">
+      <LetterWash bookend={false} />
 
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="px-5 py-4 rounded-3xl bg-card mb-2.5"
+        className="relative mx-auto max-w-lg px-6 pb-44 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))]"
       >
-        <div className="flex items-start gap-2.5">
-          <svg
-            className="w-4 h-4 shrink-0 mt-0.5"
-            style={{ color: phaseSolid("calibration") }}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 6v6l4 2" />
-          </svg>
-          <div>
-            <h3 className="text-[15px] font-normal text-foreground">Calibration phase</h3>
-            <p className="text-[12.5px] leading-relaxed text-muted-foreground mt-0.5">
-              First, the calibration phase — taking it slow while we dial in your training and see how you respond. Everything after builds from what we learn here.
-            </p>
-          </div>
-        </div>
-      </motion.div>
+        <PageHead title="Start day">
+          {firstSession ? (
+            <>Your first session is <b>{firstSession.label}</b>, <b>{firstSession.focus.toLowerCase()}</b>.</>
+          ) : (
+            <>Pick the day you <b>start training</b>.</>
+          )}
+        </PageHead>
 
-      {firstSession && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="px-5 py-4 rounded-3xl bg-card mb-8"
-        >
-          <div className="flex items-start gap-2.5">
-            <Dumbbell className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" strokeWidth={1.6} />
-            <div>
-              <h3 className="text-[15px] font-normal text-foreground">Your first session</h3>
-              <p className="text-[12.5px] text-muted-foreground mt-0.5">
-                {firstSession.label}: {firstSession.focus}
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <h2 className="text-[21px] font-light tracking-[-0.01em] text-foreground mb-1">When do you want to start?</h2>
-        <p className="text-[12.5px] text-muted-foreground mb-4">Tap a day below to set your start date.</p>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="p-4 rounded-[26px] bg-card mb-2"
-      >
-        <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-[15px] font-normal text-foreground">{format(viewMonth, "MMMM yyyy")}</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={!canGoPrev}
-              onClick={() => setViewMonth((m) => addMonths(m, -1))}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              disabled={!canGoNext}
-              onClick={() => setViewMonth((m) => addMonths(m, 1))}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Next month"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1 mb-1">
-          {WEEKDAYS.map((d) => (
-            <div key={d} className="text-center text-[11px] font-medium text-muted-foreground/70 uppercase py-1">
-              {d}
-            </div>
+        <div className="mt-7 space-y-2.5">
+          {picks.map((p) => (
+            <OptionCard
+              key={p.key}
+              selected={isSameDay(selectedDate, p.date)}
+              title={p.title}
+              subtitle={p.key === "monday" ? `${format(p.date, "d MMM")} · the start of a fresh week` : format(p.date, "EEEE d MMM")}
+              onClick={() => { setSelectedDate(p.date); setPickingOther(false); }}
+              testId={`start-${p.key}`}
+            />
           ))}
+          <OptionCard
+            selected={!isQuickPick}
+            title="Another day"
+            subtitle={isQuickPick ? "Up to 30 days out" : format(selectedDate, "EEEE d MMM")}
+            onClick={() => setPickingOther((o) => !o)}
+            trailing={<ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", pickingOther && "rotate-90")} />}
+            testId="start-other"
+          />
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {cells.map(({ date }, i) => {
-            if (!date) return <div key={i} />;
+        {pickingOther && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[17px] font-light">{format(viewMonth, "MMMM yyyy")}</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={!canGoPrev}
+                  onClick={() => setViewMonth((m) => addMonths(m, -1))}
+                  className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={!canGoNext}
+                  onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                  className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-            const disabled = isBefore(date, today) || isAfter(date, rangeEnd);
-            const selected = isSameDay(date, selectedDate);
-            const isTodayCell = isSameDay(date, today);
-
-            return (
-              <button
-                key={i}
-                type="button"
-                disabled={disabled}
-                onClick={() => setSelectedDate(date)}
-                className={cn(
-                  "min-h-13 rounded-2xl text-sm flex flex-col items-center justify-center gap-0.5 transition-colors",
-                  disabled && "text-muted-foreground/30 cursor-not-allowed",
-                  !disabled && selected && "bg-white text-black font-medium",
-                  !disabled && !selected && isTodayCell && "ring-1 ring-white text-foreground",
-                  !disabled && !selected && !isTodayCell && "bg-secondary text-foreground hover:bg-accent",
-                )}
-              >
-                <span className="leading-none">{getDate(date)}</span>
-                {isTodayCell && (
-                  <span className="text-[8px] font-semibold uppercase leading-none opacity-70">today</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+            <div className="grid grid-cols-7 gap-y-1">
+              {WEEKDAYS.map((d) => (
+                <div key={d} className="pb-1 text-center text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
+                  {d}
+                </div>
+              ))}
+              {cells.map(({ date }, i) => {
+                if (!date) return <div key={i} />;
+                const disabled = isBefore(date, today) || isAfter(date, rangeEnd);
+                const selected = isSameDay(date, selectedDate);
+                const isTodayCell = isSameDay(date, today);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setSelectedDate(date)}
+                    aria-pressed={selected}
+                    aria-label={format(date, "EEEE d MMMM")}
+                    className="flex flex-col items-center gap-1 py-0.5 disabled:cursor-not-allowed"
+                  >
+                    <span
+                      className={cn(
+                        "grid h-10 w-10 place-items-center rounded-full text-[15px] font-light transition-colors",
+                        disabled && "text-muted-foreground/30",
+                        !disabled && selected && "bg-white font-normal text-black",
+                        !disabled && !selected && "text-foreground hover:bg-secondary",
+                      )}
+                    >
+                      {getDate(date)}
+                    </span>
+                    <span className={cn("h-1 w-1 rounded-full", isTodayCell ? "bg-white" : "bg-transparent")} />
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
-      <p className="text-[12.5px] text-muted-foreground text-center mb-6">
-        Any highlighted day is fair game — up to 30 days out.
-      </p>
-
-      <Button
-        className="w-full h-[52px] text-sm font-semibold uppercase tracking-[0.06em]"
-        onClick={() => onConfirm(selectedDate)}
-        data-testid="button-commitment-confirm"
-      >
-        {isToday ? "Start today" : `Start on ${format(selectedDate, "EEE, MMM d")}`}
-      </Button>
+      <LetterDock
+        label={isToday ? "Start today" : `Start ${format(selectedDate, "EEE d MMM")}`}
+        onNext={() => onConfirm(selectedDate)}
+        nextTestId="button-commitment-confirm"
+      />
     </div>
   );
 }

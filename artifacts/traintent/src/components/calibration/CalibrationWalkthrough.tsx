@@ -1,24 +1,31 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Dumbbell, MapPin, Target } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Dumbbell, Flag, MapPin, Target } from "lucide-react";
 import { useUpdateProfile, getGetProfileQueryKey } from "@workspace/api-client-react";
-import { CalibrationReviewStep } from "@/components/calibration/CalibrationReviewStep";
+import { addDays } from "@/lib/calibration";
+import { LetterDock, LetterWash, PageDots, PageHead } from "@/components/onboarding/letter";
 
-// Source copy: docs/mammanotes.txt, "Calibration step 1" - tightened here, same
-// icon-card treatment as ProgramHighlights.tsx for visual consistency with the
-// rest of the deck.
+// Source copy: docs/mammanotes.txt, "Calibration step 1" - tightened here.
 const INTRO_FOCUS_ITEMS = [
   { icon: Dumbbell, title: "Try the program", detail: "Run through your sessions and get a feel for the plan." },
   { icon: MapPin, title: "Learn your gym", detail: "Find where every exercise lives and get comfortable with the equipment." },
-  { icon: Target, title: "Standardize your form", detail: "Settle into consistent technique you can build on." },
+  { icon: Target, title: "Standardise your form", detail: "Settle into consistent technique you can build on." },
 ] as const;
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// A review can be requested from the day after the first week (the day-8 rule
+// in lib/calibration.ts); it happens on its own later if they never ask. The window
+// can run longer, but calibration is presented as about a week, so neither the
+// cap nor a week count is shown.
+const REVIEW_FROM_DAY = 8;
 
 // Shown once, full-screen, the first time a client is living in an active
 // calibration window (see lib/calibration.ts's shouldShowCalibrationWalkthrough).
-// Visually mirrors PresentationDeck.tsx's deck chrome (progress dots, h-11
-// rounded-xl nav buttons) but is a standalone flow, not a deck card - it shows
-// later in the client's lifecycle, not right after program generation.
+// It's the last stop before the navigation tour and speaks in the same "coach's
+// letter" voice as the presentation deck: the only place calibration is
+// explained.
 export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart: Date }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -26,11 +33,12 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
   const [step, setStep] = useState(0);
 
   const steps = ["intro", "review"] as const;
-  const total = steps.length;
-  const isLast = step === total - 1;
+  const isLast = step === steps.length - 1;
 
   const todayMidnight = new Date();
   todayMidnight.setHours(0, 0, 0, 0);
+  const todayDayNumber = Math.round((todayMidnight.getTime() - calibrationStart.getTime()) / 86_400_000) + 1;
+  const reviewDate = addDays(calibrationStart, REVIEW_FROM_DAY - 1);
 
   async function finish() {
     await updateProfile.mutateAsync({ data: { calibrationWalkthroughSeenAt: new Date().toISOString() } });
@@ -39,81 +47,109 @@ export function CalibrationWalkthrough({ calibrationStart }: { calibrationStart:
   }
 
   return (
-    <div className="min-h-page flex items-center justify-center p-6">
-      <div className="w-full max-w-lg">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-1.5">
-            {steps.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${i === step ? "w-6 bg-white" : "w-1.5 bg-secondary"}`}
-              />
-            ))}
-          </div>
-          <span className="text-[11px] text-muted-foreground tracking-[0.14em] uppercase">
-            {step + 1} / {total}
-          </span>
-        </div>
+    <div className="relative min-h-page w-full bg-background text-foreground">
+      <LetterWash bookend />
 
-        <div className="space-y-5">
-          {steps[step] === "intro" && (
-            <>
-              <div className="text-[11px] tracking-[0.14em] uppercase text-[hsl(var(--sessions-cyan))]">Calibration</div>
-              <div>
-                <h2 className="text-[34px] font-light leading-[1.08] tracking-[-0.025em] text-foreground mb-2.5">Welcome to calibration</h2>
-                <p className="text-[13.5px] text-muted-foreground leading-relaxed">
-                  This is your smooth on-ramp into training. Over this first phase you'll try the
-                  program, get to know your gym, and lock in solid form on each exercise.
-                </p>
-              </div>
+      <div className="relative mx-auto flex max-w-lg justify-end px-6 pt-[max(1rem,env(safe-area-inset-top))]">
+        <PageDots count={steps.length} index={step} />
+      </div>
 
-              <div className="space-y-2.5">
-                {INTRO_FOCUS_ITEMS.map((item) => (
-                  <div key={item.title} className="px-5 py-4 rounded-3xl bg-card">
-                    <div className="flex items-start gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-secondary">
-                        <item.icon className="w-4 h-4" strokeWidth={1.6} />
+      <div className="relative mx-auto max-w-lg px-6 pb-44 pt-7">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={steps[step]}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.22 }}
+          >
+            {steps[step] === "intro" && (
+              <>
+                <PageHead title="Calibration">
+                  Your first week is about <b>learning the program</b>, not lifting heavy.
+                </PageHead>
+                <div className="mt-7">
+                  {INTRO_FOCUS_ITEMS.map((item) => (
+                    <div key={item.title} className="flex items-start gap-3.5 border-b border-border py-4 last:border-b-0">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-card">
+                        <item.icon className="h-[18px] w-[18px]" strokeWidth={1.6} />
                       </span>
                       <div className="min-w-0">
-                        <h3 className="text-[15px] font-normal text-foreground">{item.title}</h3>
-                        <p className="text-[12.5px] text-muted-foreground mt-0.5 leading-relaxed">{item.detail}</p>
+                        <h3 className="text-[16px] font-normal text-foreground">{item.title}</h3>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.detail}</p>
                       </div>
                     </div>
+                  ))}
+                </div>
+                <p className="mt-5 text-[13px] leading-relaxed text-muted-foreground">
+                  Everything you notice feeds back to your coach, who fine-tunes your program from it.
+                </p>
+              </>
+            )}
+
+            {steps[step] === "review" && (
+              <>
+                <PageHead title="Your review">
+                  After <b>your first week</b>, ask for your review <b>whenever you're ready</b>.
+                </PageHead>
+
+                <div className="mt-8 flex items-start gap-1.5" data-testid="calibration-week">
+                  {Array.from({ length: REVIEW_FROM_DAY - 1 }, (_, i) => {
+                    const dayNumber = i + 1;
+                    const date = addDays(calibrationStart, i);
+                    const isToday = dayNumber === todayDayNumber;
+                    const past = dayNumber < todayDayNumber;
+                    return (
+                      <div key={dayNumber} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">{WEEKDAY_SHORT[date.getDay()]}</span>
+                        <span
+                          className={`grid aspect-square w-full max-w-10 place-items-center rounded-full text-[13px] ${
+                            isToday ? "bg-white font-medium text-black" : past ? "bg-card text-muted-foreground" : "bg-card text-foreground"
+                          }`}
+                        >
+                          {date.getDate()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                    <span className="text-[10px] uppercase tracking-[0.06em] text-[hsl(var(--sessions-cyan))]">Review</span>
+                    <span className="grid aspect-square w-full max-w-10 place-items-center rounded-full border-[1.5px] border-white">
+                      <Flag className="h-3.5 w-3.5" strokeWidth={2} />
+                    </span>
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <p className="text-[12.5px] text-muted-foreground leading-relaxed">
-                Everything you notice feeds back to your AI coach, who fine-tunes your program
-                before you move toward your goal.
-              </p>
-            </>
-          )}
+                <div className="mt-6 space-y-0">
+                  <div className="flex items-baseline justify-between gap-3 border-b border-border py-3.5">
+                    <span className="text-[15px] text-foreground">Ask for your review</span>
+                    <span className="whitespace-nowrap text-[14px] text-muted-foreground">
+                      from {WEEKDAY_SHORT[reviewDate.getDay()]} {reviewDate.getDate()}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 py-3.5">
+                    <span className="text-[15px] text-foreground">If you don't ask</span>
+                    <span className="whitespace-nowrap text-[14px] text-muted-foreground">it happens on its own</span>
+                  </div>
+                </div>
 
-          {steps[step] === "review" && (
-            <CalibrationReviewStep calibrationStart={calibrationStart} today={todayMidnight} />
-          )}
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            disabled={step === 0}
-            className="flex-1 h-[52px] rounded-full border border-foreground/90 text-sm font-medium uppercase tracking-[0.06em] text-foreground hover:bg-secondary transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
-            data-testid="calibration-walkthrough-back"
-          >
-            <ChevronLeft className="w-4 h-4" /> Back
-          </button>
-          <button
-            onClick={() => (isLast ? finish() : setStep((s) => Math.min(total - 1, s + 1)))}
-            disabled={updateProfile.isPending}
-            className="flex-1 h-[52px] rounded-full bg-primary text-primary-foreground text-sm font-semibold uppercase tracking-[0.06em] hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
-            data-testid="calibration-walkthrough-next"
-          >
-            Next <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+                <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
+                  Your coach looks back at the week, then sets your real targets for what comes next.
+                </p>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      <LetterDock
+        label={isLast ? "Show me around" : "Next"}
+        onNext={() => (isLast ? finish() : setStep((s) => Math.min(steps.length - 1, s + 1)))}
+        onBack={step > 0 ? () => setStep((s) => Math.max(0, s - 1)) : undefined}
+        disabled={updateProfile.isPending}
+        nextTestId="calibration-walkthrough-next"
+        backTestId="calibration-walkthrough-back"
+      />
     </div>
   );
 }

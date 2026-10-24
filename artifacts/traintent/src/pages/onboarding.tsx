@@ -522,30 +522,24 @@ export default function Onboarding() {
 
   if (phase === "presentation" && program) {
     return (
-      <div className="min-h-page bg-background text-foreground flex flex-col">
-        <div className="flex-1 flex flex-col items-center p-6 py-12">
-          <PresentationDeck
-            program={program}
-            goal={form.goal}
-            weightUnit={form.weightUnit}
-            onSatisfied={() => setPhase("commitment")}
-            onSubmitFeedback={handleRegenerateFeedback}
-            isSubmitting={generateProgram.isPending}
-            showRegenerateNudge={regenerateCount >= 3}
-            error={generateProgram.isError || updateProfile.isError}
-          />
-        </div>
-      </div>
+      <PresentationDeck
+        program={program}
+        goal={form.goal}
+        weightUnit={form.weightUnit}
+        name={form.name.trim() || undefined}
+        priorityMuscles={form.priorityMuscles}
+        onSatisfied={() => setPhase("commitment")}
+        onSubmitFeedback={handleRegenerateFeedback}
+        isSubmitting={generateProgram.isPending}
+        showRegenerateNudge={regenerateCount >= 3}
+        error={generateProgram.isError || updateProfile.isError}
+      />
     );
   }
 
   if (phase === "commitment" && program) {
     return (
-      <div className="min-h-page bg-background text-foreground flex flex-col">
-        <div className="flex-1 flex flex-col items-center p-6 py-12">
-          <CommitmentScreen program={program} onConfirm={handleCommit} />
-        </div>
-      </div>
+      <CommitmentScreen program={program} onConfirm={handleCommit} />
     );
   }
 
